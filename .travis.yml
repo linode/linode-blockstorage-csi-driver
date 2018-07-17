@@ -1,0 +1,28 @@
+sudo: required
+
+services:
+  - docker
+
+language: go
+
+go:
+  - 1.10.x
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+before_install:
+  - make vendor
+  - go get github.com/mattn/goveralls
+  - go get github.com/lawrencewoodman/roveralls
+  - go get github.com/alecthomas/gometalinter
+
+install:
+  - gometalinter --install
+
+script:
+  - make
+  - travis_wait 20 roveralls
+  - goveralls -coverprofile=roveralls.coverprofile -service=travis-ci
