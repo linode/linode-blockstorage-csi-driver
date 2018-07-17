@@ -42,7 +42,7 @@ func TestDriverSuite(t *testing.T) {
 	driver := &Driver{
 		endpoint:     endpoint,
 		nodeId:       "987654",
-		region:       "nyc3",
+		region:       "us-east",
 		linodeClient: linodeClient,
 		mounter:      &fakeMounter{},
 		log:          logrus.New().WithField("test_enabed", true),
