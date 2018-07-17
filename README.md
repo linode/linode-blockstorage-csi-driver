@@ -16,7 +16,7 @@ Cloud Foundry. Feel free to test it on other CO's and give us a feedback.
 
 ### 1. Create a secret with your Linode API Access Token:
 
-Replace the placeholder string starting with `a05...` with your own secret and
+Replace the placeholder string starting with `deadbeef..` with your own secret and
 save it as `secret.yml`: 
 
 ```yaml
