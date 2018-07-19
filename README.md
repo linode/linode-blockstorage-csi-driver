@@ -10,14 +10,14 @@ Cloud Foundry. Feel free to test it on other CO's and give us a feedback.
 
 **Requirements:**
 
-* Kubernetes v1.10 minimum
-* `--allow-privileged` flag must be set to true for both the API server and the kubelet
-* (if you use Docker) the Docker daemon of the cluster nodes must allow shared mounts
+- Kubernetes v1.10 minimum
+- `--allow-privileged` flag must be set to true for both the API server and the kubelet
+- (if you use Docker) the Docker daemon of the cluster nodes must allow shared mounts
 
 ### 1. Create a secret with your Linode API Access Token:
 
 Replace the placeholder string starting with `deadbeef..` with your own secret and
-save it as `secret.yml`: 
+save it as `secret.yml`:
 
 ```yaml
 apiVersion: v1
@@ -61,8 +61,8 @@ provisioning. If you're using multiple storage classes you might want to remove
 the annotation from the `csi-storageclass.yaml` and re-deploy it. This is
 based on the [recommended mechanism](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md#recommended-mechanism-for-deploying-csi-drivers-on-kubernetes) of deploying CSI drivers on Kubernetes
 
-*Note that the deployment proposal to Kubernetes is still a work in progress and not all of the written
-features are implemented. When in doubt, open an issue or ask #sig-storage in [Kubernetes Slack](http://slack.k8s.io)*
+_Note that the deployment proposal to Kubernetes is still a work in progress and not all of the written
+features are implemented. When in doubt, open an issue or ask #sig-storage in [Kubernetes Slack](http://slack.k8s.io)_
 
 #### 3. Test and verify
 
@@ -124,6 +124,13 @@ hello-world
 
 At Linode we value and love our community! If you have any issues or
 would like to contribute, feel free to open an issue/PR
+
+### Devlopment
+
+    dep ensure # the vendor folder is ignored
+    # TODO document tests
+    cd cmd/linode-csi-plugin
+    make
 
 ## Discussion / Help
 

@@ -26,7 +26,7 @@ package driver
 
 import (
 	"context"
-	"path/filepath"
+	"strconv"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
@@ -57,12 +57,17 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
 
-	vol, _, err := d.linodeClient.Storage.GetVolume(ctx, req.VolumeId)
+	volumeID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
 		return nil, err
 	}
 
-	source := getDiskSource(vol.Name)
+	vol, err := d.linodeClient.GetVolume(volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	source := vol.FilesystemPath
 	target := req.StagingTargetPath
 
 	mnt := req.VolumeCapability.GetMount()
@@ -75,7 +80,7 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 
 	ll := d.log.WithFields(logrus.Fields{
 		"volume_id":           req.VolumeId,
-		"volume_name":         vol.Name,
+		"volume_name":         vol.Label,
 		"staging_target_path": req.StagingTargetPath,
 		"source":              source,
 		"fsType":              fsType,
@@ -260,7 +265,7 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 func (d *Driver) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
 	d.log.WithField("method", "node_get_id").Info("node get id called")
 	return &csi.NodeGetIdResponse{
-		NodeId: d.nodeId,
+		NodeId: d.nodeID,
 	}, nil
 }
 
@@ -284,10 +289,4 @@ func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabi
 			nscap,
 		},
 	}, nil
-}
-
-// getDiskSource returns the absolute path of the attached volume for the given
-// DO volume name
-func getDiskSource(volumeName string) string {
-	return filepath.Join(diskIDPath, diskDevPrefix+volumeName)
 }
