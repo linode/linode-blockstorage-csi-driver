@@ -52,7 +52,7 @@ func TestDriverSuite(t *testing.T) {
 	ts := httptest.NewServer(fake)
 	defer ts.Close()
 
-	linodeClient := linodego.NewClient(nil, nil)
+	linodeClient := linodego.NewClient(nil)
 	// url, _ := url.Parse(ts.URL)
 	// linodeClient.BaseURL = url
 
