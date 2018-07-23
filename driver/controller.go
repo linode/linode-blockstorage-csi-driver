@@ -18,13 +18,13 @@ package driver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/chiefy/linodego"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -40,9 +40,8 @@ const (
 )
 
 const (
-	defaultVolumeSizeInGB = 16 * GB
-
-	createdByDO = "Created by Linode CSI driver"
+	// Linode minimum
+	defaultVolumeSizeInGB = 10 * GB
 )
 
 // CreateVolume creates a new volume from the given request. The function is
@@ -51,6 +50,8 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume Name must be provided")
 	}
+
+	// TODO check volume min (10GB) and max size (10TB)
 
 	if req.VolumeCapabilities == nil || len(req.VolumeCapabilities) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume Volume capabilities must be provided")
@@ -70,11 +71,12 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	})
 	ll.Info("create volume called")
 
-	// get volume first, if it's created do no thing
-	volumes, _, err := d.linodeClient.Storage.ListVolumes(ctx, &linodego.ListVolumeParams{
-		Region: d.region,
-		Name:   volumeName,
-	})
+	jsonFilter, err := json.Marshal(map[string]string{"label": volumeName})
+	if err != nil {
+		return nil, err
+	}
+
+	volumes, err := d.linodeClient.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -86,30 +88,23 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		}
 		vol := volumes[0]
 
-		// check if it was created by the CSI driver
-		if vol.Description != createdByDO {
-			return nil, fmt.Errorf("fatal issue: volume %q (%s) was not created by CSI",
-				vol.Name, vol.Description)
-		}
-
-		if vol.SizeGigaBytes*GB != size {
+		if int64(vol.Size) != size {
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
 		}
 
 		ll.Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				Id:            vol.ID,
-				CapacityBytes: vol.SizeGigaBytes * GB,
+				Id:            strconv.Itoa(vol.ID),
+				CapacityBytes: int64(vol.Size),
 			},
 		}, nil
 	}
 
-	volumeReq := &linodego.VolumeCreateRequest{
-		Region:        d.region,
-		Name:          volumeName,
-		Description:   createdByDO,
-		SizeGigaBytes: size / GB,
+	volumeReq := linodego.VolumeCreateOptions{
+		Region: d.region,
+		Label:  volumeName,
+		Size:   int(size / GB),
 	}
 
 	ll.WithField("volume_req", volumeReq).Info("creating volume")
@@ -118,14 +113,18 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	// future, if we support more modes, we need to make sure to create a
 	// volume that aligns with the incoming capability. We need to make sure to
 	// test req.VolumeCapabilities
-	vol, _, err := d.linodeClient.Storage.CreateVolume(ctx, volumeReq)
+	vol, err := d.linodeClient.CreateVolume(ctx, volumeReq)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	if err := d.waitAction(ctx, vol.ID, "active"); err != nil {
+		return nil, err
+	}
+
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			Id:            vol.ID,
+			Id:            strconv.Itoa(vol.ID),
 			CapacityBytes: size,
 		},
 	}
@@ -146,16 +145,17 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 	})
 	ll.Info("delete volume called")
 
-	resp, err := d.linodeClient.Storage.DeleteVolume(ctx, req.VolumeId)
+	volumeID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			// we assume it's deleted already for idempotency
-			return &csi.DeleteVolumeResponse{}, nil
-		}
 		return nil, err
 	}
 
-	ll.WithField("response", resp).Info("volume is deleted")
+	err = d.linodeClient.DeleteVolume(ctx, volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	ll.Info("volume is deleted")
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -186,24 +186,19 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 	})
 	ll.Info("controller publish volume called")
 
-	action, resp, err := d.linodeClient.StorageActions.Attach(ctx, req.VolumeId, linodeID)
+	volumeID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
-		// don't do anything if attached
-		if (resp != nil && resp.StatusCode == http.StatusUnprocessableEntity) || strings.Contains(err.Error(), "This volume is already attached") {
-			ll.WithFields(logrus.Fields{
-				"error": err,
-				"resp":  resp,
-			}).Warn("assuming volume is attached already")
-			return &csi.ControllerPublishVolumeResponse{}, nil
-		}
 		return nil, err
 	}
 
-	if action != nil {
-		ll.Info("waiting until volume is attached")
-		if err := d.waitAction(ctx, req.VolumeId, action.ID); err != nil {
-			return nil, err
-		}
+	success, err := d.linodeClient.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+		LinodeID: linodeID,
+		ConfigID: 0,
+		// TODO: config profile?
+	})
+
+	if success == false {
+		return nil, fmt.Errorf("failed to attach volume")
 	}
 
 	ll.Info("volume is attached")
@@ -221,6 +216,11 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 		return nil, fmt.Errorf("malformed nodeId %q detected: %s", req.NodeId, err)
 	}
 
+	volumeID, err := strconv.Atoi(req.VolumeId)
+	if err != nil {
+		return nil, err
+	}
+
 	ll := d.log.WithFields(logrus.Fields{
 		"volume_id": req.VolumeId,
 		"node_id":   req.NodeId,
@@ -229,23 +229,10 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 	})
 	ll.Info("controller unpublish volume called")
 
-	action, resp, err := d.linodeClient.StorageActions.DetachByLinodeID(ctx, req.VolumeId, linodeID)
-	if err != nil {
-		if (resp != nil && resp.StatusCode == http.StatusUnprocessableEntity) || strings.Contains(err.Error(), "Attachment not found") {
-			ll.WithFields(logrus.Fields{
-				"error": err,
-				"resp":  resp,
-			}).Warn("assuming volume is detached already")
-			return &csi.ControllerUnpublishVolumeResponse{}, nil
-		}
-		return nil, err
-	}
+	success, err := d.linodeClient.DetachVolume(ctx, volumeID)
 
-	if action != nil {
-		ll.Info("waiting until volume is detached")
-		if err := d.waitAction(ctx, req.VolumeId, action.ID); err != nil {
-			return nil, err
-		}
+	if success == false {
+		return nil, fmt.Errorf("failed to detach volume")
 	}
 
 	ll.Info("volume is detached")
@@ -310,22 +297,9 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 
 // ListVolumes returns a list of all requested volumes
 func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	var page int
-	var err error
-	if req.StartingToken != "" {
-		page, err = strconv.Atoi(req.StartingToken)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// TODO implement max entries and pagination
 
-	listOpts := &linodego.ListVolumeParams{
-		ListOptions: &linodego.ListOptions{
-			PerPage: int(req.MaxEntries),
-			Page:    page,
-		},
-		Region: d.region,
-	}
+	listOpts := linodego.NewListOptions(0, "")
 
 	ll := d.log.WithFields(logrus.Fields{
 		"list_opts":          listOpts,
@@ -334,50 +308,24 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 	})
 	ll.Info("list volumes called")
 
-	var volumes []linodego.Volume
-	lastPage := 0
-	for {
-		vols, resp, err := d.linodeClient.Storage.ListVolumes(ctx, listOpts)
-		if err != nil {
-			return nil, err
-		}
+	volumes, err := d.linodeClient.ListVolumes(ctx, listOpts)
 
-		volumes = append(volumes, vols...)
-
-		if resp.Links == nil || resp.Links.IsLastPage() {
-			if resp.Links != nil {
-				page, err := resp.Links.CurrentPage()
-				if err != nil {
-					return nil, err
-				}
-				// save this for the response
-				lastPage = page
-			}
-			break
-		}
-
-		page, err := resp.Links.CurrentPage()
-		if err != nil {
-			return nil, err
-		}
-
-		listOpts.ListOptions.Page = page + 1
+	if err != nil {
+		return nil, err
 	}
 
 	var entries []*csi.ListVolumesResponse_Entry
 	for _, vol := range volumes {
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
-				Id:            vol.ID,
-				CapacityBytes: vol.SizeGigaBytes * GB,
+				Id:            strconv.Itoa(vol.ID),
+				CapacityBytes: int64(vol.Size * GB),
 			},
 		})
 	}
 
-	// TODO(arslan): check that the NextToken logic works fine, might be racy
 	resp := &csi.ListVolumesResponse{
-		Entries:   entries,
-		NextToken: strconv.Itoa(lastPage),
+		Entries: entries,
 	}
 
 	ll.WithField("response", resp).Info("volumes listed")
@@ -455,38 +403,34 @@ func extractStorage(capRange *csi.CapacityRange) (int64, error) {
 }
 
 // waitAction waits until the given action for the volume is completed
-func (d *Driver) waitAction(ctx context.Context, volumeId string, actionId int) error {
+func (d *Driver) waitAction(ctx context.Context, volumeID int, status linodego.VolumeStatus) error {
 	ll := d.log.WithFields(logrus.Fields{
-		"volume_id": volumeId,
-		"action_id": actionId,
+		"volume_id":     volumeID,
+		"volume_status": status,
 	})
 
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	// TODO(arslan): use backoff in the future
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			action, _, err := d.linodeClient.StorageActions.Get(ctx, volumeId, actionId)
+			volume, err := d.linodeClient.GetVolume(ctx, volumeID)
 			if err != nil {
 				ll.WithError(err).Info("waiting for volume errored")
 				continue
 			}
-			ll.WithField("action_status", action.Status).Info("action received")
 
-			if action.Status == linodego.ActionCompleted {
+			if volume.Status == status {
 				ll.Info("action completed")
 				return nil
 			}
 
-			if action.Status == linodego.ActionInProgress {
-				continue
-			}
+			// TODO: retry x times?
 		case <-ctx.Done():
-			return fmt.Errorf("timeout occured waiting for storage action of volume: %q", volumeId)
+			return fmt.Errorf("timeout occured waiting for storage action of volume: %q", volumeID)
 		}
 	}
 }

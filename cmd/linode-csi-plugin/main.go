@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 
 	"github.com/displague/csi-linode/driver"
 )
@@ -28,10 +29,12 @@ func main() {
 		endpoint = flag.String("endpoint", "unix:///var/lib/kubelet/plugins/com.linode.csi.linodebs/csi.sock", "CSI endpoint")
 		token    = flag.String("token", "", "Linode access token")
 		url      = flag.String("url", "https://api.linode.com/", "Linode API URL")
+		region   = flag.String("region", "", "Linode Region")
+		host     = flag.String("host", hostname(), "Linode Hostname")
 	)
 	flag.Parse()
 
-	drv, err := driver.NewDriver(*endpoint, *token, *url)
+	drv, err := driver.NewDriver(*endpoint, *token, *url, *region, *host)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -39,4 +42,9 @@ func main() {
 	if err := drv.Run(); err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func hostname() string {
+	h, _ := os.Hostname()
+	return h
 }

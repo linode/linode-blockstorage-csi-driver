@@ -18,8 +18,10 @@ package driver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -28,7 +30,6 @@ import (
 
 	"github.com/chiefy/linodego"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	metadata "github.com/digitalocean/go-metadata"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -47,7 +48,7 @@ const (
 //
 type Driver struct {
 	endpoint string
-	nodeId   string
+	nodeID   string
 	region   string
 
 	srv          *grpc.Server
@@ -59,37 +60,37 @@ type Driver struct {
 // NewDriver returns a CSI plugin that contains the necessary gRPC
 // interfaces to interact with Kubernetes over unix domain sockets for
 // managaing Linode Block Storage
-func NewDriver(ep, token, url string) (*Driver, error) {
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: token,
-	})
-	oauthClient := oauth2.NewClient(context.Background(), tokenSource)
+func NewDriver(ep, token, url string, region string, host string) (*Driver, error) {
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 
-	all, err := metadata.NewClient().Metadata()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get metadata: %s", err)
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
 	}
 
-	region := all.Region
-	nodeId := strconv.Itoa(all.LinodeID)
+	linodeClient := linodego.NewClient(oauth2Client)
 
-	opts := []linodego.ClientOpt{}
-	opts = append(opts, linodego.SetBaseURL(url))
+	// TODO: make configurable
+	linodeClient.SetDebug(true)
 
-	linodeClient, err := linodego.New(oauthClient, opts...)
+	instance, err := getLinodeByHostname(linodeClient, host)
+
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize Linode client: %s", err)
+		return nil, err
 	}
+
+	nodeID := strconv.Itoa(instance.ID)
 
 	return &Driver{
 		endpoint:     ep,
-		nodeId:       nodeId,
+		nodeID:       nodeID,
 		region:       region,
-		linodeClient: linodeClient,
+		linodeClient: &linodeClient,
 		mounter:      &mounter{},
 		log: logrus.New().WithFields(logrus.Fields{
 			"region":  region,
-			"node_id": nodeId,
+			"node_id": nodeID,
 		}),
 	}, nil
 }
@@ -148,19 +149,19 @@ func (d *Driver) Stop() {
 	d.srv.Stop()
 }
 
-// getMacAddr gets the local MAC addresses
-// https://stackoverflow.com/a/44859459/156674
-func getMacAddr() ([]string, error) {
-	ifas, err := net.Interfaces()
+// This function assums that the linode hostname matches it's label
+func getLinodeByHostname(client linodego.Client, host string) (*linodego.Instance, error) {
+	jsonFilter, _ := json.Marshal(map[string]string{"label": host})
+	instances, err := client.ListInstances(context.TODO(), linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, err
 	}
-	var as []string
-	for _, ifa := range ifas {
-		a := ifa.HardwareAddr.String()
-		if a != "" {
-			as = append(as, a)
-		}
+
+	if err != nil {
+		return nil, err
+	} else if len(instances) != 1 {
+		return nil, fmt.Errorf("Could not determine Linode instance ID from Linode label %s", host)
 	}
-	return as, nil
+
+	return instances[0], nil
 }
