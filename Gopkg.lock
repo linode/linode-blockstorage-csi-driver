@@ -2,10 +2,10 @@
 
 
 [[projects]]
-  branch = "master"
   name = "github.com/chiefy/linodego"
   packages = ["."]
-  revision = "1c1608317cd6be126cadbf24832be5dd9cbbc7be"
+  revision = "724d397345e9c071b1cb6a62f9bb18ed21b6a212"
+  version = "v0.1.0"
 
 [[projects]]
   name = "github.com/container-storage-interface/spec"

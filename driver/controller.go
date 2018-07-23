@@ -76,7 +76,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		return nil, err
 	}
 
-	volumes, err := d.linodeClient.ListVolumes(linodego.NewListOptions(0, string(jsonFilter)))
+	volumes, err := d.linodeClient.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -113,7 +113,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	// future, if we support more modes, we need to make sure to create a
 	// volume that aligns with the incoming capability. We need to make sure to
 	// test req.VolumeCapabilities
-	vol, err := d.linodeClient.CreateVolume(volumeReq)
+	vol, err := d.linodeClient.CreateVolume(ctx, volumeReq)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -150,7 +150,7 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 		return nil, err
 	}
 
-	err = d.linodeClient.DeleteVolume(volumeID)
+	err = d.linodeClient.DeleteVolume(ctx, volumeID)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 		return nil, err
 	}
 
-	success, err := d.linodeClient.AttachVolume(volumeID, &linodego.VolumeAttachOptions{
+	success, err := d.linodeClient.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID: linodeID,
 		ConfigID: 0,
 		// TODO: config profile?
@@ -229,7 +229,7 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 	})
 	ll.Info("controller unpublish volume called")
 
-	success, err := d.linodeClient.DetachVolume(volumeID)
+	success, err := d.linodeClient.DetachVolume(ctx, volumeID)
 
 	if success == false {
 		return nil, fmt.Errorf("failed to detach volume")
@@ -308,7 +308,7 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 	})
 	ll.Info("list volumes called")
 
-	volumes, err := d.linodeClient.ListVolumes(listOpts)
+	volumes, err := d.linodeClient.ListVolumes(ctx, listOpts)
 
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func (d *Driver) waitAction(ctx context.Context, volumeID int, status linodego.V
 	for {
 		select {
 		case <-ticker.C:
-			volume, err := d.linodeClient.GetVolume(volumeID)
+			volume, err := d.linodeClient.GetVolume(ctx, volumeID)
 			if err != nil {
 				ll.WithError(err).Info("waiting for volume errored")
 				continue

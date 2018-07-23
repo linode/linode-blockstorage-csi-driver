@@ -27,11 +27,11 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"github.com/chiefy/linodego"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 )
 
@@ -61,13 +61,15 @@ type Driver struct {
 // interfaces to interact with Kubernetes over unix domain sockets for
 // managaing Linode Block Storage
 func NewDriver(ep, token, url string, region string, host string) (*Driver, error) {
-	transport := &http.Transport{
-		MaxIdleConns:       10,
-		IdleConnTimeout:    30 * time.Second,
-		DisableCompression: true,
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
 	}
 
-	linodeClient := linodego.NewClient(&token, transport)
+	linodeClient := linodego.NewClient(oauth2Client)
 
 	// TODO: make configurable
 	linodeClient.SetDebug(true)
@@ -150,7 +152,7 @@ func (d *Driver) Stop() {
 // This function assums that the linode hostname matches it's label
 func getLinodeByHostname(client linodego.Client, host string) (*linodego.Instance, error) {
 	jsonFilter, _ := json.Marshal(map[string]string{"label": host})
-	instances, err := client.ListInstances(linodego.NewListOptions(0, string(jsonFilter)))
+	instances, err := client.ListInstances(context.TODO(), linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, err
 	}

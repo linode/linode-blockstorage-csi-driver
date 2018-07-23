@@ -62,7 +62,7 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 		return nil, err
 	}
 
-	vol, err := d.linodeClient.GetVolume(volumeID)
+	vol, err := d.linodeClient.GetVolume(ctx, volumeID)
 	if err != nil {
 		return nil, err
 	}
