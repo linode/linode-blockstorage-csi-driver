@@ -22,12 +22,13 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/chiefy/linodego"
 	"github.com/kubernetes-csi/csi-test/pkg/sanity"
 	"github.com/sirupsen/logrus"
 )
@@ -51,15 +52,15 @@ func TestDriverSuite(t *testing.T) {
 	ts := httptest.NewServer(fake)
 	defer ts.Close()
 
-	linodeClient := linodego.NewClient(nil)
-	url, _ := url.Parse(ts.URL)
-	linodeClient.BaseURL = url
+	linodeClient := linodego.NewClient(nil, nil)
+	// url, _ := url.Parse(ts.URL)
+	// linodeClient.BaseURL = url
 
 	driver := &Driver{
 		endpoint:     endpoint,
-		nodeId:       "987654",
+		nodeID:       "987654",
 		region:       "us-east",
-		linodeClient: linodeClient,
+		linodeClient: &linodeClient,
 		mounter:      &fakeMounter{},
 		log:          logrus.New().WithField("test_enabed", true),
 	}
@@ -101,10 +102,9 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if name != "" {
 			// a list of volumes for the given name
 			for _, vol := range f.volumes {
-				if vol.Name == name {
+				if vol.Label == name {
 					var resp = struct {
 						Volumes []*linodego.Volume
-						Links   *linodego.Links
 					}{
 						Volumes: []*linodego.Volume{vol},
 					}
@@ -121,7 +121,6 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			vol := f.volumes[id]
 			var resp = struct {
 				Volume *linodego.Volume
-				Links  *linodego.Links
 			}{
 				Volume: vol,
 			}
@@ -132,36 +131,31 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// response with zero items
 		var resp = struct {
 			Volume []*linodego.Volume
-			Links  *linodego.Links
 		}{}
 		err := json.NewEncoder(w).Encode(&resp)
 		if err != nil {
 			f.t.Fatal(err)
 		}
 	case "POST":
-		v := new(linodego.VolumeCreateRequest)
+		v := new(linodego.VolumeCreateOptions)
 		err := json.NewDecoder(r.Body).Decode(v)
 		if err != nil {
 			f.t.Fatal(err)
 		}
 
-		id := randString(10)
+		id := rand.Intn(10)
 		vol := &linodego.Volume{
-			ID: id,
-			Region: &linodego.Region{
-				Slug: v.Region,
-			},
-			Description:   v.Description,
-			Name:          v.Name,
-			SizeGigaBytes: v.SizeGigaBytes,
-			CreatedAt:     time.Now().UTC(),
+			ID:      id,
+			Region:  v.Region,
+			Label:   v.Label,
+			Size:    v.Size,
+			Created: time.Now().UTC(),
 		}
 
-		f.volumes[id] = vol
+		f.volumes[strconv.Itoa(id)] = vol
 
 		var resp = struct {
 			Volume *linodego.Volume
-			Links  *linodego.Links
 		}{
 			Volume: vol,
 		}
