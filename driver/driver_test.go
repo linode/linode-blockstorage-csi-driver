@@ -22,12 +22,18 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"context"
+	"strconv"
+
+	"fmt"
+	"strings"
+
+	"github.com/chiefy/linodego"
 	"github.com/kubernetes-csi/csi-test/pkg/sanity"
 	"github.com/sirupsen/logrus"
 )
@@ -47,19 +53,31 @@ func TestDriverSuite(t *testing.T) {
 	fake := &fakeAPI{
 		t:       t,
 		volumes: map[string]*linodego.Volume{},
+		instance: &linodego.Instance{
+			Label:      "linode123",
+			Region:     "us-east",
+			Image:      "linode/debian9",
+			Type:       "g6-standard-2",
+			Group:      "Linode-Group",
+			ID:         123,
+			Status:     "running",
+			Hypervisor: "kvm",
+			CreatedStr: "2018-01-01T00:01:01",
+			UpdatedStr: "2018-01-01T00:01:01",
+		},
 	}
+
 	ts := httptest.NewServer(fake)
 	defer ts.Close()
 
-	linodeClient := linodego.NewClient(nil)
-	url, _ := url.Parse(ts.URL)
-	linodeClient.BaseURL = url
+	linodeClient := linodego.NewClient(http.DefaultClient)
+	linodeClient.SetBaseURL(ts.URL)
 
 	driver := &Driver{
 		endpoint:     endpoint,
-		nodeId:       "987654",
+		nodeId:       strconv.Itoa(fake.instance.ID),
 		region:       "us-east",
-		linodeClient: linodeClient,
+		linodeClient: &linodeClient,
 		mounter:      &fakeMounter{},
 		log:          logrus.New().WithField("test_enabed", true),
 	}
@@ -88,87 +106,146 @@ func TestDriverSuite(t *testing.T) {
 	sanity.Test(t, cfg)
 }
 
+func createLinode(t *testing.T, client *linodego.Client) int {
+	req := &linodego.InstanceCreateOptions{
+		Type:   "g6-nanode-1",
+		Region: "us-east",
+	}
+	in, err := client.CreateInstance(context.TODO(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return in.ID
+}
+
+func deleteLinode(t *testing.T, client *linodego.Client, id int) {
+	err := client.DeleteInstance(context.TODO(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 // fakeAPI implements a fake, cached DO API
 type fakeAPI struct {
-	t       *testing.T
-	volumes map[string]*linodego.Volume
+	t        *testing.T
+	volumes  map[string]*linodego.Volume
+	instance *linodego.Instance
 }
 
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
 	case "GET":
-		name := r.URL.Query().Get("name")
-		if name != "" {
-			// a list of volumes for the given name
-			for _, vol := range f.volumes {
-				if vol.Name == name {
-					var resp = struct {
-						Volumes []*linodego.Volume
-						Links   *linodego.Links
-					}{
-						Volumes: []*linodego.Volume{vol},
-					}
-					err := json.NewEncoder(w).Encode(&resp)
-					if err != nil {
-						f.t.Fatal(err)
-					}
-					return
-				}
-			}
-		} else {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/volumes/"):
 			// single volume get
 			id := filepath.Base(r.URL.Path)
 			vol := f.volumes[id]
-			var resp = struct {
-				Volume *linodego.Volume
-				Links  *linodego.Links
-			}{
-				Volume: vol,
+			if vol == nil {
+				resp := linodego.VolumesPagedResponse{
+					PageOptions: &linodego.PageOptions{
+						Page:    1,
+						Pages:   1,
+						Results: 0,
+					},
+					Data: []*linodego.Volume{},
+				}
+				rr, _ := json.Marshal(resp)
+				w.Write(rr)
 			}
-			_ = json.NewEncoder(w).Encode(&resp)
+			rr, _ := json.Marshal(&vol)
+			w.Write(rr)
+
 			return
+		case strings.HasPrefix(r.URL.Path, "/volumes"):
+			res := 0
+			data := []*linodego.Volume{}
+
+			for _, vol := range f.volumes {
+				data = append(data, vol)
+			}
+			resp := linodego.VolumesPagedResponse{
+				PageOptions: &linodego.PageOptions{
+					Page:    1,
+					Pages:   1,
+					Results: res,
+				},
+				Data: data,
+			}
+			rr, _ := json.Marshal(resp)
+			w.Write(rr)
+			return
+		case strings.HasPrefix(r.URL.Path, "/linode/instances/"):
+			id := filepath.Base(r.URL.Path)
+			if id == strconv.Itoa(f.instance.ID) {
+				rr, _ := json.Marshal(&f.instance)
+				w.Write(rr)
+				return
+			}
 		}
 
-		// response with zero items
-		var resp = struct {
-			Volume []*linodego.Volume
-			Links  *linodego.Links
-		}{}
-		err := json.NewEncoder(w).Encode(&resp)
-		if err != nil {
-			f.t.Fatal(err)
-		}
 	case "POST":
-		v := new(linodego.VolumeCreateRequest)
-		err := json.NewDecoder(r.Body).Decode(v)
+		tp := filepath.Base(r.URL.Path)
+		var vol linodego.Volume
+		if tp == "attach" {
+			v := new(linodego.VolumeAttachOptions)
+			if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+				f.t.Fatal(err)
+			}
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) != 4 {
+				f.t.Fatal("url not good")
+			}
+			vol = *f.volumes[parts[2]]
+			if vol.LinodeID != nil {
+				f.t.Fatal("volume already attached")
+				return
+			}
+			vol.LinodeID = &v.LinodeID
+			f.volumes[parts[2]] = &vol
+
+		} else if tp == "detach" {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) != 4 {
+				f.t.Fatal("url not good")
+			}
+			vol = *f.volumes[parts[2]]
+			vol.LinodeID = nil
+			f.volumes[parts[2]] = &vol
+			return
+		} else {
+			v := new(linodego.VolumeCreateOptions)
+			err := json.NewDecoder(r.Body).Decode(v)
+			if err != nil {
+				f.t.Fatal(err)
+			}
+
+			id := rand.Intn(99999)
+			name := randString(10)
+			path := fmt.Sprintf("/dev/disk/by-id/scsi-0Linode_Volume_%v", name)
+			vol = linodego.Volume{
+				ID:             id,
+				Region:         v.Region,
+				Label:          name,
+				Size:           v.Size,
+				FilesystemPath: path,
+				Status:         linodego.VolumeActive,
+				Created:        time.Now(),
+				Updated:        time.Now(),
+
+				CreatedStr: time.Now().Format("2006-01-02T15:04:05"),
+				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
+			}
+
+			f.volumes[strconv.Itoa(id)] = &vol
+
+		}
+
+		resp, err := json.Marshal(vol)
 		if err != nil {
 			f.t.Fatal(err)
 		}
-
-		id := randString(10)
-		vol := &linodego.Volume{
-			ID: id,
-			Region: &linodego.Region{
-				Slug: v.Region,
-			},
-			Description:   v.Description,
-			Name:          v.Name,
-			SizeGigaBytes: v.SizeGigaBytes,
-			CreatedAt:     time.Now().UTC(),
-		}
-
-		f.volumes[id] = vol
-
-		var resp = struct {
-			Volume *linodego.Volume
-			Links  *linodego.Links
-		}{
-			Volume: vol,
-		}
-		err = json.NewEncoder(w).Encode(&resp)
-		if err != nil {
-			f.t.Fatal(err)
-		}
+		w.Write(resp)
 	case "DELETE":
 		id := filepath.Base(r.URL.Path)
 		delete(f.volumes, id)

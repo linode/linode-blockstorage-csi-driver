@@ -26,7 +26,8 @@ metadata:
   name: linode
   namespace: kube-system
 stringData:
-  access-token: "deadbeefab1e1ead__REPLACE_ME____deadbeefab1e1ead"
+  token: "deadbeefab1e1ead__REPLACE_ME____deadbeefab1e1ead"
+  region: "us-east"
 ```
 
 and create the secret using kubectl:
