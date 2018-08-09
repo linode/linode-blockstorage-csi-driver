@@ -302,7 +302,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (
 	d.log.WithField("method", "node_get_info").Info("node get info called")
 	return &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeId,
-		MaxVolumesPerNode: 5,
+		MaxVolumesPerNode: 8,
 	}, nil
 }
 
