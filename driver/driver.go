@@ -24,11 +24,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"net/http"
+
+	"encoding/json"
 	"strconv"
 
 	"github.com/chiefy/linodego"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	metadata "github.com/digitalocean/go-metadata"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -59,36 +62,34 @@ type Driver struct {
 // NewDriver returns a CSI plugin that contains the necessary gRPC
 // interfaces to interact with Kubernetes over unix domain sockets for
 // managaing Linode Block Storage
-func NewDriver(ep, token, url string) (*Driver, error) {
+func NewDriver(ep, token, zone, host string) (*Driver, error) {
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
 		AccessToken: token,
 	})
-	oauthClient := oauth2.NewClient(context.Background(), tokenSource)
 
-	all, err := metadata.NewClient().Metadata()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get metadata: %s", err)
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
 	}
 
-	region := all.Region
-	nodeId := strconv.Itoa(all.LinodeID)
+	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient.SetDebug(true)
 
-	opts := []linodego.ClientOpt{}
-	opts = append(opts, linodego.SetBaseURL(url))
-
-	linodeClient, err := linodego.New(oauthClient, opts...)
+	linode, err := getlinodeByName(&linodeClient, host)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize Linode client: %s", err)
 	}
 
+	nodeId := strconv.Itoa(linode.ID)
 	return &Driver{
 		endpoint:     ep,
 		nodeId:       nodeId,
-		region:       region,
-		linodeClient: linodeClient,
+		region:       zone,
+		linodeClient: &linodeClient,
 		mounter:      &mounter{},
 		log: logrus.New().WithFields(logrus.Fields{
-			"region":  region,
+			"region":  zone,
 			"node_id": nodeId,
 		}),
 	}, nil
@@ -163,4 +164,21 @@ func getMacAddr() ([]string, error) {
 		}
 	}
 	return as, nil
+}
+
+func getlinodeByName(client *linodego.Client, nodeName string) (*linodego.Instance, error) {
+	jsonFilter, _ := json.Marshal(map[string]string{"label": nodeName})
+	linodes, err := client.ListInstances(context.TODO(), linodego.NewListOptions(0, string(jsonFilter)))
+	if err != nil {
+		return nil, err
+	} else if len(linodes) != 1 {
+		return nil, fmt.Errorf("Could not determine Linode instance ID from Linode label %s", nodeName)
+	}
+
+	for _, linode := range linodes {
+		if linode.Label == string(nodeName) {
+			return linode, nil
+		}
+	}
+	return nil, InstanceNotFound
 }

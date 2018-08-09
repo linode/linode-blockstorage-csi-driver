@@ -28,6 +28,10 @@ import (
 	"context"
 	"path/filepath"
 
+	"strconv"
+
+	"errors"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -37,6 +41,10 @@ import (
 const (
 	diskIDPath    = "/dev/disk/by-id"
 	diskDevPrefix = "scsi-0LINODE_Volume_"
+)
+
+var (
+	InstanceNotFound = errors.New("instance not found")
 )
 
 // NodeStageVolume mounts the volume to a staging path on the node. This is
@@ -57,12 +65,16 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
 
-	vol, _, err := d.linodeClient.Storage.GetVolume(ctx, req.VolumeId)
+	volId, err := strconv.Atoi(req.VolumeId)
+	if err != nil {
+		return nil, err
+	}
+	vol, err := d.linodeClient.GetVolume(ctx, volId)
 	if err != nil {
 		return nil, err
 	}
 
-	source := getDiskSource(vol.Name)
+	source := vol.FilesystemPath //getDiskSource(vol.Label)
 	target := req.StagingTargetPath
 
 	mnt := req.VolumeCapability.GetMount()
@@ -75,7 +87,7 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 
 	ll := d.log.WithFields(logrus.Fields{
 		"volume_id":           req.VolumeId,
-		"volume_name":         vol.Name,
+		"volume_name":         vol.Label,
 		"staging_target_path": req.StagingTargetPath,
 		"source":              source,
 		"fsType":              fsType,
@@ -283,6 +295,14 @@ func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabi
 		Capabilities: []*csi.NodeServiceCapability{
 			nscap,
 		},
+	}, nil
+}
+
+func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	d.log.WithField("method", "node_get_info").Info("node get info called")
+	return &csi.NodeGetInfoResponse{
+		NodeId:            d.nodeId,
+		MaxVolumesPerNode: 5,
 	}, nil
 }
 
