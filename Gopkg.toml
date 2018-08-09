@@ -26,12 +26,37 @@
 
 
 [[constraint]]
+  branch = "err"
+  name = "github.com/appscode/go"
+
+[[constraint]]
   branch = "master"
   name = "github.com/chiefy/linodego"
 
 [[constraint]]
+  name = "github.com/container-storage-interface/spec"
+  version = "0.3.0"
+
+[[constraint]]
+  branch = "linode"
+  name = "github.com/kubernetes-csi/csi-test"
+  source = "https://github.com/pharmer/csi-test.git"
+
+[[constraint]]
   name = "github.com/sirupsen/logrus"
-  version = "1.0.5"
+  version = "~1.0.6"
+
+[[constraint]]
+  name = "github.com/spf13/cobra"
+  version = "0.0.3"
+
+[[constraint]]
+  name = "github.com/spf13/pflag"
+  version = "1.0.1"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
+  version = "1.11.3"
 
 [prune]
   go-tests = true
