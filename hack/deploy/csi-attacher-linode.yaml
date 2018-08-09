@@ -2,12 +2,12 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: csi-provisioner-linodeplugin
+  name: csi-attacher-linodeplugin
   labels:
-    app: csi-provisioner-linodeplugin
+    app: csi-attacher-linodeplugin
 spec:
   selector:
-    app: csi-provisioner-linodeplugin
+    app: csi-attacher-linodeplugin
   ports:
     - name: dummy
       port: 12345
@@ -15,23 +15,22 @@ spec:
 kind: StatefulSet
 apiVersion: apps/v1beta1
 metadata:
-  name: csi-provisioner-linodeplugin
+  name: csi-attacher-linodeplugin
 spec:
-  serviceName: "csi-provisioner-linodeplugin"
+  serviceName: "csi-attacher-linodeplugin"
   replicas: 1
   template:
     metadata:
       labels:
-        app: csi-provisioner-linodeplugin
+        app: csi-attacher-linodeplugin
     spec:
-      serviceAccount: csi-provisioner
+      serviceAccount: csi-attacher
       containers:
-        - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v0.2.0
+        - name: csi-attacher
+          image: quay.io/k8scsi/csi-attacher:v0.2.0
           args:
-            - "--provisioner=com.linode.csi.linodebs"
-            - "--csi-address=$(ADDRESS)"
             - "--v=5"
+            - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -42,6 +41,7 @@ spec:
         - name: linode-csi-plugin
           image: displague/linode-csi-plugin:v0.0.1
           args :
+            - init
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_ACCESS_TOKEN)"
           env:

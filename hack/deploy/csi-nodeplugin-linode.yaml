@@ -41,6 +41,7 @@ spec:
             allowPrivilegeEscalation: true
           image: displague/linode-csi-plugin:v0.0.1
           args :
+            - init
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_ACCESS_TOKEN)"
           env:
