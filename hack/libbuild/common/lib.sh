@@ -128,6 +128,9 @@ attic_up() {
 }
 
 hub_up() {
+  if [[ -n "$DOCKER_USERNAME" ]]; then
+    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  fi
   local cmd="docker push $DOCKER_REGISTRY/$IMG:$TAG"
   echo $cmd; $cmd
 }
