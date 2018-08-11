@@ -30,7 +30,7 @@
   name = "github.com/appscode/go"
 
 [[constraint]]
-  branch = "master"
+  version = "0.2.0"
   name = "github.com/chiefy/linodego"
 
 [[constraint]]
