@@ -15,6 +15,7 @@ build:
 
 push:
 	@echo "==> Publishing displague/linode-csi-plugin:$(VERSION)"
+	@echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 	@docker push displague/linode-csi-plugin:$(VERSION)
 	@echo "==> Your image is now available at displague/linode-csi-plugin:$(VERSION)"
 
