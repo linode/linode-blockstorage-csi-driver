@@ -117,10 +117,6 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 	ll.WithField("volume_req", volumeReq).Info("creating volume")
 
-	// TODO(arslan): Currently DO only supports SINGLE_NODE_WRITER mode. In the
-	// future, if we support more modes, we need to make sure to create a
-	// volume that aligns with the incoming capability. We need to make sure to
-	// test req.VolumeCapabilities
 	vol, err := d.linodeClient.CreateVolume(ctx, volumeReq)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -152,12 +148,12 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 		"method":    "delete_volume",
 	})
 	ll.Info("delete volume called")
-	volId, err := strconv.Atoi(req.VolumeId)
+	volID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
 		return nil, err
 	}
 
-	vol, err := d.linodeClient.GetVolume(ctx, volId)
+	vol, err := d.linodeClient.GetVolume(ctx, volID)
 	if vol == nil {
 		// we assume it's deleted already for idempotency
 		return &csi.DeleteVolumeResponse{}, nil
@@ -166,7 +162,7 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 		return nil, err
 	}
 
-	err = d.linodeClient.DeleteVolume(ctx, volId)
+	err = d.linodeClient.DeleteVolume(ctx, volID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,20 +198,20 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 	})
 	ll.Info("controller publish volume called")
 
-	volumeId, err := strconv.Atoi(req.VolumeId)
+	volumeID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
 		return nil, err
 	}
 
-	volume, err := d.linodeClient.GetVolume(ctx, volumeId)
+	volume, err := d.linodeClient.GetVolume(ctx, volumeID)
 	if volume == nil {
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeId))
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeID))
 	}
 	if err != nil {
 		return nil, err
 	}
 	if volume.LinodeID != nil {
-		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %v already attached", volumeId))
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %v already attached", volumeID))
 	}
 
 	linode, err := d.linodeClient.GetInstance(ctx, linodeID)
@@ -230,16 +226,17 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 		LinodeID: linodeID,
 		ConfigID: 0,
 	}
-	success, err := d.linodeClient.AttachVolume(ctx, volumeId, opts)
-	if success == false {
-		return nil, fmt.Errorf("failed to attach volume")
+
+	_, err = d.linodeClient.AttachVolume(ctx, volumeID, opts)
+	if err != nil {
+		return nil, fmt.Errorf("Error attaching volume: %s", err)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	ll.Infoln("waiting for attaching volume")
-	if err = linodego.WaitForVolumeLinodeID(ctx, d.linodeClient, volumeId, &linodeID, 5); err != nil {
+	if err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, 5); err != nil {
 		return nil, err
 	}
 
@@ -266,12 +263,12 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 	})
 	ll.Info("controller unpublish volume called")
 
-	volumeId, err := strconv.Atoi(req.VolumeId)
+	volumeID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
 		return nil, err
 	}
 
-	success, err := d.linodeClient.DetachVolume(ctx, volumeId)
+	success, err := d.linodeClient.DetachVolume(ctx, volumeID)
 	if success == false {
 		return nil, fmt.Errorf("failed to detach volume")
 	}
@@ -294,14 +291,14 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
 	}
 
-	volumeId, err := strconv.Atoi(req.VolumeId)
+	volumeID, err := strconv.Atoi(req.VolumeId)
 	if err != nil {
 		return nil, err
 	}
 
-	volume, err := d.linodeClient.GetVolume(ctx, volumeId)
+	volume, err := d.linodeClient.GetVolume(ctx, volumeID)
 	if volume == nil {
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeId))
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeID))
 	}
 	if err != nil {
 		return nil, err
@@ -309,7 +306,7 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 
 	var vcaps []*csi.VolumeCapability_AccessMode
 	for _, mode := range []csi.VolumeCapability_AccessMode_Mode{
-		// DO currently only support a single node to be attached to a single
+		// Linode only supports any volume to be attached to a single
 		// node in read/write mode
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	} {
