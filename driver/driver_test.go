@@ -49,7 +49,7 @@ func TestDriverSuite(t *testing.T) {
 		t.Fatalf("failed to remove unix domain socket file %s, error: %s", socket, err)
 	}
 
-	// fake DO Server, not working yet ...
+	// fake Linode Server, not working yet ...
 	fake := &fakeAPI{
 		t:       t,
 		volumes: map[string]*linodego.Volume{},
@@ -125,7 +125,7 @@ func deleteLinode(t *testing.T, client *linodego.Client, id int) {
 	}
 }
 
-// fakeAPI implements a fake, cached DO API
+// fakeAPI implements a fake, cached Linode API
 type fakeAPI struct {
 	t        *testing.T
 	volumes  map[string]*linodego.Volume

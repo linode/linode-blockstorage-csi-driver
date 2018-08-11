@@ -46,7 +46,7 @@ type Mounter interface {
 	IsMounted(source, target string) (bool, error)
 }
 
-// TODO(arslan): this is Linux only for now. Refactor this into a package with
+// TODO(displague): this is Linux only for now. Refactor this into a package with
 // architecture specific code in the future, such as mounter_darwin.go,
 // mounter_linux.go, etc..
 type mounter struct{}
