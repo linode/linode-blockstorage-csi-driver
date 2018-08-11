@@ -46,7 +46,7 @@ const (
 	RetryInterval         = 5 * time.Second
 	RetryTimeout          = 10 * time.Minute
 
-	createdByDO = "Created by Linode CSI driver"
+	createdByLinode = "Created by Linode CSI driver"
 )
 
 // CreateVolume creates a new volume from the given request. The function is
@@ -111,7 +111,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	volumeReq := linodego.VolumeCreateOptions{
 		Region: d.region,
 		Label:  volumeName,
-		//Description:   createdByDO,
+		//Description:   createdByLinode,
 		Size: int(size / GB),
 	}
 
@@ -387,7 +387,7 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 		})
 	}
 
-	// TODO(arslan): check that the NextToken logic works fine, might be racy
+	// TODO(displague): check that the NextToken logic works fine, might be racy
 	resp := &csi.ListVolumesResponse{
 		Entries: entries,
 		//NextToken: strconv.Itoa(lastPage),
@@ -399,7 +399,7 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 
 // GetCapacity returns the capacity of the storage pool
 func (d *Driver) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	// TODO(arslan): check if we can provide this information somehow
+	// TODO(displague): check if we can provide this information somehow
 	d.log.WithFields(logrus.Fields{
 		"params": req.Parameters,
 		"method": "get_capacity",
@@ -419,7 +419,7 @@ func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.Control
 		}
 	}
 
-	// TODO(arslan): checkout if the capabilities are worth supporting
+	// TODO(displague): checkout if the capabilities are worth supporting
 	var caps []*csi.ControllerServiceCapability
 	for _, cap := range []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,

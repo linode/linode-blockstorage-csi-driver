@@ -183,14 +183,14 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume Capability must be provided")
 	}
 
-	// TODO(arslan): early return if already mounted
+	// TODO(displague): early return if already mounted
 	source := req.StagingTargetPath
 	target := req.TargetPath
 
 	mnt := req.VolumeCapability.GetMount()
 	options := mnt.MountFlags
 
-	// TODO(arslan): linode we need bind here? check it out
+	// TODO(displague): linode we need bind here? check it out
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	options = append(options, "bind")
 	if req.Readonly {
@@ -307,7 +307,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (
 }
 
 // getDiskSource returns the absolute path of the attached volume for the given
-// DO volume name
+// Linode volume name
 func getDiskSource(volumeName string) string {
 	return filepath.Join(diskIDPath, diskDevPrefix+volumeName)
 }
