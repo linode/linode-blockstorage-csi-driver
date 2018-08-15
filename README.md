@@ -53,7 +53,7 @@ release](https://github.com/displague/csi-linode/releases). For
 example, to use the version `v0.0.1` you can execute the following command:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/displague/csi-linode/master/deploy/kubernetes/releases/csi-linode-v0.0.1.yaml
+kubectl apply -f https://raw.githubusercontent.com/displague/csi-linode/master/hack/deploy/releases/csi-linode-v0.0.1.yaml
 ```
 
 A new storage class will be created with the name `linode-block-storage` which is
@@ -79,7 +79,7 @@ spec:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
   storageClassName: linode-block-storage
 ```
 
