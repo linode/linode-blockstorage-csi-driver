@@ -113,7 +113,7 @@ spec:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
             - name: LINODE_API_URL
-              value: https://api.linode.com/
+              value: https://api.linode.com/v4
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
