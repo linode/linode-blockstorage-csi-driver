@@ -30,7 +30,7 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi/
-              # TODO(arslan): the registar is not implemented yet
+              # TODO(displague): the registar is not implemented yet
               # - name: registrar-socket-dir
               #   mountPath: /var/lib/csi/sockets/
         - name: csi-linodeplugin 
@@ -43,11 +43,11 @@ spec:
           args :
             - init
             - "--endpoint=$(CSI_ENDPOINT)"
-            - "--token=$(LINODE_ACCESS_TOKEN)"
+            - "--token=$(LINODE_TOKEN)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
-            - name: LINODE_ACCESS_TOKEN
+            - name: LINODE_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: linodetoken
@@ -64,7 +64,7 @@ spec:
             - mountPath: /dev
               name: device-dir
       volumes:
-        # TODO(arslan): the registar is not implemented yet
+        # TODO(displague): the registar is not implemented yet
         #- name: registrar-socket-dir
         #  hostPath:
         #    path: /var/lib/kubelet/device-plugins/

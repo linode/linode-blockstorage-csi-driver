@@ -1,19 +1,3 @@
-/*
-Copyright 2018 Digital Ocean
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package driver
 
 import (
@@ -49,7 +33,7 @@ func TestDriverSuite(t *testing.T) {
 		t.Fatalf("failed to remove unix domain socket file %s, error: %s", socket, err)
 	}
 
-	// fake Linode Server, not working yet ...
+	// mock Linode Server, not working yet ...
 	fake := &fakeAPI{
 		t:       t,
 		volumes: map[string]*linodego.Volume{},
@@ -111,7 +95,7 @@ func createLinode(t *testing.T, client *linodego.Client) int {
 		Type:   "g6-nanode-1",
 		Region: "us-east",
 	}
-	in, err := client.CreateInstance(context.TODO(), req)
+	in, err := client.CreateInstance(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +103,7 @@ func createLinode(t *testing.T, client *linodego.Client) int {
 }
 
 func deleteLinode(t *testing.T, client *linodego.Client, id int) {
-	err := client.DeleteInstance(context.TODO(), id)
+	err := client.DeleteInstance(context.Background(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
