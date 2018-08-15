@@ -1,19 +1,3 @@
-/*
-Copyright 2018 Digital Ocean
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package driver
 
 import (
@@ -92,7 +76,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	// volume already exist, do nothing
 	if len(volumes) != 0 {
 		if len(volumes) > 1 {
-			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf(" duplicate volume %q exists", volumeName))
+			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("duplicate volume %q exists", volumeName))
 		}
 		volume := volumes[0]
 		if int64(volume.Size*GB) != size {
@@ -111,8 +95,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	volumeReq := linodego.VolumeCreateOptions{
 		Region: d.region,
 		Label:  volumeName,
-		//Description:   createdByLinode,
-		Size: int(size / GB),
+		Size:   int(size / GB),
 	}
 
 	ll.WithField("volume_req", volumeReq).Info("creating volume")
@@ -486,7 +469,7 @@ func (d *Driver) waitAction(ctx context.Context, volumeID int, status linodego.V
 		"volume_status": status,
 	})
 
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	ticker := time.NewTicker(time.Second)

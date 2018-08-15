@@ -43,11 +43,11 @@ spec:
           args :
             - init
             - "--endpoint=$(CSI_ENDPOINT)"
-            - "--token=$(LINODE_ACCESS_TOKEN)"
+            - "--token=$(LINODE_TOKEN)"
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
-            - name: LINODE_ACCESS_TOKEN
+            - name: LINODE_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: linodetoken

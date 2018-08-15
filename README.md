@@ -121,11 +121,6 @@ $ kubectl exec -ti my-csi-app /bin/sh
 hello-world
 ```
 
-## Contributing
-
-At Linode we value and love our community! If you have any issues or
-would like to contribute, feel free to open an issue/PR
-
 ## Discussion / Help
 
 Join us at [#linodego](https://gophers.slack.com/messages/CAG93EB2S) on the [gophers slack](https://gophers.slack.com)

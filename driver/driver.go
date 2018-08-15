@@ -1,19 +1,3 @@
-/*
-Copyright 2018 Digital Ocean
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package driver
 
 import (
@@ -50,7 +34,7 @@ const (
 //
 type Driver struct {
 	endpoint string
-	nodeId   string
+	nodeID   string
 	region   string
 
 	srv          *grpc.Server
@@ -62,7 +46,7 @@ type Driver struct {
 // NewDriver returns a CSI plugin that contains the necessary gRPC
 // interfaces to interact with Kubernetes over unix domain sockets for
 // managaing Linode Block Storage
-func NewDriver(ep, token, zone, host string) (*Driver, error) {
+func NewDriver(ep, token, zone, host string, url *string) (*Driver, error) {
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
 		AccessToken: token,
 	})
@@ -73,24 +57,30 @@ func NewDriver(ep, token, zone, host string) (*Driver, error) {
 		},
 	}
 
+	ua := fmt.Sprintf("LinodeCSI/%s (linodego %s)", vendorVersion, linodego.Version)
 	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient.SetUserAgent(ua)
 	linodeClient.SetDebug(true)
+
+	if url != nil {
+		linodeClient.SetBaseURL(*url)
+	}
 
 	linode, err := getlinodeByName(&linodeClient, host)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize Linode client: %s", err)
 	}
 
-	nodeId := strconv.Itoa(linode.ID)
+	nodeID := strconv.Itoa(linode.ID)
 	return &Driver{
 		endpoint:     ep,
-		nodeId:       nodeId,
+		nodeID:       nodeID,
 		region:       zone,
 		linodeClient: &linodeClient,
 		mounter:      &mounter{},
 		log: logrus.New().WithFields(logrus.Fields{
 			"region":  zone,
-			"node_id": nodeId,
+			"node_id": nodeID,
 		}),
 	}, nil
 }
@@ -110,14 +100,14 @@ func (d *Driver) Run() error {
 	// CSI plugins talk only over UNIX sockets currently
 	if u.Scheme != "unix" {
 		return fmt.Errorf("currently only unix domain sockets are supported, have: %s", u.Scheme)
-	} else {
-		// remove the socket if it's already there. This can happen if we
-		// deploy a new version and the socket was created from the old running
-		// plugin.
-		d.log.WithField("socket", addr).Info("removing socket")
-		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove unix domain socket file %s, error: %s", addr, err)
-		}
+	}
+
+	// remove the socket if it's already there. This can happen if we
+	// deploy a new version and the socket was created from the old running
+	// plugin.
+	d.log.WithField("socket", addr).Info("removing socket")
+	if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove unix domain socket file %s, error: %s", addr, err)
 	}
 
 	listener, err := net.Listen(u.Scheme, addr)
@@ -149,26 +139,9 @@ func (d *Driver) Stop() {
 	d.srv.Stop()
 }
 
-// getMacAddr gets the local MAC addresses
-// https://stackoverflow.com/a/44859459/156674
-func getMacAddr() ([]string, error) {
-	ifas, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-	var as []string
-	for _, ifa := range ifas {
-		a := ifa.HardwareAddr.String()
-		if a != "" {
-			as = append(as, a)
-		}
-	}
-	return as, nil
-}
-
 func getlinodeByName(client *linodego.Client, nodeName string) (*linodego.Instance, error) {
 	jsonFilter, _ := json.Marshal(map[string]string{"label": nodeName})
-	linodes, err := client.ListInstances(context.TODO(), linodego.NewListOptions(0, string(jsonFilter)))
+	linodes, err := client.ListInstances(context.Background(), linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, err
 	} else if len(linodes) != 1 {
