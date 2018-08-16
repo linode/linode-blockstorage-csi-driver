@@ -46,7 +46,7 @@ func (m *mounter) Format(source, fsType string) error {
 		return err
 	}
 
-	mkfsArgs := []string{}
+	var mkfsArgs []string
 
 	if fsType == "" {
 		return errors.New("fs type is not specified for formatting the volume")
@@ -72,7 +72,7 @@ func (m *mounter) Format(source, fsType string) error {
 
 func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	mountCmd := "mount"
-	mountArgs := []string{}
+	var mountArgs []string
 
 	if fsType == "" {
 		return errors.New("fs type is not specified for mounting the volume")

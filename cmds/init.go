@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewCmdInit func
 func NewCmdInit() *cobra.Command {
 	cfg := options.NewConfig()
 	cmd := &cobra.Command{

@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// Config Linode Client Config
 type Config struct {
 	Endpoint string
 	Token    string
@@ -14,6 +15,7 @@ type Config struct {
 	NodeName string
 }
 
+// NewConfig Create New Config
 func NewConfig() *Config {
 	hostname, _ := os.Hostname()
 	return &Config{
@@ -25,6 +27,7 @@ func NewConfig() *Config {
 	}
 }
 
+// AddFlags Add Flags
 func (c *Config) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.Endpoint, "endpoint", c.Endpoint, "CSI endpoint")
 	fs.StringVar(&c.Token, "token", c.Token, "Linode API Token")

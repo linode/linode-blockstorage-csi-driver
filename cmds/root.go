@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewRootCmd func
 func NewRootCmd(version string) *cobra.Command {
 
 	rootCmd := &cobra.Command{

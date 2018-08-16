@@ -3,7 +3,7 @@ package driver
 import (
 	"context"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +38,7 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 	d.log.WithFields(logrus.Fields{
 		"response": resp,
 		"method":   "get_plugin_capabilities",
-	}).Info("get plugin capabitilies called")
+	}).Info("get plugin capabilities called")
 	return resp, nil
 }
 
