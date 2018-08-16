@@ -3,7 +3,7 @@ NAME=linode-csi-plugin
 
 all: publish
 
-publish: compile build push clean
+publish: compile verify test build push clean
 
 compile:
 	@echo "==> Building the project"
@@ -19,8 +19,15 @@ push:
 	@docker push displague/linode-csi-plugin:$(VERSION)
 	@echo "==> Your image is now available at displague/linode-csi-plugin:$(VERSION)"
 
+test:
+	go test -v ./...
+
+verify:
+	# vendor/github.com/kubernetes/repo-infra/verify/verify-boilerplate.sh --rootdir=${CURDIR}
+	vendor/github.com/kubernetes/repo-infra/verify/verify-go-src.sh -v --rootdir ${CURDIR}
+
 clean:
 	@echo "==> Cleaning releases"
 	@GOOS=linux go clean -i -x ./...
 
-.PHONY: all push fetch build-image clean
+.PHONY: all push fetch build-image clean verify test
