@@ -45,7 +45,7 @@ type Driver struct {
 
 // NewDriver returns a CSI plugin that contains the necessary gRPC
 // interfaces to interact with Kubernetes over unix domain sockets for
-// managaing Linode Block Storage
+// managing Linode Block Storage
 func NewDriver(ep, token, zone, host string, url *string) (*Driver, error) {
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
 		AccessToken: token,
@@ -66,7 +66,7 @@ func NewDriver(ep, token, zone, host string, url *string) (*Driver, error) {
 		linodeClient.SetBaseURL(*url)
 	}
 
-	linode, err := getlinodeByName(&linodeClient, host)
+	linode, err := getLinodeByName(&linodeClient, host)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize Linode client: %s", err)
 	}
@@ -106,7 +106,7 @@ func (d *Driver) Run() error {
 	// deploy a new version and the socket was created from the old running
 	// plugin.
 	d.log.WithField("socket", addr).Info("removing socket")
-	if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+	if err = os.Remove(addr); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove unix domain socket file %s, error: %s", addr, err)
 	}
 
@@ -139,13 +139,13 @@ func (d *Driver) Stop() {
 	d.srv.Stop()
 }
 
-func getlinodeByName(client *linodego.Client, nodeName string) (*linodego.Instance, error) {
+func getLinodeByName(client *linodego.Client, nodeName string) (*linodego.Instance, error) {
 	jsonFilter, _ := json.Marshal(map[string]string{"label": nodeName})
 	linodes, err := client.ListInstances(context.Background(), linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, err
 	} else if len(linodes) != 1 {
-		return nil, fmt.Errorf("Could not determine Linode instance ID from Linode label %s", nodeName)
+		return nil, fmt.Errorf("could not determine Linode instance ID from Linode label %s", nodeName)
 	}
 
 	for _, linode := range linodes {

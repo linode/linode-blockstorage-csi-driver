@@ -4,6 +4,7 @@ import (
 	v "github.com/appscode/go/version"
 )
 
+// Environment Variables
 var (
 	Version         string
 	VersionStrategy string

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// Size Constants
 const (
 	_  = iota
 	KB = 1 << (10 * iota)
@@ -27,10 +28,6 @@ const (
 
 const (
 	defaultVolumeSizeInGB = 10 * GB
-	RetryInterval         = 5 * time.Second
-	RetryTimeout          = 10 * time.Minute
-
-	createdByLinode = "Created by Linode CSI driver"
 )
 
 // CreateVolume creates a new volume from the given request. The function is
@@ -212,7 +209,7 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 
 	_, err = d.linodeClient.AttachVolume(ctx, volumeID, opts)
 	if err != nil {
-		return nil, fmt.Errorf("Error attaching volume: %s", err)
+		return nil, fmt.Errorf("error attaching volume: %s", err)
 	}
 	if err != nil {
 		return nil, err
@@ -317,9 +314,8 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 		Supported: false,
 	}
 
-	for _, cap := range req.VolumeCapabilities {
-		// cap.AccessMode.Mode
-		if hasSupport(cap.AccessMode.Mode) {
+	for _, capabilities := range req.VolumeCapabilities {
+		if hasSupport(capabilities.AccessMode.Mode) {
 			resp.Supported = true
 		} else {
 			// we need to make sure all capabilities are supported. Revert back
@@ -404,12 +400,12 @@ func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.Control
 
 	// TODO(displague): checkout if the capabilities are worth supporting
 	var caps []*csi.ControllerServiceCapability
-	for _, cap := range []csi.ControllerServiceCapability_RPC_Type{
+	for _, capability := range []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 	} {
-		caps = append(caps, newCap(cap))
+		caps = append(caps, newCap(capability))
 	}
 
 	resp := &csi.ControllerGetCapabilitiesResponse{
@@ -423,16 +419,19 @@ func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.Control
 	return resp, nil
 }
 
+// CreateSnapshot Create Snapshot
 func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
+// DeleteSnapshot Delete Snapshot
 func (d *Driver) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
+// ListSnapshots List Snapshots
 func (d *Driver) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // extractStorage extracts the storage size in GB from the given capacity
@@ -479,7 +478,7 @@ func (d *Driver) waitAction(ctx context.Context, volumeID int, status linodego.V
 		case <-ticker.C:
 			volume, err := d.linodeClient.GetVolume(ctx, volumeID)
 			if err != nil {
-				ll.WithError(err).Info("waiting for volume errored")
+				ll.WithError(err).Info("waiting for volume failed")
 				continue
 			}
 

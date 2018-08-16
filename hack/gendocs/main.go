@@ -82,7 +82,7 @@ func main() {
 			!strings.ContainsRune(base, '_'),
 		}
 		var buf bytes.Buffer
-		if err := tplFrontMatter.ExecuteTemplate(&buf, "cmd", data); err != nil {
+		if err = tplFrontMatter.ExecuteTemplate(&buf, "cmd", data); err != nil {
 			log.Fatalln(err)
 		}
 		return buf.String()

@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"context"
 	"strconv"
 
 	"fmt"
@@ -59,7 +58,7 @@ func TestDriverSuite(t *testing.T) {
 
 	driver := &Driver{
 		endpoint:     endpoint,
-		nodeId:       strconv.Itoa(fake.instance.ID),
+		nodeID:       strconv.Itoa(fake.instance.ID),
 		region:       "us-east",
 		linodeClient: &linodeClient,
 		mounter:      &fakeMounter{},
@@ -88,25 +87,6 @@ func TestDriverSuite(t *testing.T) {
 	}
 
 	sanity.Test(t, cfg)
-}
-
-func createLinode(t *testing.T, client *linodego.Client) int {
-	req := &linodego.InstanceCreateOptions{
-		Type:   "g6-nanode-1",
-		Region: "us-east",
-	}
-	in, err := client.CreateInstance(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return in.ID
-}
-
-func deleteLinode(t *testing.T, client *linodego.Client, id int) {
-	err := client.DeleteInstance(context.Background(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 // fakeAPI implements a fake, cached Linode API

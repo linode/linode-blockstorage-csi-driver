@@ -10,21 +10,14 @@ package driver
 
 import (
 	"context"
-	"path/filepath"
-
 	"strconv"
 
 	"errors"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-)
-
-const (
-	diskIDPath    = "/dev/disk/by-id"
-	diskDevPrefix = "scsi-0LINODE_Volume_"
 )
 
 var (
@@ -58,7 +51,7 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 		return nil, err
 	}
 
-	source := vol.FilesystemPath //getDiskSource(vol.Label)
+	source := vol.FilesystemPath
 	target := req.StagingTargetPath
 
 	mnt := req.VolumeCapability.GetMount()
@@ -86,7 +79,7 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 
 	if !formatted {
 		ll.Info("formatting the volume for staging")
-		if err := d.mounter.Format(source, fsType); err != nil {
+		if err = d.mounter.Format(source, fsType); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
@@ -288,10 +281,4 @@ func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (
 		NodeId:            d.nodeID,
 		MaxVolumesPerNode: 8,
 	}, nil
-}
-
-// getDiskSource returns the absolute path of the attached volume for the given
-// Linode volume name
-func getDiskSource(volumeName string) string {
-	return filepath.Join(diskIDPath, diskDevPrefix+volumeName)
 }
