@@ -8,3 +8,21 @@ language: go
 go:
   - 1.10.x
   - tip
+
+matrix:
+  allow_failures:
+  - go: tip
+
+before_install:
+- go get github.com/mattn/goveralls
+- go get github.com/lawrencewoodman/roveralls
+- go get github.com/alecthomas/gometalinter
+
+install:
+- gometalinter --install
+
+script:
+# - vendor/github.com/kubernetes/repo-infra/verify/verify-boilerplate.sh --rootdir=$(pwd)
+- vendor/github.com/kubernetes/repo-infra/verify/verify-go-src.sh -v --rootdir $(pwd)
+- travis_wait 20 roveralls
+- goveralls -coverprofile=roveralls.coverprofile -service=travis-ci
