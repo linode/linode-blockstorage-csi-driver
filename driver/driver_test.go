@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	"github.com/kubernetes-csi/csi-test/pkg/sanity"
 	"github.com/sirupsen/logrus"
 )

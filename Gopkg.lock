@@ -14,14 +14,6 @@
   revision = "78f1c9091ddd78d1ae6f78d6834d388978a3b64a"
 
 [[projects]]
-  digest = "1:4dc58e6e973b1e37d42ada6a2fddbf1055fb9828fe4c036b62288cf2b4726b6d"
-  name = "github.com/chiefy/linodego"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "e7bd44d89fc5db41b43b8bce7278550a589d7ab6"
-  version = "v0.2.0"
-
-[[projects]]
   digest = "1:cf4f5171128e62b46299b0a7cd79543f50e62f483d2ca9364e4957c7bbee7a38"
   name = "github.com/container-storage-interface/spec"
   packages = ["lib/go/csi/v0"]
@@ -93,6 +85,14 @@
   packages = ["verify/boilerplate/test"]
   pruneopts = "T"
   revision = "c2f9667a4c29e70a39b0e89db2d4f0cab907dbee"
+
+[[projects]]
+  digest = "1:719c492f62f5b31816ae8315747fca291bf051588c76f39518dc91b7a07b1d5c"
+  name = "github.com/linode/linodego"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "7edbc87f0140b7561dbc20458877a56bdded5eb8"
+  version = "v0.3.0"
 
 [[projects]]
   digest = "1:b6a86e76afb80d2eda55b4222b8c848d7f465c65f6142525ed523fffebd2305d"
@@ -327,11 +327,11 @@
     "github.com/appscode/go/log/golog",
     "github.com/appscode/go/runtime",
     "github.com/appscode/go/version",
-    "github.com/chiefy/linodego",
     "github.com/container-storage-interface/spec/lib/go/csi/v0",
     "github.com/golang/glog",
     "github.com/kubernetes-csi/csi-test/pkg/sanity",
     "github.com/kubernetes/repo-infra/verify/boilerplate/test",
+    "github.com/linode/linodego",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/spf13/cobra/doc",

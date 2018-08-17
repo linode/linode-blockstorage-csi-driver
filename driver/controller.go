@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -216,11 +216,11 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 	}
 
 	ll.Infoln("waiting for attaching volume")
-	if err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, 60); err != nil {
+	if volume, err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, 60); err != nil {
 		return nil, err
 	}
 
-	ll.Info("volume is attached")
+	ll.Info("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
