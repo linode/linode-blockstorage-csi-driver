@@ -14,8 +14,8 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/linode/linodego"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"github.com/linode/linodego"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"

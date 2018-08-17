@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"encoding/json"
 	"strings"
 
-	"github.com/linode/linodego"
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"github.com/linode/linodego"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -102,9 +101,13 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	if err := d.waitAction(ctx, vol.ID, linodego.VolumeActive); err != nil {
+	vol, err = d.linodeClient.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, 60)
+
+	if err != nil {
 		return nil, err
 	}
+
+	ll.WithField("vol", vol).Info("volume active")
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
@@ -459,37 +462,4 @@ func extractStorage(capRange *csi.CapacityRange) (int64, error) {
 	}
 
 	return 0, errors.New("requiredBytes and LimitBytes are not the same")
-}
-
-// waitAction waits until the given action for the volume is completed
-func (d *Driver) waitAction(ctx context.Context, volumeID int, status linodego.VolumeStatus) error {
-	ll := d.log.WithFields(logrus.Fields{
-		"volume_id":     volumeID,
-		"volume_status": status,
-	})
-
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-	defer cancel()
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			volume, err := d.linodeClient.GetVolume(ctx, volumeID)
-			if err != nil {
-				ll.WithError(err).Info("waiting for volume failed")
-				continue
-			}
-
-			if volume.Status == status {
-				ll.Info("action completed")
-				return nil
-			}
-
-			// TODO: retry x times?
-		case <-ctx.Done():
-			return fmt.Errorf("timeout occured waiting for storage action of volume: %q", volumeID)
-		}
-	}
 }
