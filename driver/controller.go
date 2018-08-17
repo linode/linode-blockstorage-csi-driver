@@ -102,7 +102,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	if err := d.waitAction(ctx, vol.ID, "active"); err != nil {
+	if err := d.waitAction(ctx, vol.ID, linodego.VolumeActive); err != nil {
 		return nil, err
 	}
 
@@ -216,7 +216,7 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 	}
 
 	ll.Infoln("waiting for attaching volume")
-	if err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, 5); err != nil {
+	if err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, 60); err != nil {
 		return nil, err
 	}
 
