@@ -1,119 +1,96 @@
 # csi-linode [![Build Status](https://travis-ci.org/displague/csi-linode.svg?branch=master)](https://travis-ci.org/displague/csi-linode)
 
-A Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage. The CSI plugin allows you to use Linode Block Storage with your preferred Container Orchestrator.
+The Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to create and mount volumes for persistant storage claims.
 
-The Linode CSI plugin is mostly tested on Kubernetes. Theoretically it
-should also work on other Container Orchestrator's, such as Mesos or
-Cloud Foundry. Feel free to test it on other CO's and give us a feedback.
+More information about the Kubernetes CSI can be found in the GitHub [Kubernetes CSI](https://kubernetes-csi.github.io/docs/Example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repos.
 
-## Installing to Kubernetes
+## Deployment
 
-**Requirements:**
+### Requirements
 
-* Kubernetes v1.10 minimum
-* `--allow-privileged` flag must be set to true for both the API server and the kubelet
-* (if you use Docker) the Docker daemon of the cluster nodes must allow shared mounts
+* Kubernetes v1.10 or newer
+* The node `hostname` must match the Linode Instance `label`
+* `--allow-privileged` must be enabled for the API server and kubelet
 
-### 1. Create a secret with your Linode API Access Token:
+### Secure a Linode API Access Token:
 
-Replace the placeholder string starting with `deadbeef..` with your own secret and
-save it as `secret.yml`: 
+Generate a Personal Access Token (PAT) using the [Linode Cloud Manager](https://cloud.linode.com/profile/tokens).
 
-```yaml
+This token will need:
+
+* Read/Write access to Volumes (to create and delete volumes)
+* Read/Write access to Linodes (to attach and detach volumes)
+* A sufficient "Expiry" to allow for continued use of your volume
+
+
+### Create a Kubernetes secret
+
+Run the following commands to stash a `LINODE_TOKEN` in your Kubernetes cluster:
+
+```bash
+read -s -p "Linode API Access Token: " LINODE_TOKEN
+read -p "Linode Region of Cluster: " LINODE_REGION
+cat <<EOF | kubectl create -f -
+```
+
+Paste the following text at the prompt:
+
+```
 apiVersion: v1
 kind: Secret
 metadata:
   name: linode
   namespace: kube-system
 stringData:
-  token: "deadbeefab1e1ead__REPLACE_ME____deadbeefab1e1ead"
-  region: "us-east"
+  token: "$LINODE_TOKEN"
+  region: "$LINODE_REGION"
+EOF
 ```
 
-and create the secret using kubectl:
-
-```sh
-$ kubectl create -f ./secret.yml
-secret "linode" created
-```
-
-You should now see the `linode` secret in the `kube-system` namespace along with other secrets
+You should receive notification that the secret was created.  You can confirm this by running:
 
 ```sh
 $ kubectl -n kube-system get secrets
 NAME                  TYPE                                  DATA      AGE
-default-token-jskxx   kubernetes.io/service-account-token   3         18h
-linode          Opaque                                1         18h
+linode          Opaque                                2         18h
 ```
 
-#### 2. Deploy the CSI plugin and sidecars:
+### Deploy the CSI
 
-Before you continue, be sure to checkout to a [tagged
-release](https://github.com/displague/csi-linode/releases). For
-example, to use the version `v0.0.1` you can execute the following command:
+The following command will deploy the CSI and related volume attachment and provisioning sidecars:
 
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/displague/csi-linode/master/hack/deploy/releases/csi-linode-v0.0.1.yaml
 ```
 
-A new storage class will be created with the name `linode-block-storage` which is
-responsible for dynamic provisioning. This is set to **"default"** for dynamic
-provisioning. If you're using multiple storage classes you might want to remove
-the annotation from the `csi-storageclass.yaml` and re-deploy it. This is
-based on the [recommended mechanism](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md#recommended-mechanism-for-deploying-csi-drivers-on-kubernetes) of deploying CSI drivers on Kubernetes
+This deployment is a concatenation of all of the `yaml` files in [https://github.com/displague/csi-linode/tree/master/hack/deploy].
 
-*Note that the deployment proposal to Kubernetes is still a work in progress and not all of the written
-features are implemented. When in doubt, open an issue or ask #sig-storage in [Kubernetes Slack](http://slack.k8s.io)*
-
-#### 3. Test and verify
-
-Create a PersistentVolumeClaim. This makes sure a volume is created and provisioned on your behalf:
-
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: csi-pvc
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: linode-block-storage
-```
-
-After that create a Pod that refers to this volume. When the Pod is created, the volume will be attached, formatted and mounted to the specified Container
-
-```yaml
-kind: Pod
-apiVersion: v1
-metadata:
-  name: my-csi-app
-spec:
-  containers:
-    - name: my-frontend
-      image: busybox
-      volumeMounts:
-      - mountPath: "/data"
-        name: my-linode-volume
-      command: [ "sleep", "1000000" ]
-  volumes:
-    - name: my-linode-volume
-      persistentVolumeClaim:
-        claimName: csi-pvc
-```
-
-Check if the pod is running successfully:
+Notably, this deployment will make linode-block-storage the default storageclass.  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/displague/csi-linode/blob/master/hack/deploy/csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
 
 ```sh
+$ kubectl get storageclasses
+NAME                             PROVISIONER               AGE
+linode-block-storage (default)   com.linode.csi.linodebs   2d
+```
+
+### Create a PersistentVolumeClaim
+
+Verify that the volume is created, provisioned, mounted, and consumed properlyThis makes sure a volume is created and provisioned on your behalf:
+
+```
+kubectl create -f https://github.com/displague/csi-linode/blob/master/hack/deploy/example/csi-pvc.yaml
+kubectl create -f https://github.com/displague/csi-linode/blob/master/hack/deploy/example/csi-app.yaml
+```
+
+Verify that the pod is running and can consume the volume:
+
+```sh
+kubectl get pvc
 kubectl describe pods/my-csi-app
 ```
 
-Write inside the app container:
-
 ```sh
-$ kubectl exec -ti my-csi-app /bin/sh
+$ kubectl exec -it my-csi-app /bin/sh
 / # touch /data/hello-world
 / # exit
 $ kubectl exec -ti my-csi-app /bin/sh
