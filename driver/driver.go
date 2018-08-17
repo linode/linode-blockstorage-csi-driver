@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/chiefy/linodego"
+	"github.com/linode/linodego"
 	csi "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
@@ -57,7 +57,7 @@ func NewDriver(ep, token, zone, host string, url *string) (*Driver, error) {
 		},
 	}
 
-	ua := fmt.Sprintf("LinodeCSI/%s (linodego %s)", vendorVersion, linodego.Version)
+	ua := fmt.Sprintf("LinodeCSI/%s linodego/%s", vendorVersion, linodego.Version)
 	linodeClient := linodego.NewClient(oauth2Client)
 	linodeClient.SetUserAgent(ua)
 	linodeClient.SetDebug(true)
