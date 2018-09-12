@@ -35,7 +35,7 @@ func TestDriverSuite(t *testing.T) {
 	// mock Linode Server, not working yet ...
 	fake := &fakeAPI{
 		t:       t,
-		volumes: map[string]*linodego.Volume{},
+		volumes: map[string]linodego.Volume{},
 		instance: &linodego.Instance{
 			Label:      "linode123",
 			Region:     "us-east",
@@ -92,7 +92,7 @@ func TestDriverSuite(t *testing.T) {
 // fakeAPI implements a fake, cached Linode API
 type fakeAPI struct {
 	t        *testing.T
-	volumes  map[string]*linodego.Volume
+	volumes  map[string]linodego.Volume
 	instance *linodego.Instance
 }
 
@@ -104,26 +104,24 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case strings.HasPrefix(r.URL.Path, "/volumes/"):
 			// single volume get
 			id := filepath.Base(r.URL.Path)
-			vol := f.volumes[id]
-			if vol == nil {
-				resp := linodego.VolumesPagedResponse{
-					PageOptions: &linodego.PageOptions{
-						Page:    1,
-						Pages:   1,
-						Results: 0,
+			vol, ok := f.volumes[id]
+			if ok {
+				rr, _ := json.Marshal(vol)
+				w.Write(rr)
+			} else {
+				w.WriteHeader(404)
+				resp := linodego.APIError{
+					Errors: []linodego.APIErrorReason{
+						{Reason: "Not Found"},
 					},
-					Data: []*linodego.Volume{},
 				}
 				rr, _ := json.Marshal(resp)
 				w.Write(rr)
 			}
-			rr, _ := json.Marshal(&vol)
-			w.Write(rr)
-
 			return
 		case strings.HasPrefix(r.URL.Path, "/volumes"):
 			res := 0
-			data := []*linodego.Volume{}
+			data := []linodego.Volume{}
 
 			for _, vol := range f.volumes {
 				data = append(data, vol)
@@ -151,6 +149,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		tp := filepath.Base(r.URL.Path)
 		var vol linodego.Volume
+		var found bool
 		if tp == "attach" {
 			v := new(linodego.VolumeAttachOptions)
 			if err := json.NewDecoder(r.Body).Decode(v); err != nil {
@@ -160,22 +159,44 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if len(parts) != 4 {
 				f.t.Fatal("url not good")
 			}
-			vol = *f.volumes[parts[2]]
+			vol, found = f.volumes[parts[2]]
+			if !found {
+				w.WriteHeader(404)
+				resp := linodego.APIError{
+					Errors: []linodego.APIErrorReason{
+						{Reason: "Not Found"},
+					},
+				}
+				rr, _ := json.Marshal(resp)
+				w.Write(rr)
+				return
+			}
 			if vol.LinodeID != nil {
 				f.t.Fatal("volume already attached")
 				return
 			}
 			vol.LinodeID = &v.LinodeID
-			f.volumes[parts[2]] = &vol
+			f.volumes[parts[2]] = vol
 
 		} else if tp == "detach" {
 			parts := strings.Split(r.URL.Path, "/")
 			if len(parts) != 4 {
 				f.t.Fatal("url not good")
 			}
-			vol = *f.volumes[parts[2]]
+			vol, found = f.volumes[parts[2]]
+			if !found {
+				w.WriteHeader(404)
+				resp := linodego.APIError{
+					Errors: []linodego.APIErrorReason{
+						{Reason: "Not Found"},
+					},
+				}
+				rr, _ := json.Marshal(resp)
+				w.Write(rr)
+				return
+			}
 			vol.LinodeID = nil
-			f.volumes[parts[2]] = &vol
+			f.volumes[parts[2]] = vol
 			return
 		} else {
 			v := new(linodego.VolumeCreateOptions)
@@ -201,7 +222,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
 			}
 
-			f.volumes[strconv.Itoa(id)] = &vol
+			f.volumes[strconv.Itoa(id)] = vol
 
 		}
 

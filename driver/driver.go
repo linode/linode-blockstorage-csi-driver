@@ -150,7 +150,7 @@ func getLinodeByName(client *linodego.Client, nodeName string) (*linodego.Instan
 
 	for _, linode := range linodes {
 		if linode.Label == string(nodeName) {
-			return linode, nil
+			return &linode, nil
 		}
 	}
 	return nil, InstanceNotFound

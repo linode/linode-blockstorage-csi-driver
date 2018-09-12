@@ -251,12 +251,9 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 		return nil, err
 	}
 
-	success, err := d.linodeClient.DetachVolume(ctx, volumeID)
-	if success == false {
-		return nil, fmt.Errorf("failed to detach volume")
-	}
+	err = d.linodeClient.DetachVolume(ctx, volumeID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error detaching volume: %s", err)
 	}
 
 	ll.Info("volume is detached")
@@ -351,7 +348,7 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 	ll.Info("list volumes called")
 
 	// TODO(sanjid) : understand paginate here
-	var volumes []*linodego.Volume
+	var volumes []linodego.Volume
 	//lastPage := 0
 
 	volumes, err = d.linodeClient.ListVolumes(ctx, listOpts)
