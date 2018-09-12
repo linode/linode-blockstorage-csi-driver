@@ -32,7 +32,7 @@ ignored = ["github.com/kubernetes/repo-infra/kazel"]
   name = "github.com/appscode/go"
 
 [[constraint]]
-  version = "0.3.0"
+  version = "0.5.1"
   name = "github.com/linode/linodego"
 
 [[constraint]]

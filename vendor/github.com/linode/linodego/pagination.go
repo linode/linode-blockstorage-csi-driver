@@ -6,6 +6,7 @@ package linodego
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 
@@ -14,27 +15,15 @@ import (
 
 // PageOptions are the pagination parameters for List endpoints
 type PageOptions struct {
-	Page    int `url:"page,omitempty"`
-	Pages   int `url:"pages,omitempty"`
-	Results int `url:"results,omitempty"`
+	Page    int `url:"page,omitempty" json:"page"`
+	Pages   int `url:"pages,omitempty" json:"pages"`
+	Results int `url:"results,omitempty" json:"results"`
 }
 
 // ListOptions are the pagination and filtering (TODO) parameters for endpoints
 type ListOptions struct {
 	*PageOptions
 	Filter string
-}
-
-type pagedResponse struct {
-	listResponse
-	*PageOptions
-}
-
-type listResponse interface {
-	endpoint(*Client) string
-	appendData(*resty.Response)
-	setResult(*resty.Request)
-	listHelper(*resty.Request, *ListOptions) *Error
 }
 
 // NewListOptions simplified construction of ListOptions using only
@@ -111,9 +100,13 @@ func (c *Client) listHelper(ctx context.Context, i interface{}, opts *ListOption
 		}
 	case *DomainsPagedResponse:
 		if r, err = coupleAPIErrors(req.SetResult(DomainsPagedResponse{}).Get(v.endpoint(c))); err == nil {
-			pages = r.Result().(*DomainsPagedResponse).Pages
-			results = r.Result().(*DomainsPagedResponse).Results
-			v.appendData(r.Result().(*DomainsPagedResponse))
+			response, ok := r.Result().(*DomainsPagedResponse)
+			if !ok {
+				return fmt.Errorf("Response is not a *DomainsPagedResponse")
+			}
+			pages = response.Pages
+			results = response.Results
+			v.appendData(response)
 		}
 	case *EventsPagedResponse:
 		if r, err = coupleAPIErrors(req.SetResult(EventsPagedResponse{}).Get(v.endpoint(c))); err == nil {
@@ -151,6 +144,16 @@ func (c *Client) listHelper(ctx context.Context, i interface{}, opts *ListOption
 			results = r.Result().(*IPv6RangesPagedResponse).Results
 			v.appendData(r.Result().(*IPv6RangesPagedResponse))
 			// @TODO consolidate this type with IPv6PoolsPagedResponse?
+		}
+	case *SSHKeysPagedResponse:
+		if r, err = coupleAPIErrors(req.SetResult(SSHKeysPagedResponse{}).Get(v.endpoint(c))); err == nil {
+			response, ok := r.Result().(*SSHKeysPagedResponse)
+			if !ok {
+				return fmt.Errorf("Response is not a *SSHKeysPagedResponse")
+			}
+			pages = response.Pages
+			results = response.Results
+			v.appendData(response)
 		}
 	case *TicketsPagedResponse:
 		if r, err = coupleAPIErrors(req.SetResult(TicketsPagedResponse{}).Get(v.endpoint(c))); err == nil {
@@ -276,7 +279,9 @@ func (c *Client) listHelper(ctx context.Context, i interface{}, opts *ListOption
 
 	if opts == nil {
 		for page := 2; page <= pages; page = page + 1 {
-			c.listHelper(ctx, i, &ListOptions{PageOptions: &PageOptions{Page: page}})
+			if err := c.listHelper(ctx, i, &ListOptions{PageOptions: &PageOptions{Page: page}}); err != nil {
+				return err
+			}
 		}
 	} else {
 		if opts.PageOptions == nil {
@@ -286,7 +291,9 @@ func (c *Client) listHelper(ctx context.Context, i interface{}, opts *ListOption
 		if opts.Page == 0 {
 			for page := 2; page <= pages; page = page + 1 {
 				opts.Page = page
-				c.listHelper(ctx, i, opts)
+				if err := c.listHelper(ctx, i, opts); err != nil {
+					return err
+				}
 			}
 		}
 		opts.Results = results
@@ -327,9 +334,13 @@ func (c *Client) listHelperWithID(ctx context.Context, i interface{}, id int, op
 		}
 	case *DomainRecordsPagedResponse:
 		if r, err = coupleAPIErrors(req.SetResult(DomainRecordsPagedResponse{}).Get(v.endpointWithID(c, id))); err == nil {
-			pages = r.Result().(*DomainRecordsPagedResponse).Pages
-			results = r.Result().(*DomainRecordsPagedResponse).Results
-			v.appendData(r.Result().(*DomainRecordsPagedResponse))
+			response, ok := r.Result().(*DomainRecordsPagedResponse)
+			if !ok {
+				return fmt.Errorf("Response is not a *DomainRecordsPagedResponse")
+			}
+			pages = response.Pages
+			results = response.Results
+			v.appendData(response)
 		}
 	case *InstanceConfigsPagedResponse:
 		if r, err = coupleAPIErrors(req.SetResult(InstanceConfigsPagedResponse{}).Get(v.endpointWithID(c, id))); err == nil {
@@ -383,7 +394,9 @@ func (c *Client) listHelperWithID(ctx context.Context, i interface{}, id int, op
 
 	if opts == nil {
 		for page := 2; page <= pages; page = page + 1 {
-			c.listHelperWithID(ctx, i, id, &ListOptions{PageOptions: &PageOptions{Page: page}})
+			if err := c.listHelperWithID(ctx, i, id, &ListOptions{PageOptions: &PageOptions{Page: page}}); err != nil {
+				return err
+			}
 		}
 	} else {
 		if opts.PageOptions == nil {
@@ -392,7 +405,9 @@ func (c *Client) listHelperWithID(ctx context.Context, i interface{}, id int, op
 		if opts.Page == 0 {
 			for page := 2; page <= pages; page = page + 1 {
 				opts.Page = page
-				c.listHelperWithID(ctx, i, id, opts)
+				if err := c.listHelperWithID(ctx, i, id, opts); err != nil {
+					return err
+				}
 			}
 		}
 		opts.Results = results
@@ -442,7 +457,9 @@ func (c *Client) listHelperWithTwoIDs(ctx context.Context, i interface{}, firstI
 
 	if opts == nil {
 		for page := 2; page <= pages; page = page + 1 {
-			c.listHelper(ctx, i, &ListOptions{PageOptions: &PageOptions{Page: page}})
+			if err := c.listHelper(ctx, i, &ListOptions{PageOptions: &PageOptions{Page: page}}); err != nil {
+				return err
+			}
 		}
 	} else {
 		if opts.PageOptions == nil {
@@ -451,7 +468,9 @@ func (c *Client) listHelperWithTwoIDs(ctx context.Context, i interface{}, firstI
 		if opts.Page == 0 {
 			for page := 2; page <= pages; page = page + 1 {
 				opts.Page = page
-				c.listHelperWithTwoIDs(ctx, i, firstID, secondID, opts)
+				if err := c.listHelperWithTwoIDs(ctx, i, firstID, secondID, opts); err != nil {
+					return err
+				}
 			}
 		}
 		opts.Results = results

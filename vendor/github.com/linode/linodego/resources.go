@@ -33,14 +33,15 @@ const (
 	nodebalancersName         = "nodebalancers"
 	nodebalancerconfigsName   = "nodebalancerconfigs"
 	nodebalancernodesName     = "nodebalancernodes"
+	sshkeysName               = "sshkeys"
 	ticketsName               = "tickets"
 	accountName               = "account"
 	eventsName                = "events"
 	invoicesName              = "invoices"
 	invoiceItemsName          = "invoiceitems"
-	notificationsName         = "notifications"
 	profileName               = "profile"
 	managedName               = "managed"
+	// notificationsName = "notifications"
 
 	stackscriptsEndpoint          = "linode/stackscripts"
 	imagesEndpoint                = "images"
@@ -69,14 +70,15 @@ const (
 	// Should we include these fields in CreateOpts and UpdateOpts?
 	nodebalancerconfigsEndpoint = "nodebalancers/{{ .ID }}/configs"
 	nodebalancernodesEndpoint   = "nodebalancers/{{ .ID }}/configs/{{ .SecondID }}/nodes"
+	sshkeysEndpoint             = "profile/sshkeys"
 	ticketsEndpoint             = "support/tickets"
 	accountEndpoint             = "account"
 	eventsEndpoint              = "account/events"
 	invoicesEndpoint            = "account/invoices"
 	invoiceItemsEndpoint        = "account/invoices/{{ .ID }}/items"
-	notificationsEndpoint       = "account/notifications"
 	profileEndpoint             = "profile"
 	managedEndpoint             = "managed"
+	// notificationsEndpoint       = "account/notifications"
 )
 
 // Resource represents a linode API resource
