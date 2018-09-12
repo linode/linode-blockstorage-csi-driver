@@ -29,6 +29,8 @@ const (
 	defaultVolumeSizeInGB = 10 * GB
 )
 
+const waitTimeout = 60
+
 // CreateVolume creates a new volume from the given request. The function is
 // idempotent.
 func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -101,7 +103,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	vol, err = d.linodeClient.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, 60)
+	vol, err = d.linodeClient.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
 
 	if err != nil {
 		return nil, err
@@ -219,7 +221,7 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 	}
 
 	ll.Infoln("waiting for attaching volume")
-	if volume, err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, 60); err != nil {
+	if volume, err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout); err != nil {
 		return nil, err
 	}
 
@@ -254,6 +256,11 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 	err = d.linodeClient.DetachVolume(ctx, volumeID)
 	if err != nil {
 		return nil, fmt.Errorf("Error detaching volume: %s", err)
+	}
+
+	ll.Infoln("waiting for detaching volume")
+	if _, err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
+		return nil, err
 	}
 
 	ll.Info("volume is detached")
