@@ -87,12 +87,12 @@
   revision = "c2f9667a4c29e70a39b0e89db2d4f0cab907dbee"
 
 [[projects]]
-  digest = "1:719c492f62f5b31816ae8315747fca291bf051588c76f39518dc91b7a07b1d5c"
+  digest = "1:c5363063ead7933de35c95fc1b8594284d85425d628ff8f9163c62e469d36d56"
   name = "github.com/linode/linodego"
   packages = ["."]
   pruneopts = "T"
-  revision = "7edbc87f0140b7561dbc20458877a56bdded5eb8"
-  version = "v0.3.0"
+  revision = "d0d31d8ca62fa3f7e4526ca0ce95de81e4ed001e"
+  version = "v0.5.1"
 
 [[projects]]
   digest = "1:b6a86e76afb80d2eda55b4222b8c848d7f465c65f6142525ed523fffebd2305d"
