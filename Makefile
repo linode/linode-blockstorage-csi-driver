@@ -1,9 +1,18 @@
 VERSION ?= v0.0.1
 NAME=linode-csi-plugin
+DOCKER_ORG=displague
 
 all: publish
 
-publish: compile verify test build push clean
+# TODO add push back
+# publish: compile verify test build push clean
+publish: compile verify test build clean
+
+$(GOPATH)/bin/dep:
+	@go get -u github.com/golang/dep/cmd/dep
+
+vendor: $(GOPATH)/bin/dep
+	@dep ensure
 
 compile:
 	@echo "==> Building the project"
@@ -11,13 +20,13 @@ compile:
 
 build:
 	@echo "==> Building the docker image"
-	@docker build -t displague/linode-csi-plugin:$(VERSION) .
+	@docker build -t $(DOCKER_ORG)/$(NAME):$(VERSION) .
 
 push:
-	@echo "==> Publishing displague/linode-csi-plugin:$(VERSION)"
+	@echo "==> Publishing $(DOCKER_ORG)/$(NAME):$(VERSION)"
 	@echo "$$DOCKER_PASSWORD" | docker login -u "$$DOCKER_USERNAME" --password-stdin
-	@docker push displague/linode-csi-plugin:$(VERSION)
-	@echo "==> Your image is now available at displague/linode-csi-plugin:$(VERSION)"
+	@docker push $(DOCKER_ORG)/$(NAME):$(VERSION)
+	@echo "==> Your image is now available at $(DOCKER_ORG)/$(NAME):$(VERSION)"
 
 test:
 	go test -v ./...
