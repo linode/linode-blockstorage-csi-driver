@@ -78,8 +78,8 @@ linode-block-storage (default)   com.linode.csi.linodebs   2d
 Verify that the volume is created, provisioned, mounted, and consumed properlyThis makes sure a volume is created and provisioned on your behalf:
 
 ```
-kubectl create -f https://github.com/displague/csi-linode/blob/master/hack/deploy/example/csi-pvc.yaml
-kubectl create -f https://github.com/displague/csi-linode/blob/master/hack/deploy/example/csi-app.yaml
+kubectl create -f https://raw.githubusercontent.com/displague/csi-linode/master/hack/deploy/example/csi-pvc.yaml
+kubectl create -f https://raw.githubusercontent.com/displague/csi-linode/master/hack/deploy/example/csi-app.yaml
 ```
 
 Verify that the pod is running and can consume the volume:
