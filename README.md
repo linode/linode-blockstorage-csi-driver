@@ -104,10 +104,11 @@ $ kubectl exec -ti my-csi-app /bin/sh
 hello-world
 ```
 
-## Discussion / Help
+## Contribution Guidelines
 
-Join us at [#linodego](https://gophers.slack.com/messages/CAG93EB2S) on the [gophers slack](https://gophers.slack.com)
+Want to improve the linode-blockstorage-csi-driver? Please start [here](/CONTRIBUTING.md).
 
-## License
+## Join the Go Community
 
-[Apache License](LICENSE)
+For general help or discussion, join the [Gophers Slack team](https://gophers.slack.com) channel [#linodego](https://gophers.slack.com/messages/CAG93EB2S).
+
