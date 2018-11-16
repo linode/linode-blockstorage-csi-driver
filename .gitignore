@@ -22,8 +22,8 @@ _cgo_export.*
 
 _output
 _testmain.go
-linode-csi-plugin
-csi-linode
+linode-blockstorage-csi-driver
+linode-blockstorage-csi-driver
 
 *.exe
 *.test

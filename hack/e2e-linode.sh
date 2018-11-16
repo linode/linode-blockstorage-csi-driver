@@ -1,16 +1,11 @@
 #!/bin/bash
 
-## This file is for app/hostpathplugin
-## It could be used for other apps in this repo, but
-## those applications may or may not take the same
-## arguments
-
 ## Must be run from the root of the repo
 
 UDS="/tmp/e2e-csi-sanity.sock"
 CSI_ENDPOINT="unix://${UDS}"
 CSI_MOUNTPOINT="/mnt"
-APP=hostpathplugin
+APP=linode
 
 SKIP="WithCapacity"
 if [ x${TRAVIS} = x"true" ] ; then
@@ -21,7 +16,7 @@ fi
 ./hack/get-sanity.sh
 
 # Build
-make hostpath
+make linode
 
 # Cleanup
 rm -f $UDS
@@ -30,7 +25,7 @@ rm -f $UDS
 sudo _output/$APP --endpoint=$CSI_ENDPOINT --nodeid=1 &
 pid=$!
 
-# Need to skip Capacity testing since hostpath does not support it
+# Need to skip Capacity testing since linode does not support it
 sudo $GOPATH/bin/csi-sanity $@ \
     --ginkgo.skip=${SKIP} \
     --csi.mountdir=$CSI_MOUNTPOINT \

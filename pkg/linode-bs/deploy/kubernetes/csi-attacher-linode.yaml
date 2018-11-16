@@ -2,12 +2,12 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: csi-attacher-linodeplugin
+  name: csi-attacher
   labels:
-    app: csi-attacher-linodeplugin
+    app: csi-attacher
 spec:
   selector:
-    app: csi-attacher-linodeplugin
+    app: csi-attacher
   ports:
     - name: dummy
       port: 12345
@@ -15,14 +15,14 @@ spec:
 kind: StatefulSet
 apiVersion: apps/v1beta1
 metadata:
-  name: csi-attacher-linodeplugin
+  name: csi-attacher
 spec:
-  serviceName: "csi-attacher-linodeplugin"
+  serviceName: "csi-attacher"
   replicas: 1
   template:
     metadata:
       labels:
-        app: csi-attacher-linodeplugin
+        app: csi-attacher
     spec:
       serviceAccount: csi-attacher
       containers:
@@ -33,20 +33,20 @@ spec:
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+              value: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/csi.sock
           imagePullPolicy: "IfNotPresent"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: linode-csi-plugin
-          image: linode/linode-csi-plugin:v0.0.1
+              mountPath: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/
+        - name: linode-blockstorage-csi-driver
+          image: linode/linode-blockstorage-csi-driver:v0.0.1
           args :
             - init
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
           env:
             - name: CSI_ENDPOINT
-              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+              value: unix:///var/lib/kubelet/plugins/linode-blockstorage-csi-driver/csi.sock
             - name: LINODE_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -55,7 +55,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
+              mountPath: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/
       volumes:
         - name: socket-dir
           emptyDir: {}
