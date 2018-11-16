@@ -1,5 +1,5 @@
 # Configuration to deploy release version of the CSI Linode
-# plugin (https://github.com/linode/csi-linode) compatible with
+# plugin (https://github.com/linode/linode-blockstorage-csi-driver) compatible with
 # Kubernetes >=v1.10
 #
 # example usage: kubectl create -f <this_file>
@@ -61,13 +61,13 @@ roleRef:
 kind: Service
 apiVersion: v1
 metadata:
-  name: csi-attacher-linodeplugin
+  name: csi-attacher
   namespace: kube-system
   labels:
-    app: csi-attacher-linodeplugin
+    app: csi-attacher
 spec:
   selector:
-    app: csi-attacher-linodeplugin
+    app: csi-attacher
   ports:
     - name: dummy
       port: 12345
@@ -75,15 +75,15 @@ spec:
 kind: StatefulSet
 apiVersion: apps/v1beta1
 metadata:
-  name: csi-attacher-linodeplugin
+  name: csi-attacher
   namespace: kube-system
 spec:
-  serviceName: "csi-attacher-linodeplugin"
+  serviceName: "csi-attacher"
   replicas: 1
   template:
     metadata:
       labels:
-        app: csi-attacher-linodeplugin
+        app: csi-attacher
     spec:
       serviceAccount: csi-attacher
       containers:
@@ -94,13 +94,13 @@ spec:
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+              value: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/csi.sock
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: linode-csi-plugin
-          image: linode/linode-csi-plugin:v0.0.1
+              mountPath: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/
+        - name: linode-blockstorage-csi-driver
+          image: linode/linode-blockstorage-csi-driver:v0.0.1
           args :
             - init
             - "--region=$(LINODE_REGION)"
@@ -111,7 +111,7 @@ spec:
             - "--v=10"
           env:
             - name: CSI_ENDPOINT
-              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+              value: unix:///var/lib/kubelet/plugins/linode-blockstorage-csi-driver/csi.sock
             - name: LINODE_API_URL
               value: https://api.linode.com/v4
             - name: NODE_NAME
@@ -131,7 +131,7 @@ spec:
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
+              mountPath: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/
       volumes:
         - name: socket-dir
           emptyDir: {}
@@ -183,13 +183,13 @@ roleRef:
 kind: Service
 apiVersion: v1
 metadata:
-  name: csi-provisioner-linodeplugin
+  name: csi-provisioner
   namespace: kube-system
   labels:
-    app: csi-provisioner-linodeplugin
+    app: csi-provisioner
 spec:
   selector:
-    app: csi-provisioner-linodeplugin
+    app: csi-provisioner
   ports:
     - name: dummy
       port: 12345
@@ -197,15 +197,15 @@ spec:
 kind: StatefulSet
 apiVersion: apps/v1beta1
 metadata:
-  name: csi-provisioner-linodeplugin
+  name: csi-provisioner
   namespace: kube-system
 spec:
-  serviceName: "csi-provisioner-linodeplugin"
+  serviceName: "csi-provisioner"
   replicas: 1
   template:
     metadata:
       labels:
-        app: csi-provisioner-linodeplugin
+        app: csi-provisioner
     spec:
       serviceAccount: csi-provisioner
       containers:
@@ -217,13 +217,13 @@ spec:
             - "--v=5"
           env:
             - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+              value: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/csi.sock
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: linode-csi-plugin
-          image: linode/linode-csi-plugin:v0.0.1
+              mountPath: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/
+        - name: linode-blockstorage-csi-driver
+          image: linode/linode-blockstorage-csi-driver:v0.0.1
           args :
             - init
             - "--region=$(LINODE_REGION)"
@@ -234,7 +234,7 @@ spec:
             - "--v=10"
           env:
             - name: CSI_ENDPOINT
-              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+              value: unix:///var/lib/kubelet/plugins/linode-blockstorage-csi-driver/csi.sock
             - name: LINODE_API_URL
               value: https://api.linode.com/v4
             - name: NODE_NAME
@@ -254,7 +254,7 @@ spec:
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
+              mountPath: /var/lib/kubelet/plugins/linode-blockstorage-csi-driver/
       volumes:
         - name: socket-dir
           emptyDir: {}
@@ -262,13 +262,13 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-linodeplugin
+  name: linode-blockstorage-csi-driver
   namespace: kube-system
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-linodeplugin
+  name: linode-blockstorage-csi-driver
   namespace: kube-system
 rules:
   - apiGroups: [""]
@@ -290,33 +290,33 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-linodeplugin
+  name: linode-blockstorage-csi-driver
   namespace: kube-system
 subjects:
   - kind: ServiceAccount
-    name: csi-linodeplugin
+    name: linode-blockstorage-csi-driver
     namespace: kube-system
 roleRef:
   kind: ClusterRole
-  name: csi-linodeplugin
+  name: linode-blockstorage-csi-driver
   apiGroup: rbac.authorization.k8s.io          
 
 ---
 kind: DaemonSet
 apiVersion: apps/v1beta2
 metadata:
-  name: csi-linodeplugin
+  name: linode-blockstorage-csi-driver
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: csi-linodeplugin
+      app: linode-blockstorage-csi-driver
   template:
     metadata:
       labels:
-        app: csi-linodeplugin
+        app: linode-blockstorage-csi-driver
     spec:
-      serviceAccount: csi-linodeplugin
+      serviceAccount: linode-blockstorage-csi-driver
       hostNetwork: true
       containers:
         - name: driver-registrar
@@ -334,13 +334,13 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi/
-        - name: csi-linodeplugin 
+        - name: linode-blockstorage-csi-driver 
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: linode/linode-csi-plugin:v0.0.1
+          image: linode/linode-blockstorage-csi-driver:v0.0.1
           args :
             - init
             - "--region=$(LINODE_REGION)"

@@ -1,4 +1,4 @@
-# Linode Block Storage CSI Driver [![Build Status](https://travis-ci.org/linode/csi-linode.svg?branch=master)](https://travis-ci.org/linode/csi-linode)
+# Linode Block Storage CSI Driver [![Build Status](https://travis-ci.org/linode/linode-blockstorage-csi-driver.svg?branch=master)](https://travis-ci.org/linode/linode-blockstorage-csi-driver)
 
 ## Overview
 The Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to manage the life-cycle of persistant storage claims.
@@ -66,12 +66,12 @@ linode          Opaque                                2         18h
 The following command will deploy the CSI and related volume attachment and provisioning sidecars:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/csi-linode/master/hack/deploy/releases/csi-linode-v0.0.1.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.0.1.yaml
 ```
 
-This deployment is a concatenation of all of the `yaml` files in [https://github.com/linode/csi-linode/tree/master/hack/deploy].
+This deployment is a concatenation of all of the `yaml` files in [https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/].
 
-Notably, this deployment will make linode-block-storage the default storageclass.  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/csi-linode/blob/master/hack/deploy/csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
+Notably, this deployment will make `linode-block-storage` the default storageclass.  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
 
 ```sh
 $ kubectl get storageclasses
@@ -84,8 +84,8 @@ linode-block-storage (default)   linodebs.csi.linode.com   2d
 Verify that the volume is created, provisioned, mounted, and consumed properlyThis makes sure a volume is created and provisioned on your behalf:
 
 ```sh
-kubectl create -f https://raw.githubusercontent.com/linode/csi-linode/master/hack/deploy/example/csi-pvc.yaml
-kubectl create -f https://raw.githubusercontent.com/linode/csi-linode/master/hack/deploy/example/csi-app.yaml
+kubectl create -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/examples/kubernetes/csi-pvc.yaml
+kubectl create -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/examples/kubernetes/csi-app.yaml
 ```
 
 Verify that the pod is running and can consume the volume:

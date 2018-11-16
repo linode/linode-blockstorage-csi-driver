@@ -1,4 +1,4 @@
-module github.com/linode/csi-linode
+module github.com/linode/linode-blockstorage-csi-driver
 
 require (
 	github.com/alecthomas/gocyclo v0.0.0-20150208221726-aa8f8b160214 // indirect

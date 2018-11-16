@@ -22,7 +22,7 @@ import (
 
 	logs "github.com/appscode/go/log/golog"
 	"github.com/golang/glog"
-	"github.com/linode/csi-linode/pkg/linode-bs"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
 	"github.com/spf13/cobra"
 )
 
@@ -80,7 +80,7 @@ func NewCmdInit() *cobra.Command {
 func NewRootCmd(version string) *cobra.Command {
 
 	rootCmd := &cobra.Command{
-		Use:               "csi-linode [command]",
+		Use:               "linode-blockstorage-csi-driver [command]",
 		Short:             `Linode CSI plugin`,
 		DisableAutoGenTag: true,
 		PersistentPreRun: func(c *cobra.Command, args []string) {

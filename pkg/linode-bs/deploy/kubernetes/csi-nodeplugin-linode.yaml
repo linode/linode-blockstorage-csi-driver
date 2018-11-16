@@ -2,17 +2,17 @@
 kind: DaemonSet
 apiVersion: apps/v1beta2
 metadata:
-  name: csi-linodeplugin
+  name: linode-blockstorage-csi-driver
 spec:
   selector:
     matchLabels:
-      app: csi-linodeplugin
+      app: linode-blockstorage-csi-driver
   template:
     metadata:
       labels:
-        app: csi-linodeplugin
+        app: linode-blockstorage-csi-driver
     spec:
-      serviceAccount: csi-linodeplugin
+      serviceAccount: linode-blockstorage-csi-driver
       hostNetwork: true
       containers:
         - name: driver-registrar
@@ -30,13 +30,13 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi/
-        - name: csi-linodeplugin 
+        - name: linode-blockstorage-csi-driver 
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: linode/linode-csi-plugin:v0.0.1
+          image: linode/linode-blockstorage-csi-driver:v0.0.1
           args :
             - init
             - "--endpoint=$(CSI_ENDPOINT)"

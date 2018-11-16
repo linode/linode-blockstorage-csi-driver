@@ -13,7 +13,7 @@
 # limitations under the License.
 
 REGISTRY_NAME=hub.docker.com/linode
-IMAGE_NAME=linode-csi-plugin
+IMAGE_NAME=linode-blockstorage-csi-driver
 IMAGE_VERSION=canary
 IMAGE_TAG=$(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 REV=$(shell git describe --long --tags --dirty)
@@ -28,7 +28,7 @@ test:
 vendor: 
 	@GO111MODULE=on go mod vendor
 linode: vendor
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X github.com/linode/csi-linode/pkg/hostpath.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X github.com/linode/linode-blockstorage-csi-driver/pkg/hostpath.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
 linode-container: linode
 	docker build -t $(IMAGE_TAG) -f ./app/linode/Dockerfile .
 push: linode-container
