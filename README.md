@@ -10,7 +10,6 @@ More information about the Kubernetes CSI can be found in the GitHub [Kubernetes
 **Warning**: This driver is a Work-In-Progress and may not be compatible between driver versions and Kubernetes versions.
 
 This is not officially supported by Linode.
->>>>>>> Initial commit
 
 ## Deployment
 
@@ -105,7 +104,11 @@ $ kubectl exec -ti my-csi-app /bin/sh
 hello-world
 ```
 
-## Discussion / Help
+## Contribution Guidelines
 
-Join us at [#linodego](https://gophers.slack.com/messages/CAG93EB2S) on the [gophers slack](https://gophers.slack.com)
+Want to improve the linode-blockstorage-csi-driver? Please start [here](/CONTRIBUTING.md).
+
+## Join the Go Community
+
+For general help or discussion, join the [Gophers Slack team](https://gophers.slack.com) channel [#linodego](https://gophers.slack.com/messages/CAG93EB2S).
 
