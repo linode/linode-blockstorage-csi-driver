@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY_NAME=hub.docker.com/linode
+REGISTRY_NAME=index.docker.io/linode
 IMAGE_NAME=linode-blockstorage-csi-driver
 IMAGE_VERSION=canary
 IMAGE_TAG=$(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
