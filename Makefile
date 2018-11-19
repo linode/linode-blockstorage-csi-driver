@@ -18,6 +18,8 @@ IMAGE_VERSION=canary
 IMAGE_TAG=$(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 REV=$(shell git describe --long --tags --dirty)
 
+export GO111MODULE=on
+
 .PHONY: all linode clean linode-container
 
 all: linode
@@ -26,7 +28,7 @@ test:
 	go test -v ./... -cover
 	go vet ./...
 vendor: 
-	@GO111MODULE=on go mod vendor
+	go mod vendor
 linode: vendor
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X github.com/linode/linode-blockstorage-csi-driver/pkg/hostpath.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
 linode-container: linode
@@ -35,7 +37,7 @@ push: linode-container
 	@echo "$$DOCKER_PASSWORD" | docker login -u "$$DOCKER_USERNAME" --password-stdin
 	docker push $(IMAGE_TAG)
 verify:
-	@GO111MODULE=on go mod verify
+	go mod verify
 clean:
 	@GOOS=linux go clean -i -r -x ./...
 	-rm -rf _output

@@ -46,3 +46,5 @@ require (
 	gopkg.in/yaml.v2 v2.2.1 // indirect
 	honnef.co/go/tools v0.0.0-20180920025451-e3ad64cb4ed3 // indirect
 )
+
+replace github.com/kubernetes-csi/csi-test v1.0.0-1 => github.com/kubernetes-csi/csi-test v1.0.0-1

@@ -72,15 +72,15 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	var mountArgs []string
 
 	if fsType == "" {
-		return errors.New("fs type is not specified for mounting the volume")
+		return errors.New("Mount requires volume fs type")
 	}
 
 	if source == "" {
-		return errors.New("source is not specified for mounting the volume")
+		return errors.New("Mount requires volume source")
 	}
 
 	if target == "" {
-		return errors.New("target is not specified for mounting the volume")
+		return errors.New("Mount requires target")
 	}
 
 	mountArgs = append(mountArgs, "-t", fsType)
@@ -100,7 +100,7 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 
 	out, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("mounting failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("Error Mounting: %v cmd: '%s %s' output: %q",
 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
 	}
 
