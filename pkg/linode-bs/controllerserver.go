@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	"github.com/linode/linodego"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -29,7 +30,8 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume name is required")
 	}
 
-	if req.VolumeCapabilities == nil || len(req.VolumeCapabilities) == 0 {
+	volCapabilities := req.GetVolumeCapabilities()
+	if volCapabilities == nil || len(volCapabilities) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume capabilities are required")
 	}
 
@@ -40,7 +42,8 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		}
 	*/
 
-	size, err := getRequestCapacity(req.CapacityRange)
+	capRange := req.GetCapacityRange()
+	size, err := getRequestCapacitySize(capRange)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -101,7 +104,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	vol, err = d.linodeClient.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
 
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	ll.WithField("vol", vol).Info("volume active")
@@ -126,31 +129,28 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 
 // DeleteVolume deletes the given volume. The function is idempotent.
 func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "DeleteVolume Volume ID must be provided")
+	volID, statusErr := common.VolumeIdAsInt("DeleteVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
 	ll := d.log.WithFields(logrus.Fields{
-		"volume_id": req.VolumeId,
+		"volume_id": volID,
 		"method":    "delete_volume",
 	})
 	ll.Info("delete volume called")
-	volID, err := strconv.Atoi(req.VolumeId)
-	if err != nil {
-		return nil, err
-	}
 
 	if vol, err := d.linodeClient.GetVolume(ctx, volID); err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code != 404 {
+		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
 			return &csi.DeleteVolumeResponse{}, nil
 		}
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	} else if vol.LinodeID != nil {
 		return nil, status.Error(codes.FailedPrecondition, "DeleteVolume Volume in use")
 	}
 
 	if err := d.linodeClient.DeleteVolume(ctx, volID); err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	ll.Info("volume is deleted")
@@ -159,53 +159,53 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 
 // ControllerPublishVolume attaches the given volume to the node
 func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerPublishVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
-	if req.NodeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Node ID must be provided")
+	linodeID, statusErr := common.NodeIdAsInt("ControllerPublishVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
-	if req.VolumeCapability == nil {
+	cap := req.GetVolumeCapability()
+	if cap == nil {
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume capability must be provided")
 	}
 
-	linodeID, err := strconv.Atoi(req.NodeId)
-	if err != nil {
-		return nil, status.Error(codes.Unknown, fmt.Sprintf("malformed nodeId %q detected: %s", req.NodeId, err))
+	if !validVolumeCapabilities([]*csi.VolumeCapability{req.GetVolumeCapability()}) {
+		return nil, status.Errorf(codes.InvalidArgument, "ControllerPublishVolume Volume capability is not compatible: %v", req)
 	}
 
 	ll := d.log.WithFields(logrus.Fields{
-		"volume_id": req.VolumeId,
-		"node_id":   req.NodeId,
-		"linode_id": linodeID,
+		"volume_id": volumeID,
+		"node_id":   linodeID,
+		"cap":       cap,
 		"method":    "controller_publish_volume",
 	})
 	ll.Info("controller publish volume called")
 
-	volumeID, err := strconv.Atoi(req.VolumeId)
-	if err != nil {
-		return nil, err
+	if volume, err := d.linodeClient.GetVolume(ctx, volumeID); err != nil {
+		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %d not found", volumeID))
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	} else if volume.LinodeID != nil {
+		/**
+		TODO(displague) existing volume on node is not ok unless checking publish caps are identical
+		if *volume.LinodeID == linodeID {
+			return &csi.ControllerPublishVolumeResponse{}, nil
+		}
+		**/
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %d already attached to node %d", volumeID, *volume.LinodeID))
 	}
 
-	volume, err := d.linodeClient.GetVolume(ctx, volumeID)
-	if volume == nil {
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeID))
-	}
-	if err != nil {
-		return nil, err
-	}
-	if volume.LinodeID != nil {
-		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %v already attached", volumeID))
-	}
-
-	linode, err := d.linodeClient.GetInstance(ctx, linodeID)
-	if linode == nil {
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("Linode instance with id %v not found", linodeID))
-	}
-	if err != nil {
-		return nil, err
+	if _, err := d.linodeClient.GetInstance(ctx, linodeID); err != nil {
+		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("Linode with id %d not found", linodeID))
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	opts := &linodego.VolumeAttachOptions{
@@ -213,55 +213,49 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 		ConfigID: 0,
 	}
 
-	_, err = d.linodeClient.AttachVolume(ctx, volumeID, opts)
-	if err != nil {
-		return nil, fmt.Errorf("error attaching volume: %s", err)
+	if _, err := d.linodeClient.AttachVolume(ctx, volumeID, opts); err != nil {
+		return nil, status.Errorf(codes.Internal, "error attaching volume: %s", err)
 	}
+
+	ll.Infoln("waiting for volume to attach")
+	volume, err := d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout)
 	if err != nil {
 		return nil, err
 	}
-
-	ll.Infoln("waiting for attaching volume")
-	if volume, err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout); err != nil {
-		return nil, err
-	}
-
 	ll.Infof("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
+
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
 func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
-	linodeID, err := strconv.Atoi(req.NodeId)
-	if err != nil {
-		return nil, fmt.Errorf("malformed nodeId %q detected: %s", req.NodeId, err)
+	linodeID, statusErr := common.NodeIdAsInt("ControllerUnpublishVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
 	ll := d.log.WithFields(logrus.Fields{
-		"volume_id": req.VolumeId,
-		"node_id":   req.NodeId,
-		"linode_id": linodeID,
+		"volume_id": volumeID,
+		"node_id":   linodeID,
 		"method":    "controller_unpublish_volume",
 	})
 	ll.Info("controller unpublish volume called")
 
-	volumeID, err := strconv.Atoi(req.VolumeId)
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.linodeClient.DetachVolume(ctx, volumeID)
-	if err != nil {
-		return nil, fmt.Errorf("Error detaching volume: %s", err)
+	if err := d.linodeClient.DetachVolume(ctx, volumeID); err != nil {
+		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "Error detaching volume: %s", err)
 	}
 
 	ll.Infoln("waiting for detaching volume")
-	if _, err = d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
-		return nil, err
+	if _, err := d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	ll.Info("volume is detached")
@@ -270,17 +264,13 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 
 // ValidateVolumeCapabilities checks whether the volume capabilities requested are supported.
 func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume ID must be provided")
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
 	if req.VolumeCapabilities == nil {
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
-	}
-
-	volumeID, err := strconv.Atoi(req.VolumeId)
-	if err != nil {
-		return nil, err
 	}
 
 	volume, err := d.linodeClient.GetVolume(ctx, volumeID)
@@ -380,7 +370,7 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 				AccessibleTopology: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							"region": vol.Region,
+							"topology.linode.com/region": vol.Region,
 						},
 					},
 				},
@@ -430,7 +420,7 @@ func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.Control
 }
 
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size
-func getRequestCapacity(capRange *csi.CapacityRange) (int64, error) {
+func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	if capRange == nil {
 		return minProviderVolumeBytes, nil
 	}
@@ -453,21 +443,26 @@ func getRequestCapacity(capRange *csi.CapacityRange) (int64, error) {
 		if minSize < minProviderVolumeBytes {
 			return 0, fmt.Errorf("Required bytes %v is less than minimum bytes %v", minSize, minProviderVolumeBytes)
 		}
-	} else if minSize == 0 {
+		maxSize = minSize
+	}
+
+	if maxSize < minProviderVolumeBytes {
+		return 0, fmt.Errorf("Limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
+	}
+
+	if minSize == 0 {
 		// Only received a limit size
-		if maxSize < minProviderVolumeBytes {
-			return 0, fmt.Errorf("Limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
-		}
 		minSize = maxSize
-	} else if maxSize != minSize {
-		return 0, errors.New("RequiredBytes and LimitBytes are not the same")
 	}
 
 	return minSize, nil
 }
 
-func validVolumeCapabilities(req *csi.CreateVolumeRequest) bool {
-	caps := req.GetVolumeCapabilities()
+type withVolumeCapability interface {
+	GetVolumeCapabilities() []*csi.VolumeCapability
+}
+
+func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 	for _, cap := range caps {
 		if cap == nil {
 			return false

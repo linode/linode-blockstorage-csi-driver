@@ -143,6 +143,15 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				rr, _ := json.Marshal(&f.instance)
 				w.Write(rr)
 				return
+			} else {
+				w.WriteHeader(404)
+				resp := linodego.APIError{
+					Errors: []linodego.APIErrorReason{
+						{Reason: "Not Found"},
+					},
+				}
+				rr, _ := json.Marshal(resp)
+				w.Write(rr)
 			}
 		}
 
