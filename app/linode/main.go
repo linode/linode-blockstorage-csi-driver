@@ -14,16 +14,26 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"flag"
 
-	"github.com/spf13/pflag"
-
-	logs "github.com/appscode/go/log/golog"
 	"github.com/golang/glog"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
+	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+)
+
+const (
+	driverName = "linodebs.csi.linode.com"
+)
+
+var (
+	vendorVersion string
 )
 
 // Config Linode Client Config
@@ -47,10 +57,7 @@ func NewConfig() *Config {
 }
 
 func main() {
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := NewRootCmd(Version).Execute(); err != nil {
+	if err := NewRootCmd(vendorVersion).Execute(); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -63,14 +70,31 @@ func NewCmdInit() *cobra.Command {
 		Short:             "Initializes the driver.",
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			drv, err := driver.NewDriver(cfg.Endpoint, cfg.Token, cfg.Region, cfg.NodeName, &cfg.URL)
+			if vendorVersion == "" {
+				glog.Fatalf("vendorVersion must be set at compile time")
+			}
+			glog.V(4).Infof("Driver vendor version %v", vendorVersion)
+
+			linodeDriver := driver.GetLinodeDriver()
+
+			//Initialize Linode Driver (Move setup to main?)
+			uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
+			cloudProvider := linodeclient.NewLinodeClient(cfg.Token, uaPrefix, cfg.URL)
+
+			mounter := mountmanager.NewSafeMounter()
+			deviceUtils := mountmanager.NewDeviceUtils()
+
+			ms, err := metadataservice.NewMetadataService(cloudProvider, cfg.Region, cfg.NodeName)
 			if err != nil {
-				glog.Fatalln(err)
+				glog.Fatalf("Failed to set up metadata service: %v", err)
 			}
 
-			if err := drv.Run(); err != nil {
-				glog.Fatalln(err)
+			err = linodeDriver.SetupLinodeDriver(cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion)
+			if err != nil {
+				glog.Fatalf("Failed to initialize Linode CSI Driver: %v", err)
 			}
+
+			linodeDriver.Run(cfg.Endpoint)
 		},
 	}
 	cfg.AddFlags(cmd.Flags())

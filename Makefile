@@ -30,7 +30,7 @@ test:
 vendor: 
 	go mod vendor
 linode: vendor
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X github.com/linode/linode-blockstorage-csi-driver/pkg/hostpath.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
 linode-container: linode
 	docker build -t $(IMAGE_TAG) -f ./app/linode/Dockerfile .
 push: linode-container
