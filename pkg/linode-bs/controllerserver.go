@@ -1,4 +1,4 @@
-package driver
+package linodebs
 
 import (
 	"context"
@@ -10,9 +10,11 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/golang/glog"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	"github.com/linode/linodego"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -21,9 +23,17 @@ const gigabyte = 1024 * 1024 * 1024
 const minProviderVolumeBytes = 10 * gigabyte
 const waitTimeout = 300
 
+type LinodeControllerServer struct {
+	Driver          *LinodeDriver
+	CloudProvider   linodeclient.LinodeClient
+	MetadataService metadataservice.MetadataService
+}
+
+var _ csi.ControllerServer = &LinodeControllerServer{}
+
 // CreateVolume will be called by the CO to provision a new volume on behalf of a user (to be consumed
 // as either a block device or a mounted filesystem).  This operation is idempotent.
-func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	name := req.GetName()
 
 	if len(name) == 0 {
@@ -53,19 +63,18 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		volumeName = volumeName[:32]
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
+	glog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
 		"storage_size_giga_bytes": size / gigabyte,
 		"volume_name":             volumeName,
 	})
-	ll.Info("create volume called")
 
 	jsonFilter, err := json.Marshal(map[string]string{"label": volumeName})
 	if err != nil {
 		return nil, err
 	}
 
-	volumes, err := d.linodeClient.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
+	volumes, err := linodeCS.CloudProvider.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -79,7 +88,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
 		}
 
-		ll.Info("volume already created")
+		glog.V(4).Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId:      strconv.Itoa(volume.ID),
@@ -89,25 +98,25 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	}
 
 	volumeReq := linodego.VolumeCreateOptions{
-		Region: d.region,
+		Region: linodeCS.MetadataService.GetZone(),
 		Label:  volumeName,
 		Size:   int(size / gigabyte),
 	}
 
-	ll.WithField("volume_req", volumeReq).Info("creating volume")
+	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
 
-	vol, err := d.linodeClient.CreateVolume(ctx, volumeReq)
+	vol, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	vol, err = d.linodeClient.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
+	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	ll.WithField("vol", vol).Info("volume active")
+	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
@@ -123,24 +132,23 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		},
 	}
 
-	ll.WithField("response", resp).Info("volume created")
+	glog.V(4).Infoln("volume created", map[string]interface{}{"response": resp})
 	return resp, nil
 }
 
 // DeleteVolume deletes the given volume. The function is idempotent.
-func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	volID, statusErr := common.VolumeIdAsInt("DeleteVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
+	glog.V(4).Infoln("delete volume called", map[string]interface{}{
 		"volume_id": volID,
 		"method":    "delete_volume",
 	})
-	ll.Info("delete volume called")
 
-	if vol, err := d.linodeClient.GetVolume(ctx, volID); err != nil {
+	if vol, err := linodeCS.CloudProvider.GetVolume(ctx, volID); err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
 			return &csi.DeleteVolumeResponse{}, nil
 		}
@@ -149,16 +157,16 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 		return nil, status.Error(codes.FailedPrecondition, "DeleteVolume Volume in use")
 	}
 
-	if err := d.linodeClient.DeleteVolume(ctx, volID); err != nil {
+	if err := linodeCS.CloudProvider.DeleteVolume(ctx, volID); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	ll.Info("volume is deleted")
+	glog.V(4).Info("volume is deleted")
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 // ControllerPublishVolume attaches the given volume to the node
-func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
@@ -178,15 +186,14 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 		return nil, status.Errorf(codes.InvalidArgument, "ControllerPublishVolume Volume capability is not compatible: %v", req)
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
+	glog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
 		"volume_id": volumeID,
 		"node_id":   linodeID,
 		"cap":       cap,
 		"method":    "controller_publish_volume",
 	})
-	ll.Info("controller publish volume called")
 
-	if volume, err := d.linodeClient.GetVolume(ctx, volumeID); err != nil {
+	if volume, err := linodeCS.CloudProvider.GetVolume(ctx, volumeID); err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
 			return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %d not found", volumeID))
 		}
@@ -201,7 +208,7 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %d already attached to node %d", volumeID, *volume.LinodeID))
 	}
 
-	if _, err := d.linodeClient.GetInstance(ctx, linodeID); err != nil {
+	if _, err := linodeCS.CloudProvider.GetInstance(ctx, linodeID); err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
 			return nil, status.Error(codes.NotFound, fmt.Sprintf("Linode with id %d not found", linodeID))
 		}
@@ -213,22 +220,22 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 		ConfigID: 0,
 	}
 
-	if _, err := d.linodeClient.AttachVolume(ctx, volumeID, opts); err != nil {
+	if _, err := linodeCS.CloudProvider.AttachVolume(ctx, volumeID, opts); err != nil {
 		return nil, status.Errorf(codes.Internal, "error attaching volume: %s", err)
 	}
 
-	ll.Infoln("waiting for volume to attach")
-	volume, err := d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout)
+	glog.V(4).Infoln("waiting for volume to attach")
+	volume, err := linodeCS.CloudProvider.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout)
 	if err != nil {
 		return nil, err
 	}
-	ll.Infof("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
+	glog.V(4).Infof("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
 
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
-func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
@@ -239,31 +246,30 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 		return nil, statusErr
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
+	glog.V(4).Infoln("controller unpublish volume called", map[string]interface{}{
 		"volume_id": volumeID,
 		"node_id":   linodeID,
 		"method":    "controller_unpublish_volume",
 	})
-	ll.Info("controller unpublish volume called")
 
-	if err := d.linodeClient.DetachVolume(ctx, volumeID); err != nil {
+	if err := linodeCS.CloudProvider.DetachVolume(ctx, volumeID); err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Error detaching volume: %s", err)
 	}
 
-	ll.Infoln("waiting for detaching volume")
-	if _, err := d.linodeClient.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
+	glog.V(4).Infoln("waiting for detaching volume")
+	if _, err := linodeCS.CloudProvider.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	ll.Info("volume is detached")
+	glog.V(4).Info("volume is detached")
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 // ValidateVolumeCapabilities checks whether the volume capabilities requested are supported.
-func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
@@ -273,7 +279,7 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
 	}
 
-	volume, err := d.linodeClient.GetVolume(ctx, volumeID)
+	volume, err := linodeCS.CloudProvider.GetVolume(ctx, volumeID)
 	if volume == nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeID))
 	}
@@ -288,13 +294,12 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 		vcaps = append(vcaps, &csi.VolumeCapability_AccessMode{Mode: mode})
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
+	glog.V(4).Infoln("validate volume capabilities called", map[string]interface{}{
 		"volume_id":              req.VolumeId,
 		"volume_capabilities":    req.VolumeCapabilities,
 		"supported_capabilities": vcaps,
 		"method":                 "validate_volume_capabilities",
 	})
-	ll.Info("validate volume capabilities called")
 
 	/*
 		hasSupport := func(mode csi.VolumeCapability_AccessMode_Mode) bool {
@@ -322,12 +327,12 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 		}
 	*/
 
-	ll.WithField("response", resp).Info("supported capabilities")
+	glog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": resp})
 	return resp, nil
 }
 
 // ListVolumes shall return information about all the volumes the provider knows about
-func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	var err error
 
 	startingToken := req.GetStartingToken()
@@ -347,16 +352,15 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
+	glog.V(4).Infoln("list volumes called", map[string]interface{}{
 		"list_opts":          listOpts,
 		"req_starting_token": req.StartingToken,
 		"method":             "list_volumes",
 	})
-	ll.Info("list volumes called")
 
 	var volumes []linodego.Volume
 
-	volumes, err = d.linodeClient.ListVolumes(ctx, listOpts)
+	volumes, err = linodeCS.CloudProvider.ListVolumes(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -383,12 +387,12 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 		NextToken: nextToken,
 	}
 
-	ll.WithField("response", resp).Info("volumes listed")
+	glog.V(4).Infoln("volumes listed", map[string]interface{}{"response": resp})
 	return resp, nil
 }
 
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by this Plugin
-func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
 		return &csi.ControllerServiceCapability{
 			Type: &csi.ControllerServiceCapability_Rpc{
@@ -412,11 +416,27 @@ func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.Control
 		Capabilities: caps,
 	}
 
-	d.log.WithFields(logrus.Fields{
+	glog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
 		"response": resp,
 		"method":   "controller_get_capabilities",
-	}).Info("controller get capabilities called")
+	})
 	return resp, nil
+}
+
+func (linodeCS *LinodeControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (linodeCS *LinodeControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (linodeCS *LinodeControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
 }
 
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size

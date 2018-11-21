@@ -1,148 +1,163 @@
-package driver
+package linodebs
+
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"net"
-	"net/url"
-	"os"
-	"path"
-	"path/filepath"
-
-	"net/http"
-
-	"encoding/json"
-	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	"github.com/linode/linodego"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	"google.golang.org/grpc"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
+
+	"github.com/golang/glog"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-const (
-	driverName    = "linodebs.csi.linode.com"
-	vendorVersion = "0.0.1"
-)
+type LinodeDriver struct {
+	name          string
+	vendorVersion string
 
-type Driver struct {
-	*csicommon.DefaultNodeServer
-	*csicommon.DefaultIdentityServer
-	*csicommon.DefaultControllerServer
+	ids *LinodeIdentityServer
+	ns  *LinodeNodeServer
+	cs  *LinodeControllerServer
 
-	endpoint string
-	nodeID   string
-	region   string
-
-	srv          *grpc.Server
-	linodeClient *linodego.Client
-	mounter      Mounter
-	log          *logrus.Entry
+	vcap  []*csi.VolumeCapability_AccessMode
+	cscap []*csi.ControllerServiceCapability
+	nscap []*csi.NodeServiceCapability
 }
 
-func NewDriver(ep, token, zone, host string, url *string) (*Driver, error) {
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: token,
-	})
-
-	oauth2Client := &http.Client{
-		Transport: &oauth2.Transport{
-			Source: tokenSource,
-		},
-	}
-
-	ua := fmt.Sprintf("LinodeCSI/%s linodego/%s", vendorVersion, linodego.Version)
-	linodeClient := linodego.NewClient(oauth2Client)
-	linodeClient.SetUserAgent(ua)
-	linodeClient.SetDebug(true)
-
-	if url != nil {
-		linodeClient.SetBaseURL(*url)
-	}
-
-	linode, err := getLinodeByName(&linodeClient, host)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize Linode client: %s", err)
-	}
-
-	nodeID := strconv.Itoa(linode.ID)
-	return &Driver{
-		endpoint:     ep,
-		nodeID:       nodeID,
-		region:       zone,
-		linodeClient: &linodeClient,
-		mounter:      &mounter{},
-		log: logrus.New().WithFields(logrus.Fields{
-			"region":  zone,
-			"node_id": nodeID,
-		}),
-	}, nil
+func GetLinodeDriver() *LinodeDriver {
+	return &LinodeDriver{}
 }
 
-func (d *Driver) Run() error {
-	u, err := url.Parse(d.endpoint)
-	if err != nil {
-		return fmt.Errorf("unable to parse address: %q", err)
+func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.LinodeClient, mounter *mount.SafeFormatAndMount,
+	deviceUtils mountmanager.DeviceUtils, metadata metadata.MetadataService, name, vendorVersion string) error {
+	if name == "" {
+		return fmt.Errorf("Driver name missing")
 	}
 
-	addr := path.Join(u.Host, filepath.FromSlash(u.Path))
-	if u.Host == "" {
-		addr = filepath.FromSlash(u.Path)
+	linodeDriver.name = name
+	linodeDriver.vendorVersion = vendorVersion
+
+	// Adding Capabilities
+	vcam := []csi.VolumeCapability_AccessMode_Mode{
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	}
-
-	if u.Scheme != "unix" {
-		return fmt.Errorf("currently only unix domain sockets are supported, have: %s", u.Scheme)
+	linodeDriver.AddVolumeCapabilityAccessModes(vcam)
+	csc := []csi.ControllerServiceCapability_RPC_Type{
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
+		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 	}
-
-	// clear stale socket files (especially for upgrades)
-	d.log.WithField("socket", addr).Info("removing socket")
-	if err = os.Remove(addr); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove unix domain socket file %s, error: %s", addr, err)
+	linodeDriver.AddControllerServiceCapabilities(csc)
+	ns := []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 	}
+	linodeDriver.AddNodeServiceCapabilities(ns)
 
-	listener, err := net.Listen(u.Scheme, addr)
-	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
-	}
+	// Set up RPC Servers
+	linodeDriver.ids = NewIdentityServer(linodeDriver)
+	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata)
+	linodeDriver.cs = NewControllerServer(linodeDriver, linodeClient, metadata)
 
-	errHandler := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		resp, err := handler(ctx, req)
-		if err != nil {
-			d.log.WithError(err).WithField("method", info.FullMethod).Error("method failed")
-		}
-		return resp, err
-	}
-
-	d.srv = grpc.NewServer(grpc.UnaryInterceptor(errHandler))
-	csi.RegisterIdentityServer(d.srv, d)
-	csi.RegisterControllerServer(d.srv, d)
-	csi.RegisterNodeServer(d.srv, d)
-
-	d.log.WithField("addr", addr).Info("server started")
-	return d.srv.Serve(listener)
+	return nil
 }
 
-func (d *Driver) Stop() {
-	d.log.Info("server stopped")
-	d.srv.Stop()
+func (linodeDriver *LinodeDriver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_AccessMode_Mode) error {
+	var vca []*csi.VolumeCapability_AccessMode
+	for _, c := range vc {
+		glog.V(4).Infof("Enabling volume access mode: %v", c.String())
+		vca = append(vca, NewVolumeCapabilityAccessMode(c))
+	}
+	linodeDriver.vcap = vca
+	return nil
 }
 
-func getLinodeByName(client *linodego.Client, nodeName string) (*linodego.Instance, error) {
-	jsonFilter, _ := json.Marshal(map[string]string{"label": nodeName})
-	linodes, err := client.ListInstances(context.Background(), linodego.NewListOptions(0, string(jsonFilter)))
-	if err != nil {
-		return nil, err
-	} else if len(linodes) != 1 {
-		return nil, fmt.Errorf("Could not identify a Linode ID with label %q", nodeName)
+func (linodeDriver *LinodeDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) error {
+	var csc []*csi.ControllerServiceCapability
+	for _, c := range cl {
+		glog.V(4).Infof("Enabling controller service capability: %v", c.String())
+		csc = append(csc, NewControllerServiceCapability(c))
+	}
+	linodeDriver.cscap = csc
+	return nil
+}
+
+func (linodeDriver *LinodeDriver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_Type) error {
+	var nsc []*csi.NodeServiceCapability
+	for _, n := range nl {
+		glog.V(4).Infof("Enabling node service capability: %v", n.String())
+		nsc = append(nsc, NewNodeServiceCapability(n))
+	}
+	linodeDriver.nscap = nsc
+	return nil
+}
+
+func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(c csi.ControllerServiceCapability_RPC_Type) error {
+	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
+		return nil
 	}
 
-	for _, linode := range linodes {
-		if linode.Label == string(nodeName) {
-			return &linode, nil
+	for _, cap := range linodeDriver.cscap {
+		if c == cap.GetRpc().Type {
+			return nil
 		}
 	}
-	return nil, errors.New("instance not found")
+
+	return status.Error(codes.InvalidArgument, "Invalid controller service request")
+}
+
+func NewIdentityServer(linodeDriver *LinodeDriver) *LinodeIdentityServer {
+	return &LinodeIdentityServer{
+		Driver: linodeDriver,
+	}
+}
+
+func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, cloudProvider linodeclient.LinodeClient, meta metadata.MetadataService) *LinodeNodeServer {
+	return &LinodeNodeServer{
+		Driver:          linodeDriver,
+		Mounter:         mounter,
+		DeviceUtils:     deviceUtils,
+		CloudProvider:   cloudProvider,
+		MetadataService: meta,
+	}
+}
+
+func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.LinodeClient, meta metadata.MetadataService) *LinodeControllerServer {
+	return &LinodeControllerServer{
+		Driver:          linodeDriver,
+		CloudProvider:   cloudProvider,
+		MetadataService: meta,
+	}
+}
+
+func (linodeDriver *LinodeDriver) Run(endpoint string) {
+	glog.V(4).Infof("Driver: %v", linodeDriver.name)
+
+	//Start the nonblocking GRPC
+	s := NewNonBlockingGRPCServer()
+	// TODO(#34): Only start specific servers based on a flag.
+	// In the future have this only run specific combinations of servers depending on which version this is.
+	// The schema for that was in util. basically it was just s.start but with some nil servers.
+
+	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
+	s.Wait()
 }

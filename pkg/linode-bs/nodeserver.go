@@ -1,266 +1,304 @@
-package driver
+package linodebs
+
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 import (
-	"context"
+	"fmt"
+	"os"
 	"strconv"
+	"sync"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/sirupsen/logrus"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/golang/glog"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/kubernetes/pkg/util/mount"
+	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
 	maxVolumesPerNode = 8
 )
 
-// NodeStageVolume mounts the volume to a staging path on the node. This is
-// called by the CO before NodePublishVolume and is used to temporary mount the
-// volume to a staging path. Once mounted, NodePublishVolume will make sure to
-// mount it to the appropriate path
-func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	d.log.Info("node stage volume called")
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume ID must be provided")
-	}
-
-	if req.StagingTargetPath == "" {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Staging Target Path must be provided")
-	}
-
-	if req.VolumeCapability == nil {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
-	}
-
-	volID, err := strconv.Atoi(req.VolumeId)
-	if err != nil {
-		return nil, err
-	}
-	vol, err := d.linodeClient.GetVolume(ctx, volID)
-	if err != nil {
-		return nil, err
-	}
-
-	source := vol.FilesystemPath
-	target := req.StagingTargetPath
-
-	mnt := req.VolumeCapability.GetMount()
-	options := mnt.MountFlags
-
-	fsType := "ext4"
-	if mnt.FsType != "" {
-		fsType = mnt.FsType
-	}
-
-	ll := d.log.WithFields(logrus.Fields{
-		"volume_id":           req.VolumeId,
-		"volume_name":         vol.Label,
-		"staging_target_path": req.StagingTargetPath,
-		"source":              source,
-		"fsType":              fsType,
-		"mount_options":       options,
-		"method":              "node_stage_volume",
-	})
-
-	formatted, err := d.mounter.IsFormatted(source)
-	if err != nil {
-		return nil, err
-	}
-
-	if !formatted {
-		ll.Info("formatting the volume for staging")
-		if err = d.mounter.Format(source, fsType); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	} else {
-		ll.Info("source device is already formatted")
-	}
-
-	ll.Info("mounting the volume for staging")
-
-	mounted, err := d.mounter.IsMounted(source, target)
-	if err != nil {
-		return nil, err
-	}
-
-	if !mounted {
-		if err := d.mounter.Mount(source, target, fsType, options...); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	} else {
-		ll.Info("source device is already mounted to the target path")
-	}
-
-	ll.Info("formatting and mounting stage volume is finished")
-	return &csi.NodeStageVolumeResponse{}, nil
+type LinodeNodeServer struct {
+	Driver          *LinodeDriver
+	Mounter         *mount.SafeFormatAndMount
+	DeviceUtils     mountmanager.DeviceUtils
+	CloudProvider   linodeclient.LinodeClient
+	MetadataService metadata.MetadataService
+	// TODO: Only lock mutually exclusive calls and make locking more fine grained
+	mux sync.Mutex
 }
 
-// NodeUnstageVolume unstages the volume from the staging path
-func (d *Driver) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	if req.VolumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Volume ID must be provided")
-	}
+var _ csi.NodeServer = &LinodeNodeServer{}
 
-	if req.StagingTargetPath == "" {
-		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Staging Target Path must be provided")
-	}
+func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	ns.mux.Lock()
+	defer ns.mux.Unlock()
+	glog.V(4).Infof("NodePublishVolume called with req: %#v", req)
 
-	ll := d.log.WithFields(logrus.Fields{
-		"volume_id":           req.VolumeId,
-		"staging_target_path": req.StagingTargetPath,
-		"method":              "node_unstage_volume",
-	})
-	ll.Info("node unstage volume called")
-
-	mounted, err := d.mounter.IsMounted("", req.StagingTargetPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if mounted {
-		ll.Info("unmounting the staging target path")
-		err := d.mounter.Unmount(req.StagingTargetPath)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		ll.Info("staging target path is already unmounted")
-	}
-
-	ll.Info("unmounting stage volume is finished")
-	return &csi.NodeUnstageVolumeResponse{}, nil
-}
-
-// NodePublishVolume mounts the volume mounted to the staging path to the target path
-func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	d.log.Info("node publish volume called")
-	if req.VolumeId == "" {
+	// Validate Arguments
+	targetPath := req.GetTargetPath()
+	stagingTargetPath := req.GetStagingTargetPath()
+	readOnly := req.GetReadonly()
+	volumeID := req.GetVolumeId()
+	volumeCapability := req.GetVolumeCapability()
+	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume ID must be provided")
 	}
-
-	if req.StagingTargetPath == "" {
+	if len(stagingTargetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Staging Target Path must be provided")
 	}
-
-	if req.TargetPath == "" {
+	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Target Path must be provided")
 	}
-
-	if req.VolumeCapability == nil {
+	if volumeCapability == nil {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume Capability must be provided")
 	}
 
-	source := req.StagingTargetPath
-	target := req.TargetPath
+	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mount point: %s %v", targetPath, err)
+		return nil, err
+	}
+	if !notMnt {
+		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
+		/*
+			1) Target Path MUST be the vol referenced by vol ID
+			2) VolumeCapability MUST match
+			3) Readonly MUST match
 
-	mnt := req.VolumeCapability.GetMount()
-	options := mnt.MountFlags
+		*/
+		return &csi.NodePublishVolumeResponse{}, nil
+	}
+
+	if err := ns.Mounter.Interface.MakeDir(targetPath); err != nil {
+		glog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
+		return nil, err
+	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	options = append(options, "bind")
-	if req.Readonly {
+	options := []string{"bind"}
+	if readOnly {
 		options = append(options, "ro")
 	}
 
-	fsType := "ext4"
-	if mnt.FsType != "" {
-		fsType = mnt.FsType
-	}
-
-	ll := d.log.WithFields(logrus.Fields{
-		"volume_id":     req.VolumeId,
-		"source":        source,
-		"target":        target,
-		"fsType":        fsType,
-		"mount_options": options,
-		"method":        "node_publish_volume",
-	})
-
-	mounted, err := d.mounter.IsMounted(source, target)
+	err = ns.Mounter.Interface.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
-		return nil, err
-	}
-
-	if !mounted {
-		ll.Info("mounting the volume")
-		if err := d.mounter.Mount(source, target, fsType, options...); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+		notMnt, mntErr := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
+		if mntErr != nil {
+			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume failed to check whether target path is a mount point: %v", err))
 		}
-	} else {
-		ll.Info("volume is already mounedt")
+		if !notMnt {
+			if mntErr = ns.Mounter.Interface.Unmount(targetPath); mntErr != nil {
+				glog.Errorf("Failed to unmount: %v", mntErr)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume failed to unmount target path: %v", err))
+			}
+			notMnt, mntErr := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
+			if mntErr != nil {
+				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume failed to check whether target path is a mount point: %v", err))
+			}
+			if !notMnt {
+				// This is very odd, we don't expect it.  We'll try again next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", targetPath)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume something is wrong with mounting: %v", err))
+			}
+		}
+		os.Remove(targetPath)
+		glog.Errorf("Mount of disk %s failed: %v", targetPath, err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume mount of disk failed: %v", err))
 	}
 
-	ll.Info("bind mounting the volume is finished")
+	glog.V(4).Infof("Successfully mounted %s", targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-// NodeUnpublishVolume unmounts the volume from the target path
-func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	if req.VolumeId == "" {
+func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	ns.mux.Lock()
+	defer ns.mux.Unlock()
+	glog.V(4).Infof("NodeUnpublishVolume called with args: %v", req)
+	// Validate Arguments
+	targetPath := req.GetTargetPath()
+	volID := req.GetVolumeId()
+	if len(volID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Volume ID must be provided")
 	}
-
-	if req.TargetPath == "" {
+	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Target Path must be provided")
 	}
 
-	ll := d.log.WithFields(logrus.Fields{
-		"volume_id":   req.VolumeId,
-		"target_path": req.TargetPath,
-		"method":      "node_unpublish_volume",
-	})
-	ll.Info("node unpublish volume called")
+	err := volumeutils.UnmountMountPoint(targetPath, ns.Mounter.Interface, false /* bind mount */)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, targetPath))
+	}
 
-	mounted, err := d.mounter.IsMounted("", req.TargetPath)
+	return &csi.NodeUnpublishVolumeResponse{}, nil
+}
+
+func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	ns.mux.Lock()
+	defer ns.mux.Unlock()
+	glog.V(4).Infof("NodeStageVolume called with req: %#v", req)
+
+	// Validate Arguments
+	volumeKey := req.GetVolumeId()
+	stagingTargetPath := req.GetStagingTargetPath()
+	volumeCapability := req.GetVolumeCapability()
+	if len(volumeKey) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume ID must be provided")
+	}
+	if len(stagingTargetPath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Staging Target Path must be provided")
+	}
+	if volumeCapability == nil {
+		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
+	}
+
+	volumeID, err := common.VolumeIdAsInt("NodeStageVolume", req)
 	if err != nil {
 		return nil, err
 	}
 
-	if mounted {
-		ll.Info("unmounting the target path")
-		err := d.mounter.Unmount(req.TargetPath)
-		if err != nil {
-			return nil, err
+	// TODO(displague) we can avoid using the API if we search for volumeID in the available device paths
+	vol, err := ns.CloudProvider.GetVolume(ctx, volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceName := vol.Label
+	devicePath := vol.FilesystemPath
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v", deviceName, err))
+	}
+
+	/*
+		if devicePath == "" {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Unable to find device path out of attempted paths: %v", devicePath))
 		}
-	} else {
-		ll.Info("target path is already unmounted")
+	*/
+
+	glog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
+
+	// Part 2: Check if mount already exists at targetpath
+	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := ns.Mounter.Interface.MakeDir(stagingTargetPath); err != nil {
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", stagingTargetPath, err))
+			}
+			notMnt = true
+		} else {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Unknown error when checking mount point (%q): %v", stagingTargetPath, err))
+		}
 	}
 
-	ll.Info("unmounting volume is finished")
-	return &csi.NodeUnpublishVolumeResponse{}, nil
+	if !notMnt {
+		// TODO(#95): Check who is mounted here. No error if its us
+		/*
+			1) Target Path MUST be the vol referenced by vol ID
+			2) VolumeCapability MUST match
+			3) Readonly MUST match
+
+		*/
+		return &csi.NodeStageVolumeResponse{}, nil
+
+	}
+
+	// Part 3: Mount device to stagingTargetPath
+	// Default fstype is ext4
+	fstype := "ext4"
+	options := []string{}
+	if mnt := volumeCapability.GetMount(); mnt != nil {
+		if mnt.FsType != "" {
+			fstype = mnt.FsType
+		}
+		for _, flag := range mnt.MountFlags {
+			options = append(options, flag)
+		}
+	} else if blk := volumeCapability.GetBlock(); blk != nil {
+		// TODO(#64): Block volume support
+		return nil, status.Error(codes.Unimplemented, fmt.Sprintf("Block volume support is not yet implemented"))
+	}
+
+	err = ns.Mounter.FormatAndMount(devicePath, stagingTargetPath, fstype, options)
+	if err != nil {
+		return nil, status.Error(codes.Internal,
+			fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
+				devicePath, stagingTargetPath, fstype, options, err))
+	}
+
+	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-// NodeGetCapabilities returns the supported capabilities of the node server
-func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	// currently there is a single NodeServer capability according to the spec
-	nscap := &csi.NodeServiceCapability{
-		Type: &csi.NodeServiceCapability_Rpc{
-			Rpc: &csi.NodeServiceCapability_RPC{
-				Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
-			},
-		},
+func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	ns.mux.Lock()
+	defer ns.mux.Unlock()
+	glog.V(4).Infof("NodeUnstageVolume called with req: %#v", req)
+	// Validate arguments
+	volumeID := req.GetVolumeId()
+	stagingTargetPath := req.GetStagingTargetPath()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Volume ID must be provided")
+	}
+	if len(stagingTargetPath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Staging Target Path must be provided")
 	}
 
-	d.log.WithFields(logrus.Fields{
-		"node_capabilities": nscap,
-		"method":            "node_get_capabilities",
-	}).Info("node get capabilities called")
+	err := volumeutils.UnmountMountPoint(stagingTargetPath, ns.Mounter.Interface, false /* bind mount */)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err))
+	}
+	return &csi.NodeUnstageVolumeResponse{}, nil
+}
+
+func (ns *LinodeNodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	glog.V(4).Infof("NodeGetCapabilities called with req: %#v", req)
+
 	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			nscap,
-		},
+		Capabilities: ns.Driver.nscap,
 	}, nil
 }
 
-func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	d.log.WithField("method", "node_get_info").Info("node get info called")
-	return &csi.NodeGetInfoResponse{
-		NodeId:            d.nodeID,
-		MaxVolumesPerNode: maxVolumesPerNode,
-		AccessibleTopology: &csi.Topology{
-			Segments: map[string]string{
-				"topology.linode.com/region": d.region,
-			},
+func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	glog.V(4).Infof("NodeGetInfo called with req: %#v", req)
+
+	top := &csi.Topology{
+		Segments: map[string]string{
+			"topology.linode.com/region": ns.MetadataService.GetZone(),
 		},
-	}, nil
+	}
+
+	nodeID := ns.MetadataService.GetNodeID()
+
+	resp := &csi.NodeGetInfoResponse{
+		NodeId:             strconv.Itoa(nodeID),
+		MaxVolumesPerNode:  maxVolumesPerNode,
+		AccessibleTopology: top,
+	}
+	return resp, nil
+
+}
+
+func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeGetVolumeStats is not yet implemented"))
 }

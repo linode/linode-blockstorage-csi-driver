@@ -1,4 +1,4 @@
-package driver
+package linodebs
 
 import (
 	"encoding/json"
@@ -11,6 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+
 	"strconv"
 
 	"fmt"
@@ -18,7 +22,11 @@ import (
 
 	"github.com/kubernetes-csi/csi-test/pkg/sanity"
 	"github.com/linode/linodego"
-	"github.com/sirupsen/logrus"
+)
+
+var (
+	driver        = "linodebs.csi.linode.com"
+	vendorVersion = "test-vendor"
 )
 
 func init() {
@@ -53,20 +61,21 @@ func TestDriverSuite(t *testing.T) {
 	ts := httptest.NewServer(fake)
 	defer ts.Close()
 
-	linodeClient := linodego.NewClient(http.DefaultClient)
-	linodeClient.SetBaseURL(ts.URL)
-
-	driver := &Driver{
-		endpoint:     endpoint,
-		nodeID:       strconv.Itoa(fake.instance.ID),
-		region:       "us-east",
-		linodeClient: &linodeClient,
-		mounter:      &fakeMounter{},
-		log:          logrus.New().WithField("test_enabed", true),
+	mounter := mountmanager.NewFakeSafeMounter()
+	deviceUtils := mountmanager.NewFakeDeviceUtils()
+	fakeCloudProvider := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s;test", vendorVersion), ts.URL)
+	// TODO fake metadata
+	ms, err := metadata.NewMetadataService(fakeCloudProvider, fake.instance.Region, fake.instance.Label)
+	if err != nil {
+		t.Fatalf("Failed to setup Linode metadata: %v", err)
 	}
-	defer driver.Stop()
+	linodeDriver := GetLinodeDriver()
+	err = linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, ms, driver, vendorVersion)
+	if err != nil {
+		t.Fatalf("Failed to setup Linode Driver: %v", err)
+	}
 
-	go driver.Run()
+	go linodeDriver.Run(endpoint)
 
 	mntDir, err := ioutil.TempDir("", "mnt")
 	if err != nil {
@@ -153,6 +162,23 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				rr, _ := json.Marshal(resp)
 				w.Write(rr)
 			}
+		case strings.HasPrefix(r.URL.Path, "/linode/instances"):
+			res := 1
+			data := []linodego.Instance{}
+
+			data = append(data, *f.instance)
+			resp := linodego.InstancesPagedResponse{
+				PageOptions: &linodego.PageOptions{
+					Page:    1,
+					Pages:   1,
+					Results: res,
+				},
+				Data: data,
+			}
+			rr, _ := json.Marshal(resp)
+			w.Write(rr)
+			return
+
 		}
 
 	case "POST":
@@ -253,25 +279,4 @@ func randString(n int) string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
-}
-
-type fakeMounter struct{}
-
-func (f *fakeMounter) Format(source string, fsType string) error {
-	return nil
-}
-
-func (f *fakeMounter) Mount(source string, target string, fsType string, options ...string) error {
-	return nil
-}
-
-func (f *fakeMounter) Unmount(target string) error {
-	return nil
-}
-
-func (f *fakeMounter) IsFormatted(source string) (bool, error) {
-	return true, nil
-}
-func (f *fakeMounter) IsMounted(source, target string) (bool, error) {
-	return true, nil
 }
