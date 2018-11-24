@@ -1,28 +1,35 @@
----
 kind: DaemonSet
 apiVersion: apps/v1beta2
 metadata:
-  name: linode-blockstorage-csi-driver
+  name: csi-linode-node
+  namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: linode-blockstorage-csi-driver
+      app: csi-linode-node
   template:
     metadata:
       labels:
-        app: linode-blockstorage-csi-driver
+        app: csi-linode-node
+        role: csi-linode
     spec:
-      serviceAccount: linode-blockstorage-csi-driver
+      serviceAccount: csi-node-sa
       hostNetwork: true
       containers:
         - name: driver-registrar
-          image: quay.io/k8scsi/driver-registrar:v0.2.0
+          image: quay.io/k8scsi/driver-registrar:v1.0.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
+            - "--mode=node-register"
+            - "--driver-requires-attachment=true"
+            - "--pod-info-mount-version=\"v1\""
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/linodebs.csi.linode.com/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -30,26 +37,43 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi/
-        - name: linode-blockstorage-csi-driver 
+            - name: registration-dir
+              mountPath: /registration/
+        - name: csi-linode-plugin 
+          image: linode/linode-blockstorage-csi-driver:canary
+          args :
+            - init
+            - "--region=$(LINODE_REGION)"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--token=$(LINODE_TOKEN)"
+            - "--url=$(LINODE_API_URL)"
+            - "--node=$(NODE_NAME)"
+            - "--v=10"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: LINODE_API_URL
+              value: https://api.linode.com/v4
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: LINODE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: linode
+                  key: token
+            - name: LINODE_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: linode
+                  key: region
+          imagePullPolicy: "Always"
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: linode/linode-blockstorage-csi-driver:v0.0.1
-          args :
-            - init
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--token=$(LINODE_TOKEN)"
-          env:
-            - name: CSI_ENDPOINT
-              value: unix:///csi/csi.sock
-            - name: LINODE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: linodetoken
-                  key: token
-          imagePullPolicy: "IfNotPresent"
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
@@ -61,6 +85,10 @@ spec:
             - mountPath: /dev
               name: device-dir
       volumes:
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/
+            type: DirectoryOrCreate
         - name: plugin-dir
           hostPath:
             path: /var/lib/kubelet/plugins/linodebs.csi.linode.com
