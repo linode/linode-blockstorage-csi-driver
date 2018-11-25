@@ -6,6 +6,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   group: csi.storage.k8s.io
+  version: v1alpha1
   names:
     kind: CSINodeInfo
     plural: csinodeinfos
@@ -51,4 +52,3 @@ spec:
                       to use for any in-tree plugins replaced by this driver.
                     pattern: in-tree|csi
                     type: string
-  version: v1alpha1

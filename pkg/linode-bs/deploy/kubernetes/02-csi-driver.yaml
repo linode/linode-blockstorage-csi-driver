@@ -6,6 +6,7 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  version: v1alpha1
   group: csi.storage.k8s.io
   names:
     kind: CSIDriver
@@ -26,4 +27,13 @@ spec:
               description: Indicates this CSI volume driver requires additional pod
                 information (like podName, podUID, etc.) during mount operations.
               type: string
-  version: v1alpha1
+
+---
+
+apiVersion: csi.storage.k8s.io/v1alpha1
+kind: CSIDriver
+metadata:
+  name: linodebs.csi.linode.com
+spec:
+  attachRequired: true
+  podInfoOnMountVersion: "v1"
