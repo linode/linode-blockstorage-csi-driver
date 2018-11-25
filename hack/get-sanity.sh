@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION="v1.0.0-rc2"
+VERSION="v1.0.0-1"
 SANITYTGZ="csi-sanity-${VERSION}.linux.amd64.tar.gz"
 
 echo "Downloading csi-test from https://github.com/kubernetes-csi/csi-test/releases/download/${VERSION}/${SANITYTGZ}"

@@ -88,10 +88,12 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
 		}
 
+		key := common.CreateLinodeVolumeKey(volume.ID, volume.Label)
+
 		glog.V(4).Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				VolumeId:      strconv.Itoa(volume.ID),
+				VolumeId:      key.GetVolumeKey(),
 				CapacityBytes: int64(volume.Size * gigabyte),
 			},
 		}, nil
@@ -118,9 +120,10 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 
 	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
+	key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			VolumeId:      strconv.Itoa(vol.ID),
+			VolumeId:      key.GetVolumeKey(),
 			CapacityBytes: size,
 			AccessibleTopology: []*csi.Topology{
 				{
@@ -167,12 +170,12 @@ func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *c
 
 // ControllerPublishVolume attaches the given volume to the node
 func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerPublishVolume", req)
+	linodeID, statusErr := common.NodeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
 
-	linodeID, statusErr := common.NodeIdAsInt("ControllerPublishVolume", req)
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -367,9 +370,11 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 
 	var entries []*csi.ListVolumesResponse_Entry
 	for _, vol := range volumes {
+		key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
+
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
-				VolumeId:      strconv.Itoa(vol.ID),
+				VolumeId:      key.GetVolumeKey(),
 				CapacityBytes: int64(vol.Size * gigabyte),
 				AccessibleTopology: []*csi.Topology{
 					{

@@ -84,7 +84,7 @@ func NewCmdInit() *cobra.Command {
 			mounter := mountmanager.NewSafeMounter()
 			deviceUtils := mountmanager.NewDeviceUtils()
 
-			ms, err := metadataservice.NewMetadataService(cloudProvider, cfg.Region, cfg.NodeName)
+			ms, err := metadataservice.NewMetadataService(cloudProvider, cfg.NodeName)
 			if err != nil {
 				glog.Fatalf("Failed to set up metadata service: %v", err)
 			}
@@ -125,6 +125,7 @@ func (c *Config) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.Endpoint, "endpoint", c.Endpoint, "CSI endpoint")
 	fs.StringVar(&c.Token, "token", c.Token, "Linode API Token")
 	fs.StringVar(&c.URL, "url", c.URL, "Linode API URL")
+	// TODO(displague) region is not needed, looked up via linode hostname / linode label
 	fs.StringVar(&c.Region, "region", c.Region, "Linode Region")
 	fs.StringVar(&c.NodeName, "node", c.NodeName, "Linode Hostname")
 }

@@ -27,14 +27,14 @@ type metadataServiceManager struct {
 
 var _ MetadataService = &metadataServiceManager{}
 
-func NewMetadataService(linodeClient linodeclient.LinodeClient, zone, host string) (metadata MetadataService, err error) {
+func NewMetadataService(linodeClient linodeclient.LinodeClient, host string) (metadata MetadataService, err error) {
 	linode, err := getLinodeByName(linodeClient, host)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize Linode client: %s", err)
 	}
 
 	return &metadataServiceManager{
-		region:  zone,
+		region:  linode.Region,
 		nodeID:  linode.ID,
 		label:   linode.Label,
 		project: linode.Group,
