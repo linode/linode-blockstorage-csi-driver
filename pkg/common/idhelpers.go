@@ -1,8 +1,10 @@
 package common
 
 import (
+	"fmt"
 	"hash/fnv"
 	"strconv"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,8 +37,11 @@ func VolumeIdAsInt(caller string, w withVolume) (int, error) {
 		return 0, status.Errorf(codes.InvalidArgument, "%sVolume ID must be provided", caller)
 	}
 
-	volID, err := strconv.Atoi(strVolID)
-	if err != nil {
+	volID := 0
+	if key, err := ParseLinodeVolumeKey(strVolID); err == nil {
+		volID = key.GetVolumeID()
+	} else {
+		// hack to permit csi-test to use ill-formatted volumeids
 		volID = hashStringToInt(strVolID)
 	}
 
@@ -59,4 +64,49 @@ func NodeIdAsInt(caller string, w withNode) (int, error) {
 	}
 
 	return nodeID, nil
+}
+
+type LinodeVolumeKey struct {
+	VolumeID int
+	Label    string
+}
+
+func CreateLinodeVolumeKey(id int, label string) LinodeVolumeKey {
+	return LinodeVolumeKey{id, label}
+}
+
+func ParseLinodeVolumeKey(key string) (*LinodeVolumeKey, error) {
+	keys := strings.SplitN(key, "-", 2)
+	if len(keys) != 2 {
+		return nil, fmt.Errorf("Invalid Linode Volume key: %q", key)
+	}
+
+	volumeID, err := strconv.Atoi(keys[0])
+	if err != nil {
+		return nil, fmt.Errorf("Invalid Linode Volume ID: %q", keys[0])
+	}
+
+	lvk := LinodeVolumeKey{volumeID, keys[1]}
+	return &lvk, nil
+}
+
+func (key *LinodeVolumeKey) GetVolumeID() int {
+	return key.VolumeID
+}
+
+func (key *LinodeVolumeKey) GetVolumeLabel() string {
+	return key.Label
+}
+
+func (key *LinodeVolumeKey) GetNormalizedLabel() string {
+	volumeName := strings.Replace(key.Label, "-", "", -1)
+	if len(volumeName) > 32 {
+		volumeName = volumeName[:32]
+	}
+	return volumeName
+}
+
+func (key *LinodeVolumeKey) GetVolumeKey() string {
+	volumeName := key.GetNormalizedLabel()
+	return fmt.Sprintf("%d-%s", key.VolumeID, volumeName)
 }

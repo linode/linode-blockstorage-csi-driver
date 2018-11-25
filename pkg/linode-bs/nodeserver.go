@@ -173,29 +173,32 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
 
-	volumeID, err := common.VolumeIdAsInt("NodeStageVolume", req)
+	key, err := common.ParseLinodeVolumeKey(volumeKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO(displague) we can avoid using the API if we search for volumeID in the available device paths
-	vol, err := ns.CloudProvider.GetVolume(ctx, volumeID)
-	if err != nil {
-		return nil, err
+	// Part 1: Get device path of attached device
+	partition := ""
+
+	if part, ok := req.GetVolumeContext()["partition"]; ok {
+		partition = part
 	}
 
-	deviceName := vol.Label
-	devicePath := vol.FilesystemPath
-
+	deviceName := key.GetNormalizedLabel()
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v", deviceName, err))
+		status.Error(codes.Internal, fmt.Sprintf("error getting device name: %v", err))
 	}
 
-	/*
-		if devicePath == "" {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("Unable to find device path out of attempted paths: %v", devicePath))
-		}
-	*/
+	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
+	devicePath, err := ns.DeviceUtils.VerifyDevicePath(devicePaths)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err))
+	}
+	if devicePath == "" {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Unable to find device path out of attempted paths: %v", devicePaths))
+	}
 
 	glog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
 

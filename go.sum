@@ -73,8 +73,6 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGi
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kubernetes-csi/csi-test v1.0.0-2 h1:kowlhieDeIzshH1BojqVD3Byfi2BCgrMwmefcTAJNtU=
 github.com/kubernetes-csi/csi-test v1.0.0-2/go.mod h1:YxJ4UiuPWIhMBkxUKY5c267DyA0uDZ/MtAimhx/2TA0=
-github.com/kubernetes-csi/csi-test v1.0.0-rc2 h1:sfFvZ/R0/1Rdcn0KsfBaog/i3+GrzfgnaRGMpN3LafQ=
-github.com/kubernetes-csi/csi-test v1.0.0-rc2/go.mod h1:YxJ4UiuPWIhMBkxUKY5c267DyA0uDZ/MtAimhx/2TA0=
 github.com/linode/linodego v0.6.2 h1:LTYSTCTBuFUYG8kNAM11fYprsy1h425NF4XBbV0P1cs=
 github.com/linode/linodego v0.6.2/go.mod h1:ga11n3ivecUrPCHN0rANxKmfWBJVkOXfLMZinAbj2sY=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
