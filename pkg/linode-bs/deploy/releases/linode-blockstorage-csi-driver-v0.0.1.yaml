@@ -320,6 +320,7 @@ spec:
         role: csi-linode
     spec:
       serviceAccount: csi-controller-sa
+      hostNetwork: true
       containers:
         - name: csi-provisioner
           image: quay.io/k8scsi/csi-provisioner:v1.0.0
