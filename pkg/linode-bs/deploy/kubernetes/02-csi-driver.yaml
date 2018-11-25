@@ -1,12 +1,13 @@
+# Requires CSIDriverRegistry feature gate (alpha in 1.12)
 # https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
-apiVersion: apiextensions.k8s.io/v1
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: csidrivers.csi.storage.k8s.io
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
-  version: v1
+  version: v1alpha1
   group: csi.storage.k8s.io
   names:
     kind: CSIDriver

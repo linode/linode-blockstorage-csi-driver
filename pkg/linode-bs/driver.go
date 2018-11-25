@@ -57,14 +57,14 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 	// Adding Capabilities
 	vcam := []csi.VolumeCapability_AccessMode_Mode{
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		// csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	}
 	linodeDriver.AddVolumeCapabilityAccessModes(vcam)
 	csc := []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
-		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
+		// csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		// csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 	}
 	linodeDriver.AddControllerServiceCapabilities(csc)

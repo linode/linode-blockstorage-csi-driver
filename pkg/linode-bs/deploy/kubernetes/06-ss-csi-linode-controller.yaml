@@ -23,6 +23,9 @@ metadata:
 spec:
   serviceName: "csi-linode"
   replicas: 1
+  selector:
+    matchLabels:
+      app: csi-linode-controller
   template:
     metadata:
       labels:

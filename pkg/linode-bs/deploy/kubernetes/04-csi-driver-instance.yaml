@@ -1,5 +1,5 @@
 
-apiVersion: csi.storage.k8s.io/v1
+apiVersion: csi.storage.k8s.io/v1alpha1
 kind: CSIDriver
 metadata:
   name: linodebs.csi.linode.com

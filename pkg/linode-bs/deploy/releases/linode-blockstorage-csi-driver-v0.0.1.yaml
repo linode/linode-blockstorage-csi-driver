@@ -1,3 +1,5 @@
+# pkg/linode-bs/deploy/kubernetes/01-csi-nodeinfo.yaml
+# Requires CSINodeInfo feature gate (alpha in 1.12)
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -54,15 +56,17 @@ spec:
                     type: string
 
 ---
+# pkg/linode-bs/deploy/kubernetes/02-csi-driver.yaml
+# Requires CSIDriverRegistry feature gate (alpha in 1.12)
 # https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
-apiVersion: apiextensions.k8s.io/v1
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: csidrivers.csi.storage.k8s.io
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
-  version: v1
+  version: v1alpha1
   group: csi.storage.k8s.io
   names:
     kind: CSIDriver
@@ -84,6 +88,7 @@ spec:
                 information (like podName, podUID, etc.) during mount operations.
               type: string
 ---
+# pkg/linode-bs/deploy/kubernetes/03-accounts-roles-bindings.yaml
 ##### Node Service Account, Roles, RoleBindings
 apiVersion: v1
 kind: ServiceAccount
@@ -258,8 +263,9 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+# pkg/linode-bs/deploy/kubernetes/04-csi-driver-instance.yaml
 
-apiVersion: csi.storage.k8s.io/v1
+apiVersion: csi.storage.k8s.io/v1alpha1
 kind: CSIDriver
 metadata:
   name: linodebs.csi.linode.com
@@ -268,6 +274,7 @@ spec:
   podInfoOnMountVersion: "v1"
 
 ---
+# pkg/linode-bs/deploy/kubernetes/05-csi-storageclass.yaml
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -277,6 +284,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: linodebs.csi.linode.com
 ---
+# pkg/linode-bs/deploy/kubernetes/06-ss-csi-linode-controller.yaml
 # stateful sets needs a headless service to provide pod network indentity
 kind: Service
 apiVersion: v1
@@ -302,6 +310,9 @@ metadata:
 spec:
   serviceName: "csi-linode"
   replicas: 1
+  selector:
+    matchLabels:
+      app: csi-linode-controller
   template:
     metadata:
       labels:
@@ -372,6 +383,7 @@ spec:
         - name: socket-dir
           emptyDir: {}
 ---
+# pkg/linode-bs/deploy/kubernetes/07-ds-csi-linode-node.yaml
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -391,7 +403,7 @@ spec:
       hostNetwork: true
       containers:
         - name: driver-registrar
-          image: quay.io/k8scsi/driver-registrar:v1.0.1
+          image: quay.io/k8scsi/driver-registrar:v1.0-canary
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
