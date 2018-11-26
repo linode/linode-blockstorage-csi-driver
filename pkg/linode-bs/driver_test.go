@@ -116,7 +116,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			vol, ok := f.volumes[id]
 			if ok {
 				rr, _ := json.Marshal(vol)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 			} else {
 				w.WriteHeader(404)
 				resp := linodego.APIError{
@@ -125,7 +125,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					},
 				}
 				rr, _ := json.Marshal(resp)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 			}
 			return
 		case strings.HasPrefix(r.URL.Path, "/volumes"):
@@ -144,13 +144,13 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Data: data,
 			}
 			rr, _ := json.Marshal(resp)
-			w.Write(rr)
+			_, _ = w.Write(rr)
 			return
 		case strings.HasPrefix(r.URL.Path, "/linode/instances/"):
 			id := filepath.Base(r.URL.Path)
 			if id == strconv.Itoa(f.instance.ID) {
 				rr, _ := json.Marshal(&f.instance)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 				return
 			} else {
 				w.WriteHeader(404)
@@ -160,7 +160,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					},
 				}
 				rr, _ := json.Marshal(resp)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 			}
 		case strings.HasPrefix(r.URL.Path, "/linode/instances"):
 			res := 1
@@ -176,7 +176,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Data: data,
 			}
 			rr, _ := json.Marshal(resp)
-			w.Write(rr)
+			_, _ = w.Write(rr)
 			return
 
 		}
@@ -203,7 +203,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					},
 				}
 				rr, _ := json.Marshal(resp)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 				return
 			}
 			if vol.LinodeID != nil {
@@ -227,7 +227,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					},
 				}
 				rr, _ := json.Marshal(resp)
-				w.Write(rr)
+				_, _ = w.Write(rr)
 				return
 			}
 			vol.LinodeID = nil
@@ -265,7 +265,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			f.t.Fatal(err)
 		}
-		w.Write(resp)
+		_, _ = w.Write(resp)
 	case "DELETE":
 		id := filepath.Base(r.URL.Path)
 		delete(f.volumes, id)

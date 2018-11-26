@@ -37,13 +37,11 @@ var (
 	endpoint      = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
 	token         = flag.String("token", "", "Linode API Token")
 	url           = flag.String("url", "", "Linode API URL")
-	// TODO(displague) region is not needed, looked up via linode hostname / linode label
-	region = flag.String("region", "", "Linode Region")
-	node   = flag.String("node", "", "Linode Hostname")
+	node          = flag.String("node", "", "Linode Hostname")
 )
 
 func init() {
-	flag.Set("logtostderr", "true")
+	_ = flag.Set("logtostderr", "true")
 }
 
 func main() {

@@ -33,19 +33,6 @@ const (
 	diskPartitionSuffix  = "-part"
 	diskSDPath           = "/dev/sd"
 	diskSDPattern        = "/dev/sd*"
-	// How many times to retry for a consistent read of /proc/mounts.
-	maxListTries = 3
-	// Number of fields per line in /proc/mounts as per the fstab man page.
-	expectedNumFieldsPerLine = 6
-	// Location of the mount file to use
-	procMountsPath = "/proc/mounts"
-	// Location of the mountinfo file
-	procMountInfoPath = "/proc/self/mountinfo"
-	// 'fsck' found errors and corrected them
-	fsckErrorsCorrected = 1
-	// 'fsck' found errors but exited without correcting them
-	fsckErrorsUncorrected = 4
-	defaultMountCommand   = "mount"
 )
 
 // DeviceUtils are a collection of methods that act on the devices attached
