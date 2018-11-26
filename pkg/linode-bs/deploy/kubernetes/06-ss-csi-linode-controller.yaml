@@ -63,8 +63,6 @@ spec:
         - name: linode-csi-plugin
           image: linode/linode-blockstorage-csi-driver:canary
           args :
-            - init
-            - "--region=$(LINODE_REGION)"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
             - "--url=$(LINODE_API_URL)"
@@ -84,11 +82,6 @@ spec:
                 secretKeyRef:
                   name: linode
                   key: token
-            - name: LINODE_REGION
-              valueFrom:
-                secretKeyRef:
-                  name: linode
-                  key: region
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
