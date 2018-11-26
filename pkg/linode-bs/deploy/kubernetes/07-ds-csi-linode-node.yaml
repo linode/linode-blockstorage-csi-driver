@@ -1,5 +1,5 @@
 kind: DaemonSet
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 metadata:
   name: csi-linode-node
   namespace: kube-system
@@ -42,8 +42,6 @@ spec:
         - name: csi-linode-plugin 
           image: linode/linode-blockstorage-csi-driver:canary
           args :
-            - init
-            - "--region=$(LINODE_REGION)"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
             - "--url=$(LINODE_API_URL)"
@@ -63,11 +61,6 @@ spec:
                 secretKeyRef:
                   name: linode
                   key: token
-            - name: LINODE_REGION
-              valueFrom:
-                secretKeyRef:
-                  name: linode
-                  key: region
           imagePullPolicy: "Always"
           securityContext:
             privileged: true

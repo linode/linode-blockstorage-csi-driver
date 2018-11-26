@@ -15,7 +15,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"flag"
 
@@ -24,8 +26,6 @@ import (
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -34,98 +34,49 @@ const (
 
 var (
 	vendorVersion string
+	endpoint      = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
+	token         = flag.String("token", "", "Linode API Token")
+	url           = flag.String("url", "", "Linode API URL")
+	// TODO(displague) region is not needed, looked up via linode hostname / linode label
+	region = flag.String("region", "", "Linode Region")
+	node   = flag.String("node", "", "Linode Hostname")
 )
 
-// Config Linode Client Config
-type Config struct {
-	Endpoint string
-	Token    string
-	URL      string
-	Region   string
-	NodeName string
-}
-
-func NewConfig() *Config {
-	hostname, _ := os.Hostname()
-	return &Config{
-		Endpoint: "unix:///var/lib/kubelet/plugins/linodebs.csi.linode.com/csi.sock",
-		URL:      "https://api.linode.com/v4",
-		Token:    "",
-		Region:   "",
-		NodeName: hostname,
-	}
+func init() {
+	flag.Set("logtostderr", "true")
 }
 
 func main() {
-	if err := NewRootCmd(vendorVersion).Execute(); err != nil {
-		os.Exit(1)
-	}
+	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
+	handle()
 	os.Exit(0)
 }
 
-func NewCmdInit() *cobra.Command {
-	cfg := NewConfig()
-	cmd := &cobra.Command{
-		Use:               "init",
-		Short:             "Initializes the driver.",
-		DisableAutoGenTag: true,
-		Run: func(cmd *cobra.Command, args []string) {
-			if vendorVersion == "" {
-				glog.Fatalf("vendorVersion must be set at compile time")
-			}
-			glog.V(4).Infof("Driver vendor version %v", vendorVersion)
-
-			linodeDriver := driver.GetLinodeDriver()
-
-			//Initialize Linode Driver (Move setup to main?)
-			uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
-			cloudProvider := linodeclient.NewLinodeClient(cfg.Token, uaPrefix, cfg.URL)
-
-			mounter := mountmanager.NewSafeMounter()
-			deviceUtils := mountmanager.NewDeviceUtils()
-
-			ms, err := metadataservice.NewMetadataService(cloudProvider, cfg.NodeName)
-			if err != nil {
-				glog.Fatalf("Failed to set up metadata service: %v", err)
-			}
-
-			err = linodeDriver.SetupLinodeDriver(cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion)
-			if err != nil {
-				glog.Fatalf("Failed to initialize Linode CSI Driver: %v", err)
-			}
-
-			linodeDriver.Run(cfg.Endpoint)
-		},
+func handle() {
+	if vendorVersion == "" {
+		glog.Fatalf("vendorVersion must be set at compile time")
 	}
-	cfg.AddFlags(cmd.Flags())
-	return cmd
-}
+	glog.V(4).Infof("Driver vendor version %v", vendorVersion)
 
-func NewRootCmd(version string) *cobra.Command {
+	linodeDriver := driver.GetLinodeDriver()
 
-	rootCmd := &cobra.Command{
-		Use:               "linode-blockstorage-csi-driver [command]",
-		Short:             `Linode CSI plugin`,
-		DisableAutoGenTag: true,
-		PersistentPreRun: func(c *cobra.Command, args []string) {
-		},
+	//Initialize Linode Driver (Move setup to main?)
+	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
+	cloudProvider := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
+
+	mounter := mountmanager.NewSafeMounter()
+	deviceUtils := mountmanager.NewDeviceUtils()
+
+	ms, err := metadataservice.NewMetadataService(cloudProvider, *node)
+	if err != nil {
+		glog.Fatalf("Failed to set up metadata service: %v", err)
 	}
-	rootCmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-	// ref: https://github.com/kubernetes/kubernetes/issues/17162#issuecomment-225596212
-	flag.CommandLine.Parse([]string{})
 
-	rootCmd.AddCommand(NewCmdInit())
+	err = linodeDriver.SetupLinodeDriver(cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion)
+	if err != nil {
+		glog.Fatalf("Failed to initialize Linode CSI Driver: %v", err)
+	}
 
-	// rootCmd.AddCommand(v.NewCmdVersion())
-
-	return rootCmd
-}
-
-func (c *Config) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&c.Endpoint, "endpoint", c.Endpoint, "CSI endpoint")
-	fs.StringVar(&c.Token, "token", c.Token, "Linode API Token")
-	fs.StringVar(&c.URL, "url", c.URL, "Linode API URL")
-	// TODO(displague) region is not needed, looked up via linode hostname / linode label
-	fs.StringVar(&c.Region, "region", c.Region, "Linode Region")
-	fs.StringVar(&c.NodeName, "node", c.NodeName, "Linode Hostname")
+	linodeDriver.Run(*endpoint)
 }
