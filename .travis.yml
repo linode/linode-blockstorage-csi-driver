@@ -9,7 +9,7 @@ env:
 - GO111MODULE=on
 
 go:
-  - 1.11.x
+  - 1.11.2
   - tip
 
 cache:
@@ -32,5 +32,6 @@ install:
 script:
   - make test
   - make linode-container
+  - golangci-lint run
   - travis_wait 20 roveralls
   - goveralls -coverprofile=roveralls.coverprofile -service=travis-ci
