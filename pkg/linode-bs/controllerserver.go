@@ -41,7 +41,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 	}
 
 	volCapabilities := req.GetVolumeCapabilities()
-	if volCapabilities == nil || len(volCapabilities) == 0 {
+	if len(volCapabilities) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume capabilities are required")
 	}
 
@@ -481,10 +481,6 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	}
 
 	return minSize, nil
-}
-
-type withVolumeCapability interface {
-	GetVolumeCapabilities() []*csi.VolumeCapability
 }
 
 func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {

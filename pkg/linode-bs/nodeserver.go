@@ -187,7 +187,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 
 	deviceName := key.GetNormalizedLabel()
 	if err != nil {
-		status.Error(codes.Internal, fmt.Sprintf("error getting device name: %v", err))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("error getting device name: %v", err))
 	}
 
 	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
@@ -235,9 +235,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		if mnt.FsType != "" {
 			fstype = mnt.FsType
 		}
-		for _, flag := range mnt.MountFlags {
-			options = append(options, flag)
-		}
+		options = append(options, mnt.MountFlags...)
 	} else if blk := volumeCapability.GetBlock(); blk != nil {
 		// TODO(#64): Block volume support
 		return nil, status.Error(codes.Unimplemented, fmt.Sprintf("Block volume support is not yet implemented"))

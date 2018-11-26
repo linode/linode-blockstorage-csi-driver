@@ -22,7 +22,7 @@ type (
 
 func hashStringToInt(b string) int {
 	algorithm := fnv.New32a()
-	algorithm.Write([]byte(b))
+	_, _ = algorithm.Write([]byte(b))
 	i := algorithm.Sum32()
 	return int(i)
 }

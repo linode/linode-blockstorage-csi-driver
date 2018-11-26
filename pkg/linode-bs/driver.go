@@ -59,7 +59,9 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		// csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	}
-	linodeDriver.AddVolumeCapabilityAccessModes(vcam)
+	if err := linodeDriver.AddVolumeCapabilityAccessModes(vcam); err != nil {
+		return err
+	}
 	csc := []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
@@ -67,11 +69,15 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 		// csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 	}
-	linodeDriver.AddControllerServiceCapabilities(csc)
+	if err := linodeDriver.AddControllerServiceCapabilities(csc); err != nil {
+		return err
+	}
 	ns := []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 	}
-	linodeDriver.AddNodeServiceCapabilities(ns)
+	if err := linodeDriver.AddNodeServiceCapabilities(ns); err != nil {
+		return err
+	}
 
 	// Set up RPC Servers
 	linodeDriver.ids = NewIdentityServer(linodeDriver)
