@@ -28,7 +28,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-node-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: driver-registrar-role
@@ -82,7 +82,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: external-provisioner-role
@@ -119,7 +119,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: external-attacher-role
@@ -165,7 +165,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: external-snapshotter-role
