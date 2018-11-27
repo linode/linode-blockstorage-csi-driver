@@ -46,4 +46,3 @@ If you discover a potential security issue in this project we ask that you notif
 
 See the [LICENSE file](/LICENSE) for our project's licensing.
 
-
