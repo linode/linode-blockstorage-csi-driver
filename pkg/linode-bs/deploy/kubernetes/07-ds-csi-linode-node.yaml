@@ -80,8 +80,12 @@ spec:
       volumes:
         - name: registration-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/
+            path: /var/lib/kubelet/plugins_registry/
             type: DirectoryOrCreate
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
         - name: plugin-dir
           hostPath:
             path: /var/lib/kubelet/plugins/linodebs.csi.linode.com
@@ -93,3 +97,20 @@ spec:
         - name: device-dir
           hostPath:
             path: /dev
+        # The following mounts are required to trigger host udevadm from container
+        - name: udev-rules-etc
+          hostPath:
+            path: /etc/udev
+            type: Directory
+        - name: udev-rules-lib
+          hostPath:
+            path: /lib/udev
+            type: Directory
+        - name: udev-socket
+          hostPath:
+            path: /run/udev
+            type: Directory
+        - name: sys
+          hostPath:
+            path: /sys
+            type: Directory
