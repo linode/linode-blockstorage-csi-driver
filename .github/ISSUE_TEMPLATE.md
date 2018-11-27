@@ -31,6 +31,6 @@
 
 ----
  
-For general help or discussion, join the [Kubernetes Slack team](https://kubernetes.slack.com/messages/CD4B15LUR/details/) channel `#linode`. To sign up, use the [Kubernetes Slack inviter](http://slack.kubernetes.io/).
+For general help or discussion, join the [Gophers Slack team](https://gophers.slack.com) channel [#linodego](https://gophers.slack.com/messages/CAG93EB2S).
 
 The [Linode Community](https://www.linode.com/community/questions/) is a great place to get additional support.
