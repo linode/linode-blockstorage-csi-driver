@@ -75,7 +75,7 @@ linode-block-storage (default)   linodebs.csi.linode.com   2d
 
 ### Create a PersistentVolumeClaim
 
-Verify that the volume is created, provisioned, mounted, and consumed properlyThis makes sure a volume is created and provisioned on your behalf:
+Verify that the volume is created, provisioned, mounted, and consumed properly. This makes sure a volume is created and provisioned on your behalf:
 
 ```sh
 kubectl create -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/examples/kubernetes/csi-pvc.yaml
