@@ -9,7 +9,7 @@ More information about the Kubernetes CSI can be found in the GitHub [Kubernetes
 
 ### Requirements
 
-* Kubernetes v1.12+
+* Kubernetes v1.13+
 * The node `hostname` must match the Linode Instance `label`
 * `--allow-privileged` must be enabled for the API server and kubelet
 
