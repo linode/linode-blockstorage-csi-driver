@@ -106,7 +106,7 @@ hello-world
 
 ## Contribution Guidelines
 
-Want to improve the linode-blockstorage-csi-driver? Please start [here](/CONTRIBUTING.md).
+Want to improve the linode-blockstorage-csi-driver? Please start [here](.github/CONTRIBUTING.md).
 
 ## Join the Go Community
 
