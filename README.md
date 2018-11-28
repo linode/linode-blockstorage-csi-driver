@@ -5,12 +5,6 @@ The Container Storage Interface ([CSI](https://github.com/container-storage-inte
 
 More information about the Kubernetes CSI can be found in the GitHub [Kubernetes CSI](https://kubernetes-csi.github.io/docs/Example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repos.
 
-## Disclaimer
-
-**Warning**: This driver is a Work-In-Progress and may not be compatible between driver versions and Kubernetes versions.
-
-This is not officially supported by Linode.
-
 ## Deployment
 
 ### Requirements
