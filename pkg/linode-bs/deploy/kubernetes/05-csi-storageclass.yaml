@@ -6,3 +6,11 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: linodebs.csi.linode.com
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: linode-block-storage-retain
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Retain
