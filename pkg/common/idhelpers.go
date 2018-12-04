@@ -20,6 +20,8 @@ type (
 	}
 )
 
+const linodeBSLabelLength = 32
+
 func hashStringToInt(b string) int {
 	algorithm := fnv.New32a()
 	_, _ = algorithm.Write([]byte(b))
@@ -100,10 +102,19 @@ func (key *LinodeVolumeKey) GetVolumeLabel() string {
 
 func (key *LinodeVolumeKey) GetNormalizedLabel() string {
 	volumeName := strings.Replace(key.Label, "-", "", -1)
-	if len(volumeName) > 32 {
-		volumeName = volumeName[:32]
+	if len(volumeName) > linodeBSLabelLength {
+		volumeName = volumeName[:linodeBSLabelLength]
 	}
+
 	return volumeName
+}
+
+func (key *LinodeVolumeKey) GetNormalizedLabelWithPrefix(prefix string) string {
+	label := prefix + key.GetNormalizedLabel()
+	if len(label) > linodeBSLabelLength {
+		label = label[:linodeBSLabelLength]
+	}
+	return label
 }
 
 func (key *LinodeVolumeKey) GetVolumeKey() string {

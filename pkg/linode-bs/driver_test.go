@@ -40,6 +40,8 @@ func TestDriverSuite(t *testing.T) {
 		t.Fatalf("failed to remove unix domain socket file %s, error: %s", socket, err)
 	}
 
+	bsPrefix := "test-"
+
 	// mock Linode Server, not working yet ...
 	fake := &fakeAPI{
 		t:       t,
@@ -70,7 +72,7 @@ func TestDriverSuite(t *testing.T) {
 		t.Fatalf("Failed to setup Linode metadata: %v", err)
 	}
 	linodeDriver := GetLinodeDriver()
-	err = linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, ms, driver, vendorVersion)
+	err = linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, ms, driver, vendorVersion, bsPrefix)
 	if err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
@@ -241,7 +243,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			id := rand.Intn(99999)
-			name := randString(10)
+			name := v.Label
 			path := fmt.Sprintf("/dev/disk/by-id/scsi-0Linode_Volume_%v", name)
 			vol = linodego.Volume{
 				ID:             id,
