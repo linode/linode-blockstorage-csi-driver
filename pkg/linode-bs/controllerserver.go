@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"encoding/json"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
@@ -58,10 +57,8 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	volumeName := strings.Replace(req.Name, "-", "", -1)
-	if len(volumeName) > 32 {
-		volumeName = volumeName[:32]
-	}
+	preKey := common.CreateLinodeVolumeKey(0, name)
+	volumeName := preKey.GetNormalizedLabelWithPrefix(linodeCS.Driver.bsPrefix)
 
 	glog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",

@@ -16,6 +16,8 @@ limitations under the License.
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
@@ -31,6 +33,7 @@ import (
 type LinodeDriver struct {
 	name          string
 	vendorVersion string
+	bsPrefix      string
 
 	ids *LinodeIdentityServer
 	ns  *LinodeNodeServer
@@ -41,18 +44,29 @@ type LinodeDriver struct {
 	nscap []*csi.NodeServiceCapability
 }
 
+const linodeBSPrefixLength = 12
+
 func GetLinodeDriver() *LinodeDriver {
 	return &LinodeDriver{}
 }
 
 func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.LinodeClient, mounter *mount.SafeFormatAndMount,
-	deviceUtils mountmanager.DeviceUtils, metadata metadata.MetadataService, name, vendorVersion string) error {
+	deviceUtils mountmanager.DeviceUtils, metadata metadata.MetadataService, name, vendorVersion, bsPrefix string) error {
 	if name == "" {
 		return fmt.Errorf("Driver name missing")
 	}
 
 	linodeDriver.name = name
 	linodeDriver.vendorVersion = vendorVersion
+
+	matched, err := regexp.MatchString(`^[0-9A-Za-z_-]{0,`+strconv.Itoa(linodeBSPrefixLength)+`}$`, bsPrefix)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return fmt.Errorf("bs-prefix must be up to 12 alphanumeric characters, including hyphen and underscore")
+	}
+	linodeDriver.bsPrefix = bsPrefix
 
 	// Adding Capabilities
 	vcam := []csi.VolumeCapability_AccessMode_Mode{
@@ -157,6 +171,9 @@ func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.
 
 func (linodeDriver *LinodeDriver) Run(endpoint string) {
 	glog.V(4).Infof("Driver: %v", linodeDriver.name)
+	if len(linodeDriver.bsPrefix) > 0 {
+		glog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.bsPrefix)
+	}
 
 	//Start the nonblocking GRPC
 	s := NewNonBlockingGRPCServer()

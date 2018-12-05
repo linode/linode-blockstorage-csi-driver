@@ -15,8 +15,8 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20181110185634-c63ab54fda8f // indirect
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
-	github.com/kubernetes-csi/csi-test v1.0.0-2
-	github.com/linode/linodego v0.6.2
+	github.com/kubernetes-csi/csi-test v1.1.0
+	github.com/linode/linodego v0.7.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
@@ -43,14 +43,14 @@ require (
 	gopkg.in/resty.v1 v1.10.2 // indirect
 	k8s.io/api v0.0.0-20181121071145-b7bd5f2d334c // indirect
 	k8s.io/apiextensions-apiserver v0.0.0-20181123033937-b8ea0ae3837a // indirect
-	k8s.io/apimachinery v0.0.0-20181121191217-a6dc8e30bd0d
-	k8s.io/apiserver v0.0.0-20181123032442-6e69081b5219 // indirect
-	k8s.io/client-go v2.0.0-alpha.0.0.20181121191925-a47917edff34+incompatible // indirect
+	k8s.io/apimachinery v0.0.0-20181127025237-2b1284ed4c93
+	k8s.io/apiserver v0.0.0-20181204001702-9caa0299108f // indirect
+	k8s.io/client-go v10.0.0+incompatible // indirect
 	k8s.io/cloud-provider v0.0.0-20181121074215-9b77dc1c3846 // indirect
 	k8s.io/csi-api v0.0.0-20181121194709-474e2246bd08 // indirect
 	k8s.io/klog v0.1.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20181114233023-0317810137be // indirect
-	k8s.io/kubernetes v1.13.0-beta.2
+	k8s.io/kubernetes v1.13.0
 	k8s.io/utils v0.0.0-20181115163542-0d26856f57b3
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )

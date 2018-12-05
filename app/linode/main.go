@@ -38,6 +38,7 @@ var (
 	token         = flag.String("token", "", "Linode API Token")
 	url           = flag.String("url", "", "Linode API URL")
 	node          = flag.String("node", "", "Linode Hostname")
+	bsPrefix      = flag.String("bs-prefix", "", "Linode BlockStorage Volume label prefix")
 )
 
 func init() {
@@ -71,7 +72,12 @@ func handle() {
 		glog.Fatalf("Failed to set up metadata service: %v", err)
 	}
 
-	err = linodeDriver.SetupLinodeDriver(cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion)
+	prefix := ""
+	if bsPrefix != nil {
+		prefix = *bsPrefix
+	}
+
+	err = linodeDriver.SetupLinodeDriver(cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion, prefix)
 	if err != nil {
 		glog.Fatalf("Failed to initialize Linode CSI Driver: %v", err)
 	}
