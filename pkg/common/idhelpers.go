@@ -101,12 +101,12 @@ func (key *LinodeVolumeKey) GetVolumeLabel() string {
 }
 
 func (key *LinodeVolumeKey) GetNormalizedLabel() string {
-	volumeName := strings.Replace(key.Label, "-", "", -1)
-	if len(volumeName) > linodeBSLabelLength {
-		volumeName = volumeName[:linodeBSLabelLength]
+	label := key.Label
+	if len(label) > linodeBSLabelLength {
+		label = label[:linodeBSLabelLength]
 	}
 
-	return volumeName
+	return label
 }
 
 func (key *LinodeVolumeKey) GetNormalizedLabelWithPrefix(prefix string) string {

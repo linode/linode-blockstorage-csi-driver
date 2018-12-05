@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"encoding/json"
 
@@ -57,7 +58,15 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	preKey := common.CreateLinodeVolumeKey(0, name)
+	// to avoid mangled requests for existing volumes with hyphen,
+	// we only strip them out on creation when k8s invented the name
+	// this is still problematic because we strip "-" from volume-name-prefixes
+	// that specifically requested "-".
+	// Don't strip this when volume labels support sufficient length
+	condensedName := strings.Replace(name, "-", "", -1)
+
+	preKey := common.CreateLinodeVolumeKey(0, condensedName)
+
 	volumeName := preKey.GetNormalizedLabelWithPrefix(linodeCS.Driver.bsPrefix)
 
 	glog.V(4).Infoln("create volume called", map[string]interface{}{
