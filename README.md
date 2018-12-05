@@ -15,7 +15,7 @@ This is not officially supported by Linode.
 
 ### Requirements
 
-* Kubernetes v1.12+
+* Kubernetes v1.13+
 * The node `hostname` must match the Linode Instance `label`
 * `--allow-privileged` must be enabled for the API server and kubelet
 
@@ -66,7 +66,7 @@ linode          Opaque                                2         18h
 The following command will deploy the CSI and related volume attachment and provisioning sidecars:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.0.1.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver.yaml
 ```
 
 This deployment is a concatenation of all of the `yaml` files in [https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/].

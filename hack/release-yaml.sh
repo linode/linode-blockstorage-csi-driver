@@ -1,9 +1,13 @@
 #!/bin/bash
 
-TAG=$(git describe --abbrev=0)
+TAG=${1?$(git describe --abbrev=0)}
+RELEASES="pkg/linode-bs/deploy/releases/"
+TAGGED_RELEASE="linode-blockstorage-csi-driver-${TAG}.yaml"
+GENERIC_RELEASE="linode-blockstorage-csi-driver.yaml"
 
 for a in pkg/linode-bs/deploy/kubernetes/0*; do
 	echo "# $a"
 	cat $a
 	echo -e "\n---"
-done > "pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-${TAG}.yaml"
+done > "$RELEASES/$TAGGED_RELEASE"
+ln -fs "$TAGGED_RELEASE" "$RELEASES/$GENERIC_RELEASE"
