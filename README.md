@@ -136,7 +136,7 @@ Want to improve the linode-blockstorage-csi-driver? Please start [here](.github/
 
 ## Join us on Slack
 
-For general help or discussion, join the [Kubernetes Slack](http://slack.k8s.io/) channel [#linode] (https://kubernetes.slack.com/messages/CD4B15LUR).
+For general help or discussion, join the [Kubernetes Slack](http://slack.k8s.io/) channel [#linode](https://kubernetes.slack.com/messages/CD4B15LUR).
 
 For development and debugging, join the [Gopher's Slack](https://invite.slack.golangbridge.org/) channel [#linodego](https://gophers.slack.com/messages/CAG93EB2S).
 
