@@ -34,7 +34,7 @@ linode: vendor
 linode-container: linode
 	docker build -t $(IMAGE_TAG) -f ./app/linode/Dockerfile .
 push: linode-container
-	@echo "$$DOCKER_PASSWORD" | docker login -u "$$DOCKER_USERNAME" --password-stdin
+	#@echo "$$DOCKER_PASSWORD" | docker login -u "$$DOCKER_USERNAME" --password-stdin
 	docker push $(IMAGE_TAG)
 verify:
 	go mod verify

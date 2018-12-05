@@ -44,7 +44,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-plugin
-          image: linode/linode-blockstorage-csi-driver:canary
+          image: linode/linode-blockstorage-csi-driver:{{ .Values.image.tag }}
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"

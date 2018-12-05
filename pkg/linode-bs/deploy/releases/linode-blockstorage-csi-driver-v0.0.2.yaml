@@ -88,6 +88,7 @@ spec:
               description: Indicates this CSI volume driver requires additional pod
                 information (like podName, podUID, etc.) during mount operations.
               type: string
+
 ---
 # pkg/linode-bs/deploy/kubernetes/03-accounts-roles-bindings.yaml
 ##### Node Service Account, Roles, RoleBindings
@@ -284,6 +285,7 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: linodebs.csi.linode.com
+
 ---
 # pkg/linode-bs/deploy/kubernetes/06-ss-csi-linode-controller.yaml
 kind: StatefulSet
@@ -332,7 +334,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-plugin
-          image: linode/linode-blockstorage-csi-driver:canary
+          image: linode/linode-blockstorage-csi-driver:v0.0.2
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
@@ -363,6 +365,7 @@ spec:
       volumes:
         - name: socket-dir
           emptyDir: {}
+
 ---
 # pkg/linode-bs/deploy/kubernetes/07-ds-csi-linode-node.yaml
 kind: DaemonSet
@@ -407,7 +410,7 @@ spec:
             - name: registration-dir
               mountPath: /registration/
         - name: csi-linode-plugin 
-          image: linode/linode-blockstorage-csi-driver:canary
+          image: linode/linode-blockstorage-csi-driver:v0.0.2
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
@@ -481,4 +484,5 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+
 ---
