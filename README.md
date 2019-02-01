@@ -5,12 +5,6 @@ The Container Storage Interface ([CSI](https://github.com/container-storage-inte
 
 More information about the Kubernetes CSI can be found in the GitHub [Kubernetes CSI](https://kubernetes-csi.github.io/docs/Example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repos.
 
-## Disclaimer
-
-**Warning**: This driver is a Work-In-Progress and may not be compatible between driver versions and Kubernetes versions.
-
-This is not officially supported by Linode.
-
 ## Deployment
 
 ### Requirements
@@ -89,7 +83,6 @@ Notably, this deployment will:
   
   Volumes created by this CSI driver will automatically be deleted when they are no longer needed.
 
-
 ### Example Usage
 
 This repository contains [two manifests](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/examples/kubernetes) that demonstrate use of the Linode BlockStorage CSI.  These manifests will create a PersistentVolume Claim using the `linode-block-storage` storage class and then consume it in a minimal pod.
@@ -129,6 +122,13 @@ drwx------    2 root     root         16384 Dec  5 06:03 lost+found
 persistence
 
 ```
+
+## Disclaimers
+
+* This is not officially supported by Linode.  [Join us on Slack](#join-us-on-slack) for community support.
+* Until this driver has reached v1.0.0 it may not maintain compatibility between driver versions
+* This driver does not work with versions of Kubernetes earlier than 1.13
+* Requests for Persistent Volumes with a `require_size` less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10GiB), this is [in accordance with the CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume).  The upper-limit size constraint (`limit_bytes`) will also be honored so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
 
 ## Contribution Guidelines
 
