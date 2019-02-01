@@ -18,7 +18,7 @@ This is not officially supported by Linode.
 * Kubernetes v1.13+
 * The node `hostname` must match the Linode Instance `label`
 * `--allow-privileged` must be enabled for the API server and kubelet
-* Should have the following [feature gates enabled](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#overview): `CSINodeInfo`, `CSIDriverRegistry` (both are enabled by default in 1.13+)
+* Should have the following [feature gates enabled](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#overview): `CSINodeInfo`, `CSIDriverRegistry`
 * The following feature gates may be used in future versions: `BlockVolume`, `CSIBlockVolume`
 
 ### Secure a Linode API Access Token:
@@ -68,7 +68,7 @@ linode          Opaque                                2         18h
 The following command will deploy the CSI driver with the related Kubernetes volume attachment, driver registration, and provisioning sidecars:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.0.3.yaml
 ```
 
 This deployment is a concatenation of all of the `yaml` files in [pkg/linode-bs/deploy/kubernetes/](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/).
@@ -77,7 +77,7 @@ Notably, this deployment will:
 
 * set the default storage class to `linode-block-storage` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)
 
-  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
+  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/05-csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
 
   ```sh
   $ kubectl get storageclasses
