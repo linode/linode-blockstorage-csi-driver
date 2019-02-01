@@ -456,37 +456,40 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 		return minProviderVolumeBytes, nil
 	}
 
-	minSize := capRange.GetRequiredBytes()
+	// Volume MUST be at least this big. This field is OPTIONAL.
+	reqSize := capRange.GetRequiredBytes()
+
+	// Volume MUST not be bigger than this. This field is OPTIONAL.
 	maxSize := capRange.GetLimitBytes()
 
 	// At least one of the these fields MUST be specified.
-	if minSize == 0 && maxSize == 0 {
+	if reqSize == 0 && maxSize == 0 {
 		return 0, errors.New("RequiredBytes or LimitBytes must be set")
 	}
 
 	// The value of this field MUST NOT be negative.
-	if minSize < 0 || maxSize < 0 {
+	if reqSize < 0 || maxSize < 0 {
 		return 0, errors.New("RequiredBytes and LimitBytes may not be negative")
 	}
 
 	if maxSize == 0 {
 		// Only received a required size
-		if minSize < minProviderVolumeBytes {
-			return 0, fmt.Errorf("Required bytes %v is less than minimum bytes %v", minSize, minProviderVolumeBytes)
+		if reqSize < minProviderVolumeBytes {
+			// the Linode API would reject the request, opt to fulfill it by provisioning above
+			// the requested size, but no more than the limit size
+			reqSize = minProviderVolumeBytes
 		}
-		maxSize = minSize
-	}
-
-	if maxSize < minProviderVolumeBytes {
+		maxSize = reqSize
+	} else if maxSize < minProviderVolumeBytes {
 		return 0, fmt.Errorf("Limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
 	}
 
-	if minSize == 0 {
-		// Only received a limit size
-		minSize = maxSize
+	// fulfill the upper bound of the request
+	if reqSize == 0 || reqSize < maxSize {
+		reqSize = maxSize
 	}
 
-	return minSize, nil
+	return reqSize, nil
 }
 
 func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
