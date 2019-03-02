@@ -10,4 +10,4 @@ for manifest in pkg/linode-bs/deploy/kubernetes/0*; do
 	sed -e "s|{{ .Values.image.tag }}|${TAG}|" "$manifest"
 	echo -e "\n---"
 done > "$RELEASES/$TAGGED_RELEASE"
-ln -fs "$TAGGED_RELEASE" "$RELEASES/$GENERIC_RELEASE"
+cp "$RELEASES/$TAGGED_RELEASE" "$RELEASES/$GENERIC_RELEASE"

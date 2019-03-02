@@ -1,3 +1,8 @@
+## v0.1.0 - March 2nd 2019
+
+* per the CSI spec, fulfill volume requests with required\_size under 10GB by extending them to 10GB (the Linode minimum), unless that is over the limit size
+* added a storage class of `linode-block-storage-retain`, with a default reclaim policy of `Retain` (to avoid deletion of the Block Storage Volume data)
+
 ## v0.0.3 - Dec 5th 2018
 
 * Fixed mangling of hyphens in k8s stored volume keys (from prefixes, which affected mount)
