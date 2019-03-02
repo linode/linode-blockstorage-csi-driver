@@ -5,12 +5,6 @@ The Container Storage Interface ([CSI](https://github.com/container-storage-inte
 
 More information about the Kubernetes CSI can be found in the GitHub [Kubernetes CSI](https://kubernetes-csi.github.io/docs/Example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repos.
 
-## Disclaimer
-
-**Warning**: This driver is a Work-In-Progress and may not be compatible between driver versions and Kubernetes versions.
-
-This is not officially supported by Linode.
-
 ## Deployment
 
 ### Requirements
@@ -18,7 +12,7 @@ This is not officially supported by Linode.
 * Kubernetes v1.13+
 * The node `hostname` must match the Linode Instance `label`
 * `--allow-privileged` must be enabled for the API server and kubelet
-* Should have the following [feature gates enabled](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#overview): `CSINodeInfo`, `CSIDriverRegistry` (both are enabled by default in 1.13+)
+* Should have the following [feature gates enabled](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#overview): `CSINodeInfo`, `CSIDriverRegistry`
 * The following feature gates may be used in future versions: `BlockVolume`, `CSIBlockVolume`
 
 ### Secure a Linode API Access Token:
@@ -68,7 +62,7 @@ linode          Opaque                                2         18h
 The following command will deploy the CSI driver with the related Kubernetes volume attachment, driver registration, and provisioning sidecars:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.0.3.yaml
 ```
 
 This deployment is a concatenation of all of the `yaml` files in [pkg/linode-bs/deploy/kubernetes/](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/).
@@ -77,7 +71,7 @@ Notably, this deployment will:
 
 * set the default storage class to `linode-block-storage` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)
 
-  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
+  This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/05-csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
 
   ```sh
   $ kubectl get storageclasses
@@ -88,7 +82,6 @@ Notably, this deployment will:
 * use a `reclaimPolocy` of `Released` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/)
   
   Volumes created by this CSI driver will automatically be deleted when they are no longer needed.
-
 
 ### Example Usage
 
@@ -129,6 +122,13 @@ drwx------    2 root     root         16384 Dec  5 06:03 lost+found
 persistence
 
 ```
+
+## Disclaimers
+
+* This is not officially supported by Linode.  [Join us on Slack](#join-us-on-slack) for community support.
+* Until this driver has reached v1.0.0 it may not maintain compatibility between driver versions
+* This driver does not work with versions of Kubernetes earlier than 1.13
+* Requests for Persistent Volumes with a `require_size` less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10GiB), this is [in accordance with the CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume).  The upper-limit size constraint (`limit_bytes`) will also be honored so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
 
 ## Contribution Guidelines
 
