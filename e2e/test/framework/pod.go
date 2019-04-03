@@ -18,12 +18,12 @@ func (f *Invocation) GetPodObject(pvc string) *core.Pod {
 		Spec: core.PodSpec{
 			Containers: []core.Container{
 				{
-					Name: f.app,
+					Name:  f.app,
 					Image: "busybox",
 					VolumeMounts: []core.VolumeMount{
 						{
 							MountPath: "/data",
-							Name: "csi-volume",
+							Name:      "csi-volume",
 						},
 					},
 					Command: []string{"sleep", "1000000"},
@@ -44,7 +44,7 @@ func (f *Invocation) GetPodObject(pvc string) *core.Pod {
 }
 
 func (f *Invocation) CreatePod(pod *core.Pod) error {
-	 pod, err := f.kubeClient.CoreV1().Pods(f.namespace).Create(pod)
+	pod, err := f.kubeClient.CoreV1().Pods(f.namespace).Create(pod)
 	if err != nil {
 		return err
 	}
@@ -56,11 +56,11 @@ func (f *Invocation) DeletePod(meta metav1.ObjectMeta) error {
 	return f.kubeClient.CoreV1().Pods(f.namespace).Delete(meta.Name, deleteInForeground())
 }
 
-func (f *Invocation) GetPod(name, ns string) (*core.Pod, error)  {
+func (f *Invocation) GetPod(name, ns string) (*core.Pod, error) {
 	return f.kubeClient.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
 }
 
-func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error  {
+func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error {
 	return wait.PollImmediate(retryInterval, retryTimout, func() (bool, error) {
 		pod, err := f.kubeClient.CoreV1().Pods(f.namespace).Get(meta.Name, metav1.GetOptions{})
 		if pod == nil || err != nil {
@@ -73,8 +73,7 @@ func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error  {
 	})
 }
 
-
-func (f *Invocation) WriteFileIntoPod(filename string, pod *core.Pod) error  {
+func (f *Invocation) WriteFileIntoPod(filename string, pod *core.Pod) error {
 	_, err := exec.ExecIntoPod(f.restConfig, pod, exec.Command([]string{
 		"touch", filename,
 	}...))
@@ -82,7 +81,7 @@ func (f *Invocation) WriteFileIntoPod(filename string, pod *core.Pod) error  {
 	return err
 }
 
-func (f *Invocation) CheckFileIntoPod(filename string, pod *core.Pod) error  {
+func (f *Invocation) CheckFileIntoPod(filename string, pod *core.Pod) error {
 	out, err := exec.ExecIntoPod(f.restConfig, pod, exec.Command([]string{
 		"ls", filename,
 	}...))

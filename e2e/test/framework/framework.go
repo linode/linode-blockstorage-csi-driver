@@ -7,13 +7,14 @@ import (
 )
 
 var (
-	Image = "linode/linode-blockstorage-csi-driver:v0.1.0"
-	ApiToken =""
+	Image          = "linode/linode-blockstorage-csi-driver:v0.1.0"
+	ApiToken       = ""
+	KubeConfigFile = ""
 )
 
 type Framework struct {
-	restConfig *rest.Config
-	kubeClient kubernetes.Interface
+	restConfig   *rest.Config
+	kubeClient   kubernetes.Interface
 	namespace    string
 	name         string
 	StorageClass string
@@ -23,10 +24,10 @@ func New(
 	restConfig *rest.Config,
 	kubeClient kubernetes.Interface,
 	storageClass string,
-	) *Framework {
+) *Framework {
 	return &Framework{
-		restConfig:restConfig,
-		kubeClient:kubeClient,
+		restConfig: restConfig,
+		kubeClient: kubeClient,
 
 		name:         "csidriver",
 		namespace:    rand.WithUniqSuffix("csi"),
