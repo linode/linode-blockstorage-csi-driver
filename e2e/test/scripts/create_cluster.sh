@@ -5,7 +5,7 @@ set -o pipefail
 set -o nounset
 set -x
 
-export LINODE_API_TOKEN=d62a569581c2a74ba0a386fe682fcba88cae40c5043f4f8611d843655dbd5931
+export LINODE_API_TOKEN=""
 export CLUSTER_NAME="$2"
 
 
