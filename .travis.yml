@@ -33,5 +33,5 @@ script:
   - make test
   - make linode-container
   - golangci-lint run
-  - travis_wait 20 roveralls
-  - goveralls -coverprofile=roveralls.coverprofile -service=travis-ci
+  - travis_wait 20 roveralls -ignore e2e
+  - goveralls -coverprofile=roveralls.coverprofile -service=travis-ci -ignore=csi_driver_test.go,e2e_suite_test.go

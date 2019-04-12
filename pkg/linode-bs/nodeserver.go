@@ -186,10 +186,6 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	}
 
 	deviceName := key.GetNormalizedLabel()
-	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("error getting device name: %v", err))
-	}
-
 	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
 	devicePath, err := ns.DeviceUtils.VerifyDevicePath(devicePaths)
 
