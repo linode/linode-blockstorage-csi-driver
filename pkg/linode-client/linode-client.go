@@ -24,6 +24,8 @@ type LinodeClient interface {
 	WaitForVolumeLinodeID(context.Context, int, *int, int) (*linodego.Volume, error)
 	WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus, int) (*linodego.Volume, error)
 	DeleteVolume(context.Context, int) error
+
+	ResizeVolume(context.Context, int, int) error
 }
 
 func NewLinodeClient(token, uaPrefix string, url string) *linodego.Client {

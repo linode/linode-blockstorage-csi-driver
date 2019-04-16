@@ -419,6 +419,7 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	} {
 		caps = append(caps, newCap(capability))
 	}
@@ -448,6 +449,52 @@ func (linodeCS *LinodeControllerServer) DeleteSnapshot(ctx context.Context, req 
 
 func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error)  {
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
+	}
+
+	capRange := req.GetCapacityRange()
+	size, err := getRequestCapacitySize(capRange)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	glog.V(4).Infoln("expand volume called", map[string]interface{}{
+		"volume_id": volumeID,
+		"method":    "controller_expand_volume",
+	})
+
+	var vol *linodego.Volume
+
+	if vol, err = linodeCS.CloudProvider.GetVolume(ctx, volumeID); err != nil {
+		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
+			return &csi.ControllerExpandVolumeResponse{}, nil
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	} else if vol.LinodeID != nil {
+		return nil, status.Error(codes.FailedPrecondition, "DeleteVolume Volume in use")
+	}
+
+	if vol.Size > int(size/gigabyte) {
+		return nil, status.Error(codes.Internal, "Volumes can only be resized up")
+	}
+
+	if err := linodeCS.CloudProvider.ResizeVolume(ctx, volumeID, int(size / gigabyte)); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	resp := &csi.ControllerExpandVolumeResponse{
+		CapacityBytes: size,
+		NodeExpansionRequired: false,
+	}
+	glog.V(4).Info("volume is resized")
+	return resp, nil
+
+
 }
 
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size
