@@ -268,6 +268,14 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
+func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error)  {
+	glog.V(4).Infof("NodeExpandVolume called with req: %#v", req)
+
+	return &csi.NodeExpandVolumeResponse{
+		CapacityBytes: req.CapacityRange.RequiredBytes,
+	}, nil
+}
+
 func (ns *LinodeNodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	glog.V(4).Infof("NodeGetCapabilities called with req: %#v", req)
 

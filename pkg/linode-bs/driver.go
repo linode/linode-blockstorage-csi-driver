@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
@@ -42,6 +43,9 @@ type LinodeDriver struct {
 	vcap  []*csi.VolumeCapability_AccessMode
 	cscap []*csi.ControllerServiceCapability
 	nscap []*csi.NodeServiceCapability
+
+	readyMu sync.Mutex // protects ready
+	ready   bool
 }
 
 const linodeBSPrefixLength = 12
@@ -82,12 +86,14 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 		// csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
 		// csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 	if err := linodeDriver.AddControllerServiceCapabilities(csc); err != nil {
 		return err
 	}
 	ns := []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 	}
 	if err := linodeDriver.AddNodeServiceCapabilities(ns); err != nil {
 		return err
@@ -174,6 +180,8 @@ func (linodeDriver *LinodeDriver) Run(endpoint string) {
 	if len(linodeDriver.bsPrefix) > 0 {
 		glog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.bsPrefix)
 	}
+
+	linodeDriver.ready = true
 
 	//Start the nonblocking GRPC
 	s := NewNonBlockingGRPCServer()
