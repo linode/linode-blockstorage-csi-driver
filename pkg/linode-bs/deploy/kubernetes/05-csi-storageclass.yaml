@@ -8,8 +8,8 @@ provisioner: linodebs.csi.linode.com
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: linode-block-storage-retain
+  name: linode-block-storage-expand
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
-reclaimPolicy: Retain
+reclaimPolicy: Delete
 allowVolumeExpansion: true
