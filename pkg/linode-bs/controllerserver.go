@@ -452,7 +452,7 @@ func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *
 }
 
 func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error)  {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -475,8 +475,6 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 			return &csi.ControllerExpandVolumeResponse{}, nil
 		}
 		return nil, status.Error(codes.Internal, err.Error())
-	} else if vol.LinodeID != nil {
-		return nil, status.Error(codes.FailedPrecondition, "DeleteVolume Volume in use")
 	}
 
 	if vol.Size > int(size/gigabyte) {
@@ -486,6 +484,15 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 	if err := linodeCS.CloudProvider.ResizeVolume(ctx, volumeID, int(size / gigabyte)); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
+
 
 	resp := &csi.ControllerExpandVolumeResponse{
 		CapacityBytes: size,

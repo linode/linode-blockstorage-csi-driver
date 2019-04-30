@@ -149,8 +149,8 @@ rules:
   resources: ["persistentvolumes"]
   verbs: ["get", "list", "watch", "create", "delete"]
 - apiGroups: [""]
-  resources: ["persistentvolumeclaims"]
-  verbs: ["get", "list", "watch", "update"]
+  resources: ["persistentvolumeclaims", "persistentvolumeclaims/status"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 - apiGroups: ["storage.k8s.io"]
   resources: ["storageclasses"]
   verbs: ["get", "list", "watch"]
@@ -199,7 +199,7 @@ rules:
   verbs: ["get", "list", "watch"]
 - apiGroups: ["storage.k8s.io"]
   resources: ["volumeattachments"]
-  verbs: ["get", "list", "watch", "update"]
+  verbs: ["create", "get", "list", "watch", "update"]
 
 ---
 
@@ -270,7 +270,7 @@ metadata:
   name: cluster-driver-registrar-role
 rules:
 - apiGroups: ["csi.storage.k8s.io"]
-  resources: ["csidrivers"]
+  resources: ["csidrivers", "volumeattachments"]
   verbs: ["create", "delete"]
 ---
 
@@ -302,10 +302,11 @@ provisioner: linodebs.csi.linode.com
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: linode-block-storage-retain
+  name: linode-block-storage-expand
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
-reclaimPolicy: Retain
+reclaimPolicy: Delete
+allowVolumeExpansion: true
 
 ---
 # pkg/linode-bs/deploy/kubernetes/06-ss-csi-linode-controller.yaml
@@ -359,6 +360,17 @@ spec:
         args:
         - "--v=5"
         - "--pod-info-mount-version=\"v1\""
+        - "--csi-address=$(ADDRESS)"
+        env:
+        - name: ADDRESS
+          value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        volumeMounts:
+        - name: socket-dir
+          mountPath: /var/lib/csi/sockets/pluginproxy/
+      - name: linode-csi-resizer
+        image: quay.io/k8scsi/csi-resizer:v0.1.0
+        args:
+        - "--v=5"
         - "--csi-address=$(ADDRESS)"
         env:
         - name: ADDRESS
