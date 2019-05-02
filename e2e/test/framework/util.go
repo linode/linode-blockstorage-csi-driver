@@ -1,11 +1,15 @@
 package framework
 
 import (
-	"github.com/golang/glog"
+	"log"
 	"os"
 	"os/exec"
 	"path"
 	"time"
+
+	"github.com/codeskyblue/go-sh"
+
+	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -37,4 +41,11 @@ func runCommand(cmd string, args ...string) error {
 func deleteInForeground() *metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
 	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+}
+
+func ApplyManifest(commandName, manifest string) error {
+	args := []string{commandName, "--kubeconfig", KubeConfigFile, "-f", manifest}
+	out, err := sh.Command("kubectl", args).Output()
+	log.Println(string(out))
+	return err
 }
