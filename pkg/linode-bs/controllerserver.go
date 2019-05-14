@@ -22,6 +22,7 @@ import (
 const gigabyte = 1024 * 1024 * 1024
 const minProviderVolumeBytes = 10 * gigabyte
 const waitTimeout = 300
+const DevicePathKey = "devicePath"
 
 type LinodeControllerServer struct {
 	Driver          *LinodeDriver
@@ -229,7 +230,9 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		ConfigID: 0,
 	}
 
-	if _, err := linodeCS.CloudProvider.AttachVolume(ctx, volumeID, opts); err != nil {
+	var vol *linodego.Volume
+	var err error
+	if vol, err = linodeCS.CloudProvider.AttachVolume(ctx, volumeID, opts); err != nil {
 		return nil, status.Errorf(codes.Internal, "error attaching volume: %s", err)
 	}
 
@@ -240,7 +243,8 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 	}
 	glog.V(4).Infof("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
 
-	return &csi.ControllerPublishVolumeResponse{}, nil
+	pvInfo := map[string]string{DevicePathKey: vol.FilesystemPath}
+	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
@@ -279,7 +283,7 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 
 // ValidateVolumeCapabilities checks whether the volume capabilities requested are supported.
 func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -310,34 +314,20 @@ func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.C
 		"method":                 "validate_volume_capabilities",
 	})
 
-	/*
-		hasSupport := func(mode csi.VolumeCapability_AccessMode_Mode) bool {
-			for _, m := range vcaps {
-				if mode == m.Mode {
-					return true
-				}
-			}
-			return false
-		}
-	*/
 
-	resp := &csi.ValidateVolumeCapabilitiesResponse{
-		Message: "ValidateVolumeCapabilities is currently unimplemented for CSI v1.0.0",
+	for _, cap := range req.VolumeCapabilities {
+		if cap.GetAccessMode().GetMode() != csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER {
+			return &csi.ValidateVolumeCapabilitiesResponse{Message: ""}, nil
+		}
 	}
-	/*
-		for _, capabilities := range req.VolumeCapabilities {
-			if hasSupport(capabilities.AccessMode.Mode) {
-				resp.Supported = true
-			} else {
-				// we need to make sure all capabilities are supported. Revert back
-				// in case we have a cap that is supported, but is invalidated now
-				resp.Supported = false
-			}
-		}
-	*/
 
-	glog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": resp})
-	return resp, nil
+
+	glog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": req.VolumeCapabilities})
+	return &csi.ValidateVolumeCapabilitiesResponse{
+		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+			VolumeCapabilities: req.VolumeCapabilities,
+		},
+	}, nil
 }
 
 // ListVolumes shall return information about all the volumes the provider knows about
