@@ -2,6 +2,7 @@ package framework
 
 import (
 	"fmt"
+
 	"github.com/appscode/go/wait"
 	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
@@ -9,16 +10,16 @@ import (
 	"kmodules.xyz/client-go/tools/exec"
 )
 
-func (f *Invocation) GetPodObject(pvc string) *core.Pod {
+func (f *Invocation) GetPodObject(name string, pvc string) *core.Pod {
 	return &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      f.app,
+			Name:      name,
 			Namespace: f.namespace,
 		},
 		Spec: core.PodSpec{
 			Containers: []core.Container{
 				{
-					Name:  f.app,
+					Name:  name,
 					Image: "busybox",
 					VolumeMounts: []core.VolumeMount{
 						{
@@ -52,8 +53,8 @@ func (f *Invocation) CreatePod(pod *core.Pod) error {
 
 }
 
-func (f *Invocation) DeletePod(meta metav1.ObjectMeta) error {
-	return f.kubeClient.CoreV1().Pods(f.namespace).Delete(meta.Name, deleteInForeground())
+func (f *Invocation) DeletePod(name string) error {
+	return f.kubeClient.CoreV1().Pods(f.namespace).Delete(name, deleteInForeground())
 }
 
 func (f *Invocation) GetPod(name, ns string) (*core.Pod, error) {
