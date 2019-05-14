@@ -19,15 +19,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"golang.org/x/net/context"
 	"golang.org/x/sys/unix"
@@ -76,6 +78,21 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume Capability must be provided")
 	}
 
+	var err error
+
+	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
+	options := []string{"bind"}
+	if readOnly {
+		options = append(options, "ro")
+	}
+
+	if blk := volumeCapability.GetBlock(); blk != nil {
+		if err = ns.nodePublishVolumeForBlock(req, options); err != nil {
+			return nil, err
+		}
+		return &csi.NodePublishVolumeResponse{}, nil
+	}
+
 	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mount point: %s %v", targetPath, err)
@@ -96,13 +113,6 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		glog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
 		return nil, err
 	}
-
-	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	options := []string{"bind"}
-	if readOnly {
-		options = append(options, "ro")
-	}
-
 	err = ns.Mounter.Interface.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
 		notMnt, mntErr := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
@@ -153,6 +163,44 @@ func getMountSources(target string) ([]string, error) {
 			err, "findmnt", string(out))
 	}
 	return strings.Split(string(out), "\n"), nil
+}
+
+func (ns *LinodeNodeServer) nodePublishVolumeForBlock(req *csi.NodePublishVolumeRequest, mountOptions []string) error {
+	glog.V(4).Infof("nodePublishVolumeForBlock called with req: %#v", req)
+	target := req.GetTargetPath()
+	source := req.PublishContext["devicePath"]
+	podVolumePath := filepath.Dir(target)
+
+	// create the pod volume path if it is missing
+	// Path in the form of /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/publish/{volumeName}
+	exists, err := ns.Mounter.Interface.ExistsPath(podVolumePath)
+	if err != nil {
+		return status.Errorf(codes.Internal, "Failed to check path: %v", err)
+	}
+
+	if !exists {
+		if err := ns.Mounter.Interface.MakeDir(podVolumePath); err != nil {
+			return status.Errorf(codes.Internal, "Failed to create path: %v", err)
+		}
+	}
+
+	glog.V(5).Infof("NodePublishVolume [block]: making target file %s", target)
+	err = ns.Mounter.Interface.MakeFile(target)
+	if err != nil {
+		if removeErr := os.Remove(target); removeErr != nil {
+			return status.Errorf(codes.Internal, "Failed remove mount target %s: %v", target, err)
+		}
+		return status.Errorf(codes.Internal, "Failed to create file %s: %v", target, err)
+	}
+
+	glog.V(5).Infof("NodePublishVolume [block]: mounting %s at %s", source, target)
+	if err := ns.Mounter.Interface.Mount(source, target, "ext4", mountOptions); err != nil {
+		if removeErr := os.Remove(target); removeErr != nil {
+			return status.Errorf(codes.Internal, "Failed remove mount target %s: %v", target, err)
+		}
+		return status.Errorf(codes.Internal, "Could not mount %s at %s: %v", source, target, err)
+	}
+	return nil
 }
 
 func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
@@ -261,8 +309,8 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		}
 		options = append(options, mnt.MountFlags...)
 	} else if blk := volumeCapability.GetBlock(); blk != nil {
-		// TODO(#64): Block volume support
-		return nil, status.Error(codes.Unimplemented, "Block volume support is not yet implemented")
+		// If the access type is block, do nothing for stage
+		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	fmtAndMountSource := devicePath
