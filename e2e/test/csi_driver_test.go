@@ -60,7 +60,7 @@ var _ = Describe("CSIDriver", func() {
 			Context("Block Storage", func() {
 				JustBeforeEach(func() {
 					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaim(size)
+					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, false)
 					err = f.CreatePersistentVolumeClaim(pvc)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -184,4 +184,49 @@ var _ = Describe("CSIDriver", func() {
 		})
 	})
 
+	Describe("Test", func() {
+		Context("Block Storage", func() {
+			Context("in Raw Block Mode", func() {
+				JustBeforeEach(func() {
+					By("Creating Persistent Volume Claim")
+					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, true)
+					err = f.CreatePersistentVolumeClaim(pvc)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Creating Pod with PVC")
+					pod = f.GetPodObjectWithBlockVolume(pvc.Name)
+					err = f.CreatePod(pod)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pod with PVC")
+					err = f.DeletePod(pod.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Waiting for the Volume to be Detached")
+					time.Sleep(2 * time.Minute)
+
+					By("Deleting the PVC")
+					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Waiting for the Volume to be Deleted")
+					time.Sleep(1 * time.Minute)
+				})
+
+				Context("Creating Raw Block Storage", func() {
+					BeforeEach(func() {
+						size = "10Gi"
+					})
+
+					It("should check that raw block storage works", func() {
+						By("Creating a ext3 Filesystem on the Pod")
+						err := framework.MkfsInPod(pod)
+						Expect(err).NotTo(HaveOccurred())
+					})
+				})
+			})
+		})
+	})
 })

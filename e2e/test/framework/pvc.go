@@ -6,7 +6,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Invocation) GetPersistentVolumeClaim(size string) *core.PersistentVolumeClaim {
+func (f *Invocation) GetPersistentVolumeClaimObject(size, storageClass string, isblock bool) *core.PersistentVolumeClaim {
+
+	var volType core.PersistentVolumeMode
+
+	if isblock {
+		volType = core.PersistentVolumeBlock
+	} else {
+		volType = core.PersistentVolumeFilesystem
+	}
+
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      f.app,
@@ -16,7 +25,8 @@ func (f *Invocation) GetPersistentVolumeClaim(size string) *core.PersistentVolum
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadWriteOnce,
 			},
-			StorageClassName: &f.StorageClass,
+			VolumeMode:       &volType,
+			StorageClassName: &storageClass,
 			Resources: core.ResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse(size),
