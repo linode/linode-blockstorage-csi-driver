@@ -44,6 +44,40 @@ func GetPodObject(name, namespace, pvc string) *core.Pod {
 	}
 }
 
+func (f *Invocation) GetPodObjectWithBlockVolume(pvc string) *core.Pod {
+	return &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      f.app,
+			Namespace: f.namespace,
+		},
+		Spec: core.PodSpec{
+			Containers: []core.Container{
+				{
+					Name:  f.app,
+					Image: "ubuntu",
+					VolumeDevices: []core.VolumeDevice{
+						{
+							DevicePath: "/dev/block",
+							Name:       "csi-volume",
+						},
+					},
+					Command: []string{"sleep", "1000000"},
+				},
+			},
+			Volumes: []core.Volume{
+				{
+					Name: "csi-volume",
+					VolumeSource: core.VolumeSource{
+						PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func (f *Invocation) CreatePod(pod *core.Pod) error {
 	pod, err := f.kubeClient.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(pod)
 	if err != nil {
@@ -90,4 +124,8 @@ func (f *Invocation) CheckIfFileIsInPod(filename string, pod *core.Pod) error {
 		return nil
 	}
 	return errors.Wrap(err, fmt.Sprintf("file name %v not found", filename))
+}
+
+func MkfsInPod(pod *core.Pod) error {
+	return runCommand("kubectl", "exec", "--kubeconfig", KubeConfigFile, "-it", "-n", pod.Namespace, pod.Name, "--", "/bin/bash", "-c", "mkfs.ext3 -F /dev/block")
 }
