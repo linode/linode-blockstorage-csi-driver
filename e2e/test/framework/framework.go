@@ -2,6 +2,7 @@ package framework
 
 import (
 	"github.com/appscode/go/crypto/rand"
+	"github.com/linode/linodego"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -18,16 +19,20 @@ type Framework struct {
 	namespace    string
 	name         string
 	StorageClass string
+
+	linodeClient linodego.Client
 }
 
 func New(
 	restConfig *rest.Config,
 	kubeClient kubernetes.Interface,
+	linodeClient linodego.Client,
 	storageClass string,
 ) *Framework {
 	return &Framework{
-		restConfig: restConfig,
-		kubeClient: kubeClient,
+		restConfig:   restConfig,
+		kubeClient:   kubeClient,
+		linodeClient: linodeClient,
 
 		name:         "csidriver",
 		namespace:    rand.WithUniqSuffix("csi"),
