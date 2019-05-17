@@ -16,7 +16,7 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20181110185634-c63ab54fda8f // indirect
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
-	github.com/kubernetes-csi/csi-test v1.1.0
+	github.com/kubernetes-csi/csi-test v2.0.0+incompatible
 	github.com/linode/linodego v0.7.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
