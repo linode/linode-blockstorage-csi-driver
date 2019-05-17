@@ -348,17 +348,18 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	nextToken := ""
 
 	listOpts := linodego.NewListOptions(0, "")
-	if req.GetMaxEntries() > 0 {
-		if startingToken == "" {
-			listOpts.Page = 1
-		} else {
-			startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
-			if errParse != nil {
-				return nil, status.Error(codes.Aborted, fmt.Sprintf("Invalid starting token %v", startingToken))
-			}
-			listOpts.Page = int(startingPage)
+	if startingToken != "" {
+		startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
+		if errParse != nil {
+			return nil, status.Error(codes.Aborted, fmt.Sprintf("Invalid starting token %v", startingToken))
 		}
+
+		listOpts.Page = int(startingPage)
 		nextToken = strconv.Itoa(listOpts.Page + 1)
+	}
+
+	if req.GetMaxEntries() > 0 {
+		nextToken = strconv.Itoa(int(req.GetMaxEntries()))
 	}
 
 	glog.V(4).Infoln("list volumes called", map[string]interface{}{
@@ -373,6 +374,11 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	if err != nil {
 		return nil, err
 	}
+	if listOpts.Page > len(volumes) {
+		return nil, status.Error(codes.Aborted, fmt.Sprintf("Starting token is greater than total number of vols"))
+	}
+
+
 
 	var entries []*csi.ListVolumesResponse_Entry
 	for _, vol := range volumes {

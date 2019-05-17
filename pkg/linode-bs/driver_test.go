@@ -2,7 +2,6 @@ package linodebs
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +12,7 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 
 	"strconv"
 
@@ -79,21 +78,10 @@ func TestDriverSuite(t *testing.T) {
 
 	go linodeDriver.Run(endpoint)
 
-	mntDir, err := ioutil.TempDir("", "mnt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mntDir)
-
-	mntStageDir, err := ioutil.TempDir("", "mnt-stage")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mntStageDir)
 
 	cfg := &sanity.Config{
-		StagingPath: mntStageDir,
-		TargetPath:  mntDir,
+		TargetPath:  os.TempDir() + "/csi-target",
+		StagingPath: os.TempDir() + "/csi-staging",
 		Address:     endpoint,
 	}
 
