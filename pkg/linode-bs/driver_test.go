@@ -122,7 +122,17 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			res := 0
 			data := []linodego.Volume{}
 
+			var filters map[string]string
+			hf := r.Header.Get("X-Filter")
+			if hf != "" {
+				_= json.Unmarshal([]byte(hf), &filters)
+			}
+
 			for _, vol := range f.volumes {
+
+				if filters["label"] != "" && filters["label"] != vol.Label {
+					continue
+				}
 				data = append(data, vol)
 			}
 			resp := linodego.VolumesPagedResponse{

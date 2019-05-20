@@ -397,6 +397,10 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 				},
 			},
 		})
+		if len(entries) == int(req.MaxEntries) {
+			nextToken = strconv.Itoa(int(req.MaxEntries))
+			break
+		}
 	}
 
 	resp := &csi.ListVolumesResponse{
