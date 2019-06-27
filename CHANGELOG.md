@@ -1,3 +1,15 @@
+# Release History
+
+## [v0.1.3](https://github.com/linode/linode-cloud-controller-manager/compare/v0.1.0..v0.1.3)
+
+### Features
+
+* Support arbitrary root CAs
+
+## Enhancements
+
+* Update linodego to 0.10.0 (prepare to support 8+ volumes per VM)
+
 ## v0.1.0 - March 2nd 2019
 
 * per the CSI spec, fulfill volume requests with required\_size under 10GB by extending them to 10GB (the Linode minimum), unless that is over the limit size
