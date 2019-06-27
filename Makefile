@@ -20,24 +20,43 @@ REV=$(shell git describe --long --tags --dirty)
 
 export GO111MODULE=on
 
-.PHONY: all linode clean linode-container
-
+.PHONY: all
 all: linode
 
+.PHONY: vendor
 vendor:
 	go mod vendor
-test:
-	go test -v ./... -cover
+
+.PHONY: fmt
+fmt:
+	go fmt ./...
+
+.PHONY: vet
+vet: fmt
 	go vet ./...
+
+.PHONY: test
+test: vet
+	go test -v ./... -cover
+
+.PHONY: linode
 linode: vendor test
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
+
+.PHONY: linode-container
 linode-container: linode
 	docker build -t $(IMAGE_TAG) -f ./app/linode/Dockerfile .
+
+.PHONY: push
 push: linode-container
 	#@echo "$$DOCKER_PASSWORD" | docker login -u "$$DOCKER_USERNAME" --password-stdin
 	docker push $(IMAGE_TAG)
+
+.PHONY: verify
 verify:
 	go mod verify
+
+.PHONY: clean
 clean:
 	@GOOS=linux go clean -i -r -x ./...
 	-rm -rf _output
