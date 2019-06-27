@@ -1,6 +1,6 @@
 # Release History
 
-## [v0.1.3](https://github.com/linode/linode-cloud-controller-manager/compare/v0.1.0..v0.1.3)
+## [v0.1.3](https://github.com/linode/linode-blockstorage-csi-driver/compare/v0.1.0..v0.1.3)
 
 ### Features
 
