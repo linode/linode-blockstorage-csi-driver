@@ -16,7 +16,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/kubernetes-csi/csi-test v1.1.0
-	github.com/linode/linodego v0.10.0
+	github.com/linode/linodego v0.11.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
@@ -34,13 +34,12 @@ require (
 	github.com/stevvooe/resumable v0.0.0-20180830230917-22b14a53ba50 // indirect
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
-	golang.org/x/crypto v0.0.0-20180904163835-0709b304e793 // indirect
-	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a
+	golang.org/x/net v0.0.0-20191002035440-2ec189313ef0
 	golang.org/x/oauth2 v0.0.0-20181120190819-8f65e3013eba // indirect
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/grpc v1.16.0
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/resty.v1 v1.10.2 // indirect
+	gopkg.in/resty.v1 v1.12.0 // indirect
 	k8s.io/api v0.0.0-20181121071145-b7bd5f2d334c // indirect
 	k8s.io/apiextensions-apiserver v0.0.0-20181123033937-b8ea0ae3837a // indirect
 	k8s.io/apimachinery v0.0.0-20181127025237-2b1284ed4c93
@@ -54,3 +53,5 @@ require (
 	k8s.io/utils v0.0.0-20181115163542-0d26856f57b3
 	sigs.k8s.io/yaml v1.1.0 // indirect
 )
+
+go 1.13
