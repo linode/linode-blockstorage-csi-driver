@@ -179,7 +179,7 @@ roleRef:
   kind: ClusterRole
   name: external-provisioner-role
   apiGroup: rbac.authorization.k8s.io
-  
+
 ---
 # xref: https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
 kind: ClusterRole
@@ -341,7 +341,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-plugin
-          image: linode/linode-blockstorage-csi-driver:v0.1.0
+          image: linode/linode-blockstorage-csi-driver:v0.1.3
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
@@ -416,8 +416,8 @@ spec:
               mountPath: /csi/
             - name: registration-dir
               mountPath: /registration/
-        - name: csi-linode-plugin 
-          image: linode/linode-blockstorage-csi-driver:v0.1.0
+        - name: csi-linode-plugin
+          image: linode/linode-blockstorage-csi-driver:v0.1.3
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
