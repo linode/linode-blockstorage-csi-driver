@@ -37,7 +37,7 @@ var (
 	endpoint      = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
 	token         = flag.String("token", "", "Linode API Token")
 	url           = flag.String("url", "", "Linode API URL")
-	node          = flag.String("node", "", "Linode Hostname")
+	node          = flag.String("node", "", "Node name")
 	bsPrefix      = flag.String("bs-prefix", "", "Linode BlockStorage Volume label prefix")
 )
 

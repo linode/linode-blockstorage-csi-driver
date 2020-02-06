@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 

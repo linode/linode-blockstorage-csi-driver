@@ -16,6 +16,21 @@ spec:
         role: csi-linode
     spec:
       serviceAccount: csi-controller-sa
+      initContainers:
+        - name: init
+          image: bitnami/kubectl:1.17.2-debian-10-r11
+          command: 
+            - /scripts/get-linode-id.sh
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+          - name: linode-info
+            mountPath: /linode-info
+          - name: get-linode-id
+            mountPath: /scripts
       containers:
         - name: csi-provisioner
           image: quay.io/k8scsi/csi-provisioner:v1.0.0
@@ -70,8 +85,19 @@ spec:
                   key: token
           imagePullPolicy: "Always"
           volumeMounts:
+            - name: linode-info
+              mountPath: /linode-info
+            - name: get-linode-id
+              mountPath: /scripts
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
       volumes:
         - name: socket-dir
           emptyDir: {}
+        - name: linode-info
+          emptyDir: {}
+        - name: get-linode-id
+          configMap:
+            name: get-linode-id
+            # octal mode 755
+            defaultMode: 493
