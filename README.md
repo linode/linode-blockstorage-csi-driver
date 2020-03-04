@@ -62,7 +62,7 @@ linode          Opaque                                2         18h
 The following command will deploy the CSI driver with the related Kubernetes volume attachment, driver registration, and provisioning sidecars:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.1.3.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.1.4.yaml
 ```
 
 This deployment is a concatenation of all of the `yaml` files in [pkg/linode-bs/deploy/kubernetes/](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/).
@@ -79,9 +79,13 @@ Notably, this deployment will:
   linode-block-storage (default)   linodebs.csi.linode.com   2d
   ```
   
-* use a `reclaimPolocy` of `Released` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/)
+* use a `reclaimPolicy` of `Released` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/)
   
   Volumes created by this CSI driver will automatically be deleted when they are no longer needed.
+
+* assume that the [Linode CCM](https://github.com/linode/linode-cloud-controller-manager) is initialized and running [Learn More](https://kubernetes.io/docs/reference/command-line-tools-reference/cloud-controller-manager/)
+
+  If this is not the case, you must modify the init container script located in the `08-cm-get-linode-id.yaml` ConfigMap and delete [the line](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/08-cm-get-linode-id.yaml#L18) that contains the `exit 1`.
 
 ### Example Usage
 
