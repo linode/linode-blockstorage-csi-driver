@@ -18,7 +18,7 @@ spec:
       serviceAccount: csi-controller-sa
       initContainers:
         - name: init
-          image: bitnami/kubectl:1.17.2-debian-10-r11
+          image: bitnami/kubectl:1.16.3-debian-10-r36
           command: 
             - /scripts/get-linode-id.sh
           env:
