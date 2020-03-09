@@ -51,13 +51,13 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 		// Search for Linode instance by ID
 		linode, err = getLinodeByID(linodeClient, linodeInfo)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find Linode with ID %s: %v", linodeInfo, err)
+			return nil, err
 		}
 	} else {
 		// Search for Linode instance by label
 		linode, err = getLinodeByLabel(linodeClient, linodeInfo)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find Linode with label %s: %v", linodeInfo, err)
+			return nil, err
 		}
 	}
 

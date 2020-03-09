@@ -55,7 +55,6 @@ spec:
                       to use for any in-tree plugins replaced by this driver.
                     pattern: in-tree|csi
                     type: string
-
 ---
 # pkg/linode-bs/deploy/kubernetes/02-csi-driver.yaml
 # Requires CSIDriverRegistry feature gate (alpha in 1.12)
@@ -96,9 +95,7 @@ kind: ServiceAccount
 metadata:
   name: csi-node-sa
   namespace: kube-system
-
 ---
-
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -112,7 +109,6 @@ rules:
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -126,7 +122,6 @@ roleRef:
   kind: ClusterRole
   name: driver-registrar-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
 ##### Controller Service Account, Roles, Rolebindings
 apiVersion: v1
@@ -134,7 +129,6 @@ kind: ServiceAccount
 metadata:
   name: csi-controller-sa
   namespace: kube-system
-
 ---
 # xref: https://github.com/kubernetes-csi/external-provisioner/blob/master/deploy/kubernetes/rbac.yaml
 kind: ClusterRole
@@ -164,9 +158,7 @@ rules:
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents"]
     verbs: ["get", "list"]
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -180,7 +172,6 @@ roleRef:
   kind: ClusterRole
   name: external-provisioner-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
 # xref: https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
 kind: ClusterRole
@@ -201,9 +192,7 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -217,7 +206,6 @@ roleRef:
   kind: ClusterRole
   name: external-attacher-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
 # xref: https://github.com/kubernetes-csi/external-snapshotter/blob/master/deploy/kubernetes/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -247,9 +235,7 @@ rules:
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["mutatingwebhookconfigurations"]
   verbs: ["create"]
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -263,10 +249,8 @@ roleRef:
   kind: ClusterRole
   name: external-snapshotter-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
 # pkg/linode-bs/deploy/kubernetes/04-csi-driver-instance.yaml
-
 apiVersion: csi.storage.k8s.io/v1alpha1
 kind: CSIDriver
 metadata:
@@ -274,7 +258,6 @@ metadata:
 spec:
   attachRequired: true
   podInfoOnMountVersion: "v1"
-
 ---
 # pkg/linode-bs/deploy/kubernetes/05-csi-storageclass.yaml
 kind: StorageClass
@@ -293,7 +276,6 @@ metadata:
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Retain
-
 ---
 # pkg/linode-bs/deploy/kubernetes/06-ss-csi-linode-controller.yaml
 kind: StatefulSet
@@ -336,7 +318,7 @@ spec:
             - "--volume-name-prefix=pvc"
             - "--volume-name-uuid-length=16"
             - "--csi-address=$(ADDRESS)"
-            - "--v=5"
+            - "--v=2"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -347,7 +329,7 @@ spec:
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v1.0.0
           args:
-            - "--v=5"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
@@ -364,7 +346,7 @@ spec:
             - "--url=$(LINODE_API_URL)"
             - "--node=$(NODE_NAME)"
             - "--bs-prefix=$(LINODE_BS_PREFIX)"
-            - "--v=10"
+            - "--v=2"
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -437,7 +419,7 @@ spec:
         - name: driver-registrar
           image: quay.io/k8scsi/driver-registrar:v1.0-canary
           args:
-            - "--v=5"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
             - "--mode=node-register"
             - "--driver-requires-attachment=true"
@@ -464,7 +446,7 @@ spec:
             - "--token=$(LINODE_TOKEN)"
             - "--url=$(LINODE_API_URL)"
             - "--node=$(NODE_NAME)"
-            - "--v=10"
+            - "--v=2"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
@@ -542,7 +524,6 @@ spec:
           hostPath:
             path: /sys
             type: Directory
-
 ---
 # pkg/linode-bs/deploy/kubernetes/08-cm-get-linode-id.yaml
 apiVersion: v1
@@ -562,4 +543,5 @@ data:
       exit 0
     fi
     echo "Provider ID not found"
+    # Exit here so that we wait for the CCM to initialize the provider ID
     exit 1

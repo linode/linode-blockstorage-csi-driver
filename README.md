@@ -85,7 +85,7 @@ Notably, this deployment will:
 
 * assume that the [Linode CCM](https://github.com/linode/linode-cloud-controller-manager) is initialized and running [Learn More](https://kubernetes.io/docs/reference/command-line-tools-reference/cloud-controller-manager/)
 
-  If this is not the case, you must modify the init container script located in the `08-cm-get-linode-id.yaml` ConfigMap and delete [the line](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/08-cm-get-linode-id.yaml#L18) that contains the `exit 1`.
+  If you absolutely intend to run this on a cluster which will not run the Linode CCM, you must modify the init container script located in the `08-cm-get-linode-id.yaml` ConfigMap and delete [the line](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/08-cm-get-linode-id.yaml#L19) that contains the `exit 1`.
 
 ### Example Usage
 

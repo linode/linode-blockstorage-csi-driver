@@ -38,7 +38,7 @@ spec:
             - "--volume-name-prefix=pvc"
             - "--volume-name-uuid-length=16"
             - "--csi-address=$(ADDRESS)"
-            - "--v=5"
+            - "--v=2"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -49,7 +49,7 @@ spec:
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v1.0.0
           args:
-            - "--v=5"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
@@ -66,7 +66,7 @@ spec:
             - "--url=$(LINODE_API_URL)"
             - "--node=$(NODE_NAME)"
             - "--bs-prefix=$(LINODE_BS_PREFIX)"
-            - "--v=10"
+            - "--v=2"
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
