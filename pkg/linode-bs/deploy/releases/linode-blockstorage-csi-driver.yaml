@@ -376,7 +376,7 @@ spec:
 ---
 # pkg/linode-bs/deploy/kubernetes/07-ds-csi-linode-node.yaml
 kind: DaemonSet
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   name: csi-linode-node
   namespace: kube-system
