@@ -16,6 +16,21 @@ spec:
         role: csi-linode
     spec:
       serviceAccount: csi-controller-sa
+      initContainers:
+        - name: init
+          image: bitnami/kubectl:1.16.3-debian-10-r36
+          command: 
+            - /scripts/get-linode-id.sh
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+          - name: linode-info
+            mountPath: /linode-info
+          - name: get-linode-id
+            mountPath: /scripts
       containers:
         - name: csi-provisioner
           image: quay.io/k8scsi/csi-provisioner:v1.0.0
@@ -23,7 +38,7 @@ spec:
             - "--volume-name-prefix=pvc"
             - "--volume-name-uuid-length=16"
             - "--csi-address=$(ADDRESS)"
-            - "--v=5"
+            - "--v=2"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -34,7 +49,7 @@ spec:
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v1.0.0
           args:
-            - "--v=5"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
@@ -51,7 +66,7 @@ spec:
             - "--url=$(LINODE_API_URL)"
             - "--node=$(NODE_NAME)"
             - "--bs-prefix=$(LINODE_BS_PREFIX)"
-            - "--v=10"
+            - "--v=2"
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -70,8 +85,19 @@ spec:
                   key: token
           imagePullPolicy: "Always"
           volumeMounts:
+            - name: linode-info
+              mountPath: /linode-info
+            - name: get-linode-id
+              mountPath: /scripts
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
       volumes:
         - name: socket-dir
           emptyDir: {}
+        - name: linode-info
+          emptyDir: {}
+        - name: get-linode-id
+          configMap:
+            name: get-linode-id
+            # octal mode 755
+            defaultMode: 493
