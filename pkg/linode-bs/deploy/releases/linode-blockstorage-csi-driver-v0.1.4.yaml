@@ -55,6 +55,7 @@ spec:
                       to use for any in-tree plugins replaced by this driver.
                     pattern: in-tree|csi
                     type: string
+
 ---
 # pkg/linode-bs/deploy/kubernetes/02-csi-driver.yaml
 # Requires CSIDriverRegistry feature gate (alpha in 1.12)
@@ -87,6 +88,7 @@ spec:
               description: Indicates this CSI volume driver requires additional pod
                 information (like podName, podUID, etc.) during mount operations.
               type: string
+
 ---
 # pkg/linode-bs/deploy/kubernetes/03-accounts-roles-bindings.yaml
 ##### Node Service Account, Roles, RoleBindings
@@ -249,6 +251,7 @@ roleRef:
   kind: ClusterRole
   name: external-snapshotter-role
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # pkg/linode-bs/deploy/kubernetes/04-csi-driver-instance.yaml
 apiVersion: csi.storage.k8s.io/v1alpha1
@@ -258,6 +261,7 @@ metadata:
 spec:
   attachRequired: true
   podInfoOnMountVersion: "v1"
+
 ---
 # pkg/linode-bs/deploy/kubernetes/05-csi-storageclass.yaml
 kind: StorageClass
@@ -276,6 +280,7 @@ metadata:
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Retain
+
 ---
 # pkg/linode-bs/deploy/kubernetes/06-ss-csi-linode-controller.yaml
 kind: StatefulSet
@@ -381,6 +386,7 @@ spec:
             name: get-linode-id
             # octal mode 755
             defaultMode: 493
+
 ---
 # pkg/linode-bs/deploy/kubernetes/07-ds-csi-linode-node.yaml
 kind: DaemonSet
@@ -524,6 +530,7 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+
 ---
 # pkg/linode-bs/deploy/kubernetes/08-cm-get-linode-id.yaml
 apiVersion: v1
