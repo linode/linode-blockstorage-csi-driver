@@ -25,7 +25,7 @@ for manifest in "${manifests}"*; do
 
     # Don't add the separator if it's the last manifest
     if [[ "${manifest}" != "${last}" ]]; then
-        echo -e "---"
+        echo -e "\n---"
     fi
 done > "${RELEASES}/${TAGGED_RELEASE}"
 
