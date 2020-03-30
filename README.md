@@ -138,17 +138,6 @@ persistence
 
 Want to improve the linode-blockstorage-csi-driver? Please start [here](.github/CONTRIBUTING.md).
 
-## Doing a Release
-
-1. Open up the Makefile.
-1. Check that the `IMAGE_VERSION` variable is set to the value that you want. You should always start with a `canary` release.
-1. run `make push`. As of this writing, the `push` target depends upon the `linode-container`, `linode`, `vendor, and `test` targets. So the code should be vendored, the tests should run, the build should run, a container should be built, and it should be pushed to the container registry.
-1. Test the new canary version on a live cluster.
-1. Change `IMAGE_VERSION` to the new version of the CSI driver, for exmaple `v0.2.1`
-1. Run `make push` again
-1. Push a git tag for the new version, perferrably pgp signed.
-1. Make a GitHub release and write the release notes for the release.
-
 ## Join us on Slack
 
 For general help or discussion, join the [Kubernetes Slack](http://slack.k8s.io/) channel [#linode](https://kubernetes.slack.com/messages/CD4B15LUR).

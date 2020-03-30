@@ -1,0 +1,21 @@
+name: Release manifests
+on:
+  release:
+    types: [published]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Build manifest
+      run: "./hack/release-yaml.sh ${{ github.event.release.tag_name }}"
+    - name: Commit files
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -- pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver*\.yaml
+        git commit -m "Update manifests"
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}

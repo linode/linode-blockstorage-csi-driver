@@ -49,7 +49,6 @@ linode-container: linode
 
 .PHONY: push
 push: linode-container
-	#@echo "$$DOCKER_PASSWORD" | docker login -u "$$DOCKER_USERNAME" --password-stdin
 	docker push $(IMAGE_TAG)
 
 .PHONY: verify
