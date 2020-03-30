@@ -86,8 +86,7 @@ spec:
             podInfoOnMountVersion:
               description: Indicates this CSI volume driver requires additional pod
                 information (like podName, podUID, etc.) during mount operations.
-              type: string
----
+              type: string---
 # pkg/linode-bs/deploy/kubernetes/03-accounts-roles-bindings.yaml
 ##### Node Service Account, Roles, RoleBindings
 apiVersion: v1
