@@ -339,7 +339,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-plugin
-          image: linode/linode-blockstorage-csi-driver:v0.1.4
+          image: linode/linode-blockstorage-csi-driver:v0.1.5
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
@@ -440,7 +440,7 @@ spec:
             - name: registration-dir
               mountPath: /registration/
         - name: csi-linode-plugin
-          image: linode/linode-blockstorage-csi-driver:v0.1.4
+          image: linode/linode-blockstorage-csi-driver:v0.1.5
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
