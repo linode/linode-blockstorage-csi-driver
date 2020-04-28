@@ -8,4 +8,4 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: linode-block-storage
+  storageClassName: linode-block-storage-retain
