@@ -1,4 +1,4 @@
-# Linode Block Storage CSI Driver [![Build Status](https://travis-ci.org/linode/linode-blockstorage-csi-driver.svg?branch=master)](https://travis-ci.org/linode/linode-blockstorage-csi-driver)
+# Linode Block Storage CSI Driver [![Build Status](https://travis-ci.com/linode/linode-blockstorage-csi-driver.svg?branch=master)](https://travis-ci.com/linode/linode-blockstorage-csi-driver)
 
 ## Overview
 The Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to manage the life-cycle of persistant storage claims.
