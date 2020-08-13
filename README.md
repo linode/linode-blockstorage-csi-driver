@@ -130,7 +130,6 @@ persistence
 
 ## Disclaimers
 
-* This is not officially supported by Linode.  [Join us on Slack](#join-us-on-slack) for community support.
 * Until this driver has reached v1.0.0 it may not maintain compatibility between driver versions
 * This driver does not work with versions of Kubernetes earlier than 1.13
 * Requests for Persistent Volumes with a `require_size` less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10GiB), this is [in accordance with the CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume).  The upper-limit size constraint (`limit_bytes`) will also be honored so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
