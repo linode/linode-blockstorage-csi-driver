@@ -1,7 +1,7 @@
 package test
 
 import (
-	"e2e_test/framework"
+	"e2e_test/test/framework"
 	"time"
 
 	. "github.com/onsi/ginkgo"

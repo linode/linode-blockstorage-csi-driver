@@ -36,6 +36,7 @@ linode-blockstorage-csi-driver
 dist/
 .vscode/
 coverage.txt
+*.coverprofile
 
 *.terraform
 e2e/test/terraform*
