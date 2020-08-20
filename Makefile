@@ -23,10 +23,6 @@ export GO111MODULE=on
 .PHONY: all
 all: linode
 
-.PHONY: vendor
-vendor:
-	go mod vendor
-
 .PHONY: fmt
 fmt:
 	go fmt ./...
@@ -40,7 +36,7 @@ test: vet
 	go test -v ./... -cover
 
 .PHONY: linode
-linode: vendor test
+linode: test
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
 
 .PHONY: linode-container
