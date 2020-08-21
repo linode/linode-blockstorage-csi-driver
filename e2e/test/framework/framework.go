@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Image          = "linode/linode-blockstorage-csi-driver:v0.1.0"
+	Image          = "linode/linode-blockstorage-csi-driver:latest"
 	ApiToken       = ""
 	KubeConfigFile = ""
 )
