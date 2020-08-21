@@ -375,7 +375,7 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 		return nil, err
 	}
 	if listOpts.Page > len(volumes) {
-		return nil, status.Error(codes.Aborted, fmt.Sprintf("Starting token is greater than total number of vols"))
+		return nil, status.Error(codes.Aborted, "Starting token is greater than total number of vols")
 	}
 
 	var entries []*csi.ListVolumesResponse_Entry
