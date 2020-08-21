@@ -1,9 +1,9 @@
-# Linode Block Storage CSI Driver [![Build Status](https://travis-ci.org/linode/linode-blockstorage-csi-driver.svg?branch=master)](https://travis-ci.org/linode/linode-blockstorage-csi-driver)
+# Linode Block Storage CSI Driver [![Build Status](https://travis-ci.com/linode/linode-blockstorage-csi-driver.svg?branch=master)](https://travis-ci.com/linode/linode-blockstorage-csi-driver)
 
 ## Overview
 The Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to manage the life-cycle of persistant storage claims.
 
-More information about the Kubernetes CSI can be found in the GitHub [Kubernetes CSI](https://kubernetes-csi.github.io/docs/Example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repos.
+More information about the Kubernetes CSI can be found in the GitHub [Kubernetes CSI](https://kubernetes-csi.github.io/docs/example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repos.
 
 ## Deployment
 
@@ -62,32 +62,37 @@ linode          Opaque                                2         18h
 The following command will deploy the CSI driver with the related Kubernetes volume attachment, driver registration, and provisioning sidecars:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.0.3.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.1.6.yaml
 ```
 
 This deployment is a concatenation of all of the `yaml` files in [pkg/linode-bs/deploy/kubernetes/](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/).
 
 Notably, this deployment will:
 
-* set the default storage class to `linode-block-storage` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)
+* set the default storage class to `linode-block-storage-retain` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)
 
   This behavior can be modified in the [csi-storageclass.yaml](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/05-csi-storageclass.yaml) section of the deployment by toggling the `storageclass.kubernetes.io/is-default-class` annotation.
 
   ```sh
   $ kubectl get storageclasses
   NAME                             PROVISIONER               AGE
-  linode-block-storage (default)   linodebs.csi.linode.com   2d
+  linode-block-storage-retain (default)   linodebs.csi.linode.com   2d
+  linode-block-storage                    linodebs.csi.linode.com   2d
   ```
   
-* use a `reclaimPolocy` of `Released` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/)
+* use a `reclaimPolicy` of `Retain` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/)
   
-  Volumes created by this CSI driver will automatically be deleted when they are no longer needed.
+  Volumes created by this CSI driver will default to using the `linode-block-storage-retain` storage class if one is not specified. Upon deletion of all PersitentVolumeClaims, the PersistentVolume and its backing Block Storage Volume will remain intact.
+
+* assume that the [Linode CCM](https://github.com/linode/linode-cloud-controller-manager) is initialized and running [Learn More](https://kubernetes.io/docs/reference/command-line-tools-reference/cloud-controller-manager/)
+
+  If you absolutely intend to run this on a cluster which will not run the Linode CCM, you must modify the init container script located in the `08-cm-get-linode-id.yaml` ConfigMap and delete [the line](https://github.com/linode/linode-blockstorage-csi-driver/blob/master/pkg/linode-bs/deploy/kubernetes/08-cm-get-linode-id.yaml#L19) that contains the `exit 1`.
 
 ### Example Usage
 
-This repository contains [two manifests](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/examples/kubernetes) that demonstrate use of the Linode BlockStorage CSI.  These manifests will create a PersistentVolume Claim using the `linode-block-storage` storage class and then consume it in a minimal pod.
+This repository contains [two manifests](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/examples/kubernetes) that demonstrate use of the Linode BlockStorage CSI.  These manifests will create a PersistentVolume Claim using the `linode-block-storage-retain` storage class and then consume it in a minimal pod.
 
-Once you have installed the Linode BlockStorage CSI, the following commands will run the example.  Be sure to delete the pod and PVC and ensure that the Linode BlockStorage Volume has been deleted.
+Once you have installed the Linode BlockStorage CSI, the following commands will run the example.  Once you are finished with the example, please be sure to delete the pod, PVC, and the associated Block Storage Volume. The PVC created in this example uses the `linode-block-storage-retain` storage class, so you will need to remove the Block Storage Volume from your Linode account via the Cloud Manager or the Linode CLI.
 
 ```sh
 kubectl create -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/examples/kubernetes/csi-pvc.yaml
@@ -125,7 +130,6 @@ persistence
 
 ## Disclaimers
 
-* This is not officially supported by Linode.  [Join us on Slack](#join-us-on-slack) for community support.
 * Until this driver has reached v1.0.0 it may not maintain compatibility between driver versions
 * This driver does not work with versions of Kubernetes earlier than 1.13
 * Requests for Persistent Volumes with a `require_size` less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10GiB), this is [in accordance with the CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume).  The upper-limit size constraint (`limit_bytes`) will also be honored so the size of Linode Block Storage volumes provisioned will not exceed this parameter.

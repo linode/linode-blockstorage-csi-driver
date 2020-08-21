@@ -378,8 +378,6 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 		return nil, status.Error(codes.Aborted, fmt.Sprintf("Starting token is greater than total number of vols"))
 	}
 
-
-
 	var entries []*csi.ListVolumesResponse_Entry
 	for _, vol := range volumes {
 		key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
@@ -461,7 +459,7 @@ func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error)  {
+func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
@@ -491,7 +489,7 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 		return nil, status.Error(codes.Internal, "Volumes can only be resized up")
 	}
 
-	if err := linodeCS.CloudProvider.ResizeVolume(ctx, volumeID, int(size / gigabyte)); err != nil {
+	if err := linodeCS.CloudProvider.ResizeVolume(ctx, volumeID, int(size/gigabyte)); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -503,14 +501,12 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 
 	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
-
 	resp := &csi.ControllerExpandVolumeResponse{
-		CapacityBytes: size,
+		CapacityBytes:         size,
 		NodeExpansionRequired: false,
 	}
 	glog.V(4).Info("volume is resized")
 	return resp, nil
-
 
 }
 

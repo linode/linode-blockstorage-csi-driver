@@ -4,12 +4,15 @@ metadata:
   name: linode-block-storage
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
+allowVolumeExpansion: true
 ---
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: linode-block-storage-expand
+  name: linode-block-storage-retain
   namespace: kube-system
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
 provisioner: linodebs.csi.linode.com
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 allowVolumeExpansion: true

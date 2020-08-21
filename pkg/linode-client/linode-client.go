@@ -3,10 +3,8 @@ package linodeclient
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/linode/linodego"
-	"golang.org/x/oauth2"
 )
 
 type LinodeClient interface {
@@ -29,19 +27,11 @@ type LinodeClient interface {
 }
 
 func NewLinodeClient(token, uaPrefix string, url string) *linodego.Client {
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{
-		AccessToken: token,
-	})
-
-	oauth2Client := &http.Client{
-		Transport: &oauth2.Transport{
-			Source: tokenSource,
-		},
-	}
-
 	ua := fmt.Sprintf("%s linodego/%s", uaPrefix, linodego.Version)
-	linodeClient := linodego.NewClient(oauth2Client)
+	// Use linodego built-in http client which supports setting root CA cert
+	linodeClient := linodego.NewClient(nil)
 	linodeClient.SetUserAgent(ua)
+	linodeClient.SetToken(token)
 	linodeClient.SetDebug(true)
 
 	if url != "" {

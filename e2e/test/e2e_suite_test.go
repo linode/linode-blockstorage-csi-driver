@@ -3,17 +3,19 @@ package test
 import (
 	"flag"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/appscode/go/crypto/rand"
-	"github.com/linode/linodego"
-	"golang.org/x/oauth2"
 	"k8s.io/client-go/util/homedir"
 
-	"e2e_test/framework"
-	"os"
+	"github.com/linode/linodego"
+	"golang.org/x/oauth2"
+
 	"path/filepath"
+
+	"e2e_test/test/framework"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
@@ -25,15 +27,15 @@ import (
 var (
 	StorageClass = "linode-block-storage"
 	useExisting  = false
-	dlt          = false
-	ClusterName  = rand.WithUniqSuffix("csi-linode")
+	reuse        = false
+	clusterName  string
 )
 
 func init() {
 	flag.StringVar(&framework.Image, "image", framework.Image, "registry/repository:tag")
 	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "linode api token")
-	flag.BoolVar(&dlt, "delete", dlt, "Delete cluster after test")
-	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use existing kubernetes cluster")
+	flag.BoolVar(&reuse, "reuse", reuse, "Create a cluster and continue to use it")
+	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use an existing kubernetes cluster")
 	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", filepath.Join(homedir.HomeDir(), ".kube/config"), "To use existing cluster provide kubeconfig file")
 }
 
@@ -69,13 +71,27 @@ var getLinodeClient = func() linodego.Client {
 }
 
 var _ = BeforeSuite(func() {
+	if reuse {
+		clusterName = "csi-linode-for-reuse"
+	} else {
+		clusterName = rand.WithUniqSuffix("csi-linode")
+	}
+
+	dir, err := os.Getwd()
+	Expect(err).NotTo(HaveOccurred())
+	kubeConfigFile := filepath.Join(dir, clusterName+".conf")
+
+	if reuse {
+		if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
+			useExisting = true
+			framework.KubeConfigFile = kubeConfigFile
+		}
+	}
 
 	if !useExisting {
-		err := framework.CreateCluster(ClusterName)
+		err := framework.CreateCluster(clusterName)
 		Expect(err).NotTo(HaveOccurred())
-		dir, err := os.Getwd()
-		Expect(err).NotTo(HaveOccurred())
-		framework.KubeConfigFile = filepath.Join(dir, ClusterName+".conf")
+		framework.KubeConfigFile = kubeConfigFile
 	}
 
 	By("Using kubeconfig from " + framework.KubeConfigFile)
@@ -95,8 +111,11 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	if dlt || !useExisting {
-		err := framework.DeleteCluster(ClusterName)
+	if !(useExisting || reuse) {
+		By("Deleting cluster")
+		err := framework.DeleteCluster(clusterName)
 		Expect(err).NotTo(HaveOccurred())
+	} else {
+		By("Not deleting cluster")
 	}
 })

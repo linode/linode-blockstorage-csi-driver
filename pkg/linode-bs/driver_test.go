@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 
@@ -78,7 +78,6 @@ func TestDriverSuite(t *testing.T) {
 
 	go linodeDriver.Run(endpoint)
 
-
 	cfg := &sanity.Config{
 		TargetPath:  os.TempDir() + "/csi-target",
 		StagingPath: os.TempDir() + "/csi-staging",
@@ -125,7 +124,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var filters map[string]string
 			hf := r.Header.Get("X-Filter")
 			if hf != "" {
-				_= json.Unmarshal([]byte(hf), &filters)
+				_ = json.Unmarshal([]byte(hf), &filters)
 			}
 
 			for _, vol := range f.volumes {

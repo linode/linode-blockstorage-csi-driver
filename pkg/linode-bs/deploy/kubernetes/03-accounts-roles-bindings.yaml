@@ -4,9 +4,7 @@ kind: ServiceAccount
 metadata:
   name: csi-node-sa
   namespace: kube-system
-
 ---
-
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -16,10 +14,10 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
-
-
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -33,7 +31,6 @@ roleRef:
   kind: ClusterRole
   name: driver-registrar-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
 ##### Controller Service Account, Roles, Rolebindings
 apiVersion: v1
@@ -41,7 +38,6 @@ kind: ServiceAccount
 metadata:
   name: csi-controller-sa
   namespace: kube-system
-
 ---
 # xref: https://github.com/kubernetes-csi/external-provisioner/blob/master/deploy/kubernetes/rbac.yaml
 kind: ClusterRole
@@ -71,9 +67,7 @@ rules:
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents"]
     verbs: ["get", "list"]
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -87,7 +81,6 @@ roleRef:
   kind: ClusterRole
   name: external-provisioner-role
   apiGroup: rbac.authorization.k8s.io
-  
 ---
 # xref: https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
 kind: ClusterRole
@@ -108,9 +101,7 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -124,7 +115,6 @@ roleRef:
   kind: ClusterRole
   name: external-attacher-role
   apiGroup: rbac.authorization.k8s.io
-
 ---
 # xref: https://github.com/kubernetes-csi/external-snapshotter/blob/master/deploy/kubernetes/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -154,9 +144,7 @@ rules:
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["mutatingwebhookconfigurations"]
   verbs: ["create"]
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

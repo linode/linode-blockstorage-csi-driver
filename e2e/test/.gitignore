@@ -1,0 +1,6 @@
+# dont commit temporary files written here by Terraform
+*.conf
+cluster.tf
+terraform*
+.terraform
+

@@ -234,7 +234,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		options = append(options, mnt.MountFlags...)
 	} else if blk := volumeCapability.GetBlock(); blk != nil {
 		// TODO(#64): Block volume support
-		return nil, status.Error(codes.Unimplemented, fmt.Sprintf("Block volume support is not yet implemented"))
+		return nil, status.Error(codes.Unimplemented, "Block volume support is not yet implemented")
 	}
 
 	err = ns.Mounter.FormatAndMount(devicePath, stagingTargetPath, fstype, options)
@@ -268,7 +268,7 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error)  {
+func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	glog.V(4).Infof("NodeExpandVolume called with req: %#v", req)
 
 	return &csi.NodeExpandVolumeResponse{
@@ -305,5 +305,5 @@ func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInf
 }
 
 func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeGetVolumeStats is not yet implemented"))
+	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not yet implemented")
 }
