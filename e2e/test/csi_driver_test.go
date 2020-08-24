@@ -94,26 +94,6 @@ var _ = Describe("CSIDriver", func() {
 						readFile(file)
 					})
 				})
-
-				Context("10Gi Storage", func() {
-					BeforeEach(func() {
-						size = "10Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						readFile(file)
-					})
-				})
-
-				Context("20Gi Storage", func() {
-					BeforeEach(func() {
-						size = "20Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						readFile(file)
-					})
-				})
 			})
 		})
 	})
@@ -160,28 +140,6 @@ var _ = Describe("CSIDriver", func() {
 					It("should write and read", func() {
 						writeFile(file)
 						expandVolume("15Gi")
-						readFile(file)
-					})
-				})
-
-				Context("Expanding Storage from 10Gi to 20Gi", func() {
-					BeforeEach(func() {
-						size = "10Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						expandVolume("20Gi")
-						readFile(file)
-					})
-				})
-
-				Context("Expanding Storage from 20Gi to 25Gi", func() {
-					BeforeEach(func() {
-						size = "20Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						expandVolume("25Gi")
 						readFile(file)
 					})
 				})
