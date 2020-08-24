@@ -1,16 +1,20 @@
 export GO111MODULE=on
-IMG ?= linode/linode-blockstorage-csi-driver:latest
 
-imports: $(GOPATH)/bin/goimports
-	goimports -w test
+REGISTRY_NAME=index.docker.io/linode
+IMAGE_NAME=linode-blockstorage-csi-driver
+IMAGE_VERSION=canary
+IMAGE_TAG=$(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 
-.PHONY: test reuse-and-test clean
+.PHONY: test reuse-and-test clean check-token install-terraform test-manifest
+
+test-manifest:
+	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
 
 reuse-and-test: SUITE_ARGS='--reuse'
 
-test reuse-and-test: $(GOPATH)/bin/ginkgo check-token
+test reuse-and-test: $(GOPATH)/bin/ginkgo check-token test-manifest
 	go list -m; \
-	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --image=${IMG} $(SUITE_ARGS); \
+	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --image=${IMAGE_TAG} $(SUITE_ARGS)
 
 clean: check-token
 	cd test; \

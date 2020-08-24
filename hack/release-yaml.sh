@@ -14,20 +14,7 @@ RELEASES="pkg/linode-bs/deploy/releases"
 TAGGED_RELEASE="linode-blockstorage-csi-driver-${TAG}.yaml"
 GENERIC_RELEASE="linode-blockstorage-csi-driver.yaml"
 
-# Get the last manifest in the folder
-manifests=pkg/linode-bs/deploy/kubernetes/0
-last="$(ls -dq "${manifests}"* | tail -n 1)"
-
-# Build release manifest
-for manifest in "${manifests}"*; do
-    echo "# ${manifest}"
-    echo "$(cat ${manifest})" | sed -e "s|{{ .Values.image.tag }}|"${TAG}"|"
-
-    # Don't add the separator if it's the last manifest
-    if [[ "${manifest}" != "${last}" ]]; then
-        echo -e "---"
-    fi
-done > "${RELEASES}/${TAGGED_RELEASE}"
+$(dirname "$0")/generate-yaml.sh "$1" > "${RELEASES}/${TAGGED_RELEASE}"
 
 # Create generic manifest from tagged release manifest
 cp "${RELEASES}/${TAGGED_RELEASE}" "${RELEASES}/${GENERIC_RELEASE}"
