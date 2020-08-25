@@ -107,7 +107,7 @@ var _ = Describe("CSIDriver", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, "linode-block-storage-expand")
+					pvc = f.GetPersistentVolumeClaimObject(size, "linode-block-storage")
 					err = f.CreatePersistentVolumeClaim(pvc)
 					Expect(err).NotTo(HaveOccurred())
 
