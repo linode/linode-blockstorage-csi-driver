@@ -12,7 +12,7 @@ import (
 
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 
 	"strconv"
 
@@ -54,8 +54,6 @@ func TestDriverSuite(t *testing.T) {
 			ID:         123,
 			Status:     "running",
 			Hypervisor: "kvm",
-			CreatedStr: "2018-01-01T00:01:01",
-			UpdatedStr: "2018-01-01T00:01:01",
 		},
 	}
 
@@ -242,6 +240,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			id := rand.Intn(99999)
 			name := v.Label
 			path := fmt.Sprintf("/dev/disk/by-id/scsi-0Linode_Volume_%v", name)
+			now := time.Now()
 			vol = linodego.Volume{
 				ID:             id,
 				Region:         v.Region,
@@ -249,11 +248,8 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Size:           v.Size,
 				FilesystemPath: path,
 				Status:         linodego.VolumeActive,
-				Created:        time.Now(),
-				Updated:        time.Now(),
-
-				CreatedStr: time.Now().Format("2006-01-02T15:04:05"),
-				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
+				Created:        &now,
+				Updated:        &now,
 			}
 
 			f.volumes[strconv.Itoa(id)] = vol
