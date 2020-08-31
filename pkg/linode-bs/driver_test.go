@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubernetes-csi/csi-test/pkg/sanity"
+	"github.com/kubernetes-csi/csi-test/v3/pkg/sanity"
 	"github.com/linode/linodego"
 )
 
@@ -76,11 +76,8 @@ func TestDriverSuite(t *testing.T) {
 
 	go linodeDriver.Run(endpoint)
 
-	cfg := &sanity.Config{
-		TargetPath:  os.TempDir() + "/csi-target",
-		StagingPath: os.TempDir() + "/csi-staging",
-		Address:     endpoint,
-	}
+	cfg := sanity.NewTestConfig()
+	cfg.Address = endpoint
 
 	sanity.Test(t, cfg)
 }
