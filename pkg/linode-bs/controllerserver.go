@@ -208,12 +208,9 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	} else if volume.LinodeID != nil {
-		/**
-		TODO(displague) existing volume on node is not ok unless checking publish caps are identical
 		if *volume.LinodeID == linodeID {
 			return &csi.ControllerPublishVolumeResponse{}, nil
 		}
-		**/
 		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %d already attached to node %d", volumeID, *volume.LinodeID))
 	}
 
