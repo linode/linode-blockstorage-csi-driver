@@ -77,7 +77,7 @@ func (linodeIdentity *LinodeIdentityServer) Probe(ctx context.Context, req *csi.
 
 	return &csi.ProbeResponse{
 		Ready: &wrappers.BoolValue{
-			Value: true,
+			Value: linodeIdentity.Driver.ready,
 		},
 	}, nil
 }

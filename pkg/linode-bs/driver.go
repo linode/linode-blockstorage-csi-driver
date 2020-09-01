@@ -181,7 +181,9 @@ func (linodeDriver *LinodeDriver) Run(endpoint string) {
 		glog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.bsPrefix)
 	}
 
+	linodeDriver.readyMu.Lock()
 	linodeDriver.ready = true
+	linodeDriver.readyMu.Unlock()
 
 	//Start the nonblocking GRPC
 	s := NewNonBlockingGRPCServer()
