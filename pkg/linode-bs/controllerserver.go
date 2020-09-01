@@ -468,9 +468,6 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 	var vol *linodego.Volume
 
 	if vol, err = linodeCS.CloudProvider.GetVolume(ctx, volumeID); err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
-			return &csi.ControllerExpandVolumeResponse{}, nil
-		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
