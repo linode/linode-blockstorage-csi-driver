@@ -3,6 +3,8 @@ apiVersion: apps/v1
 metadata:
   name: csi-linode-controller
   namespace: kube-system
+  labels:
+    app: csi-linode-controller
 spec:
   serviceName: "csi-linode"
   replicas: 1

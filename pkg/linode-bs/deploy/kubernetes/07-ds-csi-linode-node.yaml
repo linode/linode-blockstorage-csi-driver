@@ -3,6 +3,8 @@ apiVersion: apps/v1
 metadata:
   name: csi-linode-node
   namespace: kube-system
+  labels:
+    app: csi-linode-node
 spec:
   selector:
     matchLabels:
