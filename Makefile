@@ -20,9 +20,6 @@ REV=$(shell git describe --long --tags --dirty)
 
 export GO111MODULE=on
 
-.PHONY: all
-all: linode
-
 .PHONY: fmt
 fmt:
 	go fmt ./...
