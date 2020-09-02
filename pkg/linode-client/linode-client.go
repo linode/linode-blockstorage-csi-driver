@@ -2,7 +2,6 @@ package linodeclient
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/linode/linodego"
 )
@@ -22,10 +21,11 @@ type LinodeClient interface {
 	WaitForVolumeLinodeID(context.Context, int, *int, int) (*linodego.Volume, error)
 	WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus, int) (*linodego.Volume, error)
 	DeleteVolume(context.Context, int) error
+
+	ResizeVolume(context.Context, int, int) error
 }
 
-func NewLinodeClient(token, uaPrefix string, url string) *linodego.Client {
-	ua := fmt.Sprintf("%s linodego/%s", uaPrefix, linodego.Version)
+func NewLinodeClient(token, ua string, url string) *linodego.Client {
 	// Use linodego built-in http client which supports setting root CA cert
 	linodeClient := linodego.NewClient(nil)
 	linodeClient.SetUserAgent(ua)

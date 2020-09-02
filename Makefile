@@ -35,16 +35,17 @@ vet: fmt
 test: vet
 	go test -v ./... -cover
 
-.PHONY: linode
-linode: test
+.PHONY: build-linux
+build-linux: test
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
 
-.PHONY: linode-container
-linode-container: linode
+.PHONY: docker-build
+docker-build: build-linux
 	docker build -t $(IMAGE_TAG) -f ./app/linode/Dockerfile .
 
-.PHONY: push
-push: linode-container
+.PHONY: docker-push
+docker-push:
+	echo "[reminder] Did you run `make docker-build`?"
 	docker push $(IMAGE_TAG)
 
 .PHONY: verify

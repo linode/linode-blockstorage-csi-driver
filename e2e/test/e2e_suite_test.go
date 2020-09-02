@@ -2,16 +2,21 @@ package test
 
 import (
 	"flag"
+	"net/http"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/appscode/go/crypto/rand"
 	"k8s.io/client-go/util/homedir"
 
-	"e2e_test/test/framework"
-	"os"
+	"github.com/linode/linodego"
+	"golang.org/x/oauth2"
+
 	"path/filepath"
 
-	"github.com/appscode/go/crypto/rand"
+	"e2e_test/test/framework"
+
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
@@ -50,6 +55,21 @@ func TestE2e(t *testing.T) {
 	RunSpecsWithDefaultAndCustomReporters(t, "e2e Suite", []Reporter{junitReporter})
 }
 
+var getLinodeClient = func() linodego.Client {
+	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: framework.ApiToken})
+
+	oauth2Client := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: tokenSource,
+		},
+	}
+
+	linodeClient := linodego.NewClient(oauth2Client)
+	linodeClient.SetDebug(true)
+
+	return linodeClient
+}
+
 var _ = BeforeSuite(func() {
 	if reuse {
 		clusterName = "csi-linode-for-reuse"
@@ -80,9 +100,10 @@ var _ = BeforeSuite(func() {
 
 	// Clients
 	kubeClient := kubernetes.NewForConfigOrDie(config)
+	linodeClient := getLinodeClient()
 
 	// Framework
-	root = framework.New(config, kubeClient, StorageClass)
+	root = framework.New(config, kubeClient, linodeClient, StorageClass)
 
 	By("Using Namespace " + root.Namespace())
 	err = root.CreateNamespace()

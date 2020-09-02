@@ -2,7 +2,6 @@ package linodebs
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubernetes-csi/csi-test/pkg/sanity"
+	"github.com/kubernetes-csi/csi-test/v3/pkg/sanity"
 	"github.com/linode/linodego"
 )
 
@@ -55,8 +54,6 @@ func TestDriverSuite(t *testing.T) {
 			ID:         123,
 			Status:     "running",
 			Hypervisor: "kvm",
-			CreatedStr: "2018-01-01T00:01:01",
-			UpdatedStr: "2018-01-01T00:01:01",
 		},
 	}
 
@@ -79,23 +76,8 @@ func TestDriverSuite(t *testing.T) {
 
 	go linodeDriver.Run(endpoint)
 
-	mntDir, err := ioutil.TempDir("", "mnt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mntDir)
-
-	mntStageDir, err := ioutil.TempDir("", "mnt-stage")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(mntStageDir)
-
-	cfg := &sanity.Config{
-		StagingPath: mntStageDir,
-		TargetPath:  mntDir,
-		Address:     endpoint,
-	}
+	cfg := sanity.NewTestConfig()
+	cfg.Address = endpoint
 
 	sanity.Test(t, cfg)
 }
@@ -134,7 +116,17 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			res := 0
 			data := []linodego.Volume{}
 
+			var filters map[string]string
+			hf := r.Header.Get("X-Filter")
+			if hf != "" {
+				_ = json.Unmarshal([]byte(hf), &filters)
+			}
+
 			for _, vol := range f.volumes {
+
+				if filters["label"] != "" && filters["label"] != vol.Label {
+					continue
+				}
 				data = append(data, vol)
 			}
 			resp := linodego.VolumesPagedResponse{
@@ -245,6 +237,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			id := rand.Intn(99999)
 			name := v.Label
 			path := fmt.Sprintf("/dev/disk/by-id/scsi-0Linode_Volume_%v", name)
+			now := time.Now()
 			vol = linodego.Volume{
 				ID:             id,
 				Region:         v.Region,
@@ -252,11 +245,8 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Size:           v.Size,
 				FilesystemPath: path,
 				Status:         linodego.VolumeActive,
-				Created:        time.Now(),
-				Updated:        time.Now(),
-
-				CreatedStr: time.Now().Format("2006-01-02T15:04:05"),
-				UpdatedStr: time.Now().Format("2006-01-02T15:04:05"),
+				Created:        &now,
+				Updated:        &now,
 			}
 
 			f.volumes[strconv.Itoa(id)] = vol

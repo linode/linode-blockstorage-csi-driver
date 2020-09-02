@@ -208,12 +208,9 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	} else if volume.LinodeID != nil {
-		/**
-		TODO(displague) existing volume on node is not ok unless checking publish caps are identical
 		if *volume.LinodeID == linodeID {
 			return &csi.ControllerPublishVolumeResponse{}, nil
 		}
-		**/
 		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %d already attached to node %d", volumeID, *volume.LinodeID))
 	}
 
@@ -349,15 +346,16 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 
 	listOpts := linodego.NewListOptions(0, "")
 	if req.GetMaxEntries() > 0 {
-		if startingToken == "" {
-			listOpts.Page = 1
-		} else {
-			startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
-			if errParse != nil {
-				return nil, status.Error(codes.Aborted, fmt.Sprintf("Invalid starting token %v", startingToken))
-			}
-			listOpts.Page = int(startingPage)
+		listOpts.PageSize = int(req.GetMaxEntries())
+	}
+
+	if startingToken != "" {
+		startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
+		if errParse != nil {
+			return nil, status.Error(codes.Aborted, fmt.Sprintf("Invalid starting token %v", startingToken))
 		}
+
+		listOpts.Page = int(startingPage)
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
@@ -373,7 +371,6 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	if err != nil {
 		return nil, err
 	}
-
 	var entries []*csi.ListVolumesResponse_Entry
 	for _, vol := range volumes {
 		key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
@@ -419,6 +416,7 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	} {
 		caps = append(caps, newCap(capability))
 	}
@@ -448,6 +446,54 @@ func (linodeCS *LinodeControllerServer) DeleteSnapshot(ctx context.Context, req 
 
 func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerExpandVolume", req)
+	if statusErr != nil {
+		return nil, statusErr
+	}
+
+	capRange := req.GetCapacityRange()
+	size, err := getRequestCapacitySize(capRange)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	glog.V(4).Infoln("expand volume called", map[string]interface{}{
+		"volume_id": volumeID,
+		"method":    "controller_expand_volume",
+	})
+
+	var vol *linodego.Volume
+
+	if vol, err = linodeCS.CloudProvider.GetVolume(ctx, volumeID); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if vol.Size > int(size/gigabyte) {
+		return nil, status.Error(codes.Internal, "Volumes can only be resized up")
+	}
+
+	if err := linodeCS.CloudProvider.ResizeVolume(ctx, volumeID, int(size/gigabyte)); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
+
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
+
+	resp := &csi.ControllerExpandVolumeResponse{
+		CapacityBytes:         size,
+		NodeExpansionRequired: false,
+	}
+	glog.V(4).Info("volume is resized")
+	return resp, nil
+
 }
 
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size

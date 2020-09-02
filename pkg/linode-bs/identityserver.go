@@ -17,6 +17,7 @@ package linodebs
 import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -58,11 +59,25 @@ func (linodeIdentity *LinodeIdentityServer) GetPluginCapabilities(ctx context.Co
 					},
 				},
 			},
+			{
+				Type: &csi.PluginCapability_VolumeExpansion_{
+					VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
+						Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+					},
+				},
+			},
 		},
 	}, nil
 }
 
 func (linodeIdentity *LinodeIdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	glog.V(4).Infof("Probe called with args: %#v", req)
-	return &csi.ProbeResponse{}, nil
+	linodeIdentity.Driver.readyMu.Lock()
+	defer linodeIdentity.Driver.readyMu.Unlock()
+
+	return &csi.ProbeResponse{
+		Ready: &wrappers.BoolValue{
+			Value: linodeIdentity.Driver.ready,
+		},
+	}, nil
 }
