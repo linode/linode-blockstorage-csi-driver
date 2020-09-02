@@ -14,7 +14,7 @@
 
 REGISTRY_NAME=index.docker.io/linode
 IMAGE_NAME=linode-blockstorage-csi-driver
-IMAGE_VERSION=canary
+IMAGE_VERSION?=canary
 IMAGE_TAG=$(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 REV=$(shell git describe --long --tags --dirty)
 
