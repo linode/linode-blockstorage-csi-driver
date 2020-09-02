@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: Build
-      run: make linode
+      run: make build-linux
     - name: Publish latest to Registry
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
