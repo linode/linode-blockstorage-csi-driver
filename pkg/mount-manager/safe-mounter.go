@@ -14,7 +14,7 @@ limitations under the License.
 
 package mountmanager
 
-import "k8s.io/kubernetes/pkg/util/mount"
+import "k8s.io/utils/mount"
 
 func NewSafeMounter() *mount.SafeFormatAndMount {
 	realMounter := mount.New("")
