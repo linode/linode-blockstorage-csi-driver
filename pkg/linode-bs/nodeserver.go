@@ -89,7 +89,7 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	if err := ns.Mounter.Interface.MakeDir(targetPath); err != nil {
+	if err := os.MkdirAll(targetPath, os.FileMode(0755)); err != nil {
 		glog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := ns.Mounter.Interface.MakeDir(stagingTargetPath); err != nil {
+			if err := os.MkdirAll(stagingTargetPath, os.FileMode(0755)); err != nil {
 				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", stagingTargetPath, err))
 			}
 			notMnt = true
