@@ -281,7 +281,8 @@ func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.C
 		return nil, statusErr
 	}
 
-	if req.VolumeCapabilities == nil {
+	volumeCapabilities := req.GetVolumeCapabilities()
+	if len(volumeCapabilities) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
 	}
 
@@ -293,47 +294,18 @@ func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.C
 		return nil, err
 	}
 
-	var vcaps []*csi.VolumeCapability_AccessMode
-	for _, mode := range []csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-	} {
-		vcaps = append(vcaps, &csi.VolumeCapability_AccessMode{Mode: mode})
-	}
-
 	glog.V(4).Infoln("validate volume capabilities called", map[string]interface{}{
-		"volume_id":              req.VolumeId,
-		"volume_capabilities":    req.VolumeCapabilities,
-		"supported_capabilities": vcaps,
-		"method":                 "validate_volume_capabilities",
+		"volume_id":           req.VolumeId,
+		"volume_capabilities": req.VolumeCapabilities,
+		"method":              "validate_volume_capabilities",
 	})
 
-	/*
-		hasSupport := func(mode csi.VolumeCapability_AccessMode_Mode) bool {
-			for _, m := range vcaps {
-				if mode == m.Mode {
-					return true
-				}
-			}
-			return false
-		}
-	*/
-
-	resp := &csi.ValidateVolumeCapabilitiesResponse{
-		Message: "ValidateVolumeCapabilities is currently unimplemented for CSI v1.0.0",
+	resp := &csi.ValidateVolumeCapabilitiesResponse{}
+	if validVolumeCapabilities(volumeCapabilities) {
+		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
 	}
-	/*
-		for _, capabilities := range req.VolumeCapabilities {
-			if hasSupport(capabilities.AccessMode.Mode) {
-				resp.Supported = true
-			} else {
-				// we need to make sure all capabilities are supported. Revert back
-				// in case we have a cap that is supported, but is invalidated now
-				resp.Supported = false
-			}
-		}
-	*/
-
 	glog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": resp})
+
 	return resp, nil
 }
 
