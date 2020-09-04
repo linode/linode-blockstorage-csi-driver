@@ -14,11 +14,14 @@ limitations under the License.
 
 package mountmanager
 
-import "k8s.io/utils/mount"
+import (
+	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
+)
 
 func NewSafeMounter() *mount.SafeFormatAndMount {
 	realMounter := mount.New("")
-	realExec := mount.NewOsExec()
+	realExec := exec.New()
 	return &mount.SafeFormatAndMount{
 		Interface: realMounter,
 		Exec:      realExec,

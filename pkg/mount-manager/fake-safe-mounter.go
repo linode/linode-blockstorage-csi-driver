@@ -14,32 +14,14 @@ limitations under the License.
 
 package mountmanager
 
-import "k8s.io/utils/mount"
+import (
+	exectesting "k8s.io/utils/exec/testing"
+	"k8s.io/utils/mount"
+)
 
 func NewFakeSafeMounter() *mount.SafeFormatAndMount {
-	execCallback := func(cmd string, args ...string) ([]byte, error) {
-		return nil, nil
-		// TODO(#48): Fill out exec callback for errors
-		/*
-			if len(test.execScripts) <= execCallCount {
-				t.Errorf("Unexpected command: %s %v", cmd, args)
-				return nil, nil
-			}
-			script := test.execScripts[execCallCount]
-			execCallCount++
-			if script.command != cmd {
-				t.Errorf("Unexpected command %s. Expecting %s", cmd, script.command)
-			}
-			for j := range args {
-				if args[j] != script.args[j] {
-					t.Errorf("Unexpected args %v. Expecting %v", args, script.args)
-				}
-			}
-			return []byte(script.output), script.err
-		*/
-	}
-	fakeMounter := &mount.FakeMounter{MountPoints: []mount.MountPoint{}, Log: []mount.FakeAction{}}
-	fakeExec := mount.NewFakeExec(execCallback)
+	fakeMounter := &mount.FakeMounter{MountPoints: []mount.MountPoint{}}
+	fakeExec := &exectesting.FakeExec{}
 	return &mount.SafeFormatAndMount{
 		Interface: fakeMounter,
 		Exec:      fakeExec,
