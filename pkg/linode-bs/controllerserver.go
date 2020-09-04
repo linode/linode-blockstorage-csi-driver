@@ -399,6 +399,11 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	return resp, nil
 }
 
+// ControllerGetVolume allows probing for health status
+func (linodeCS *LinodeControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by this Plugin
 func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
