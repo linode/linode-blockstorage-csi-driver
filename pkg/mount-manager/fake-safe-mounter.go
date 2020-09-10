@@ -21,7 +21,7 @@ import (
 
 func NewFakeSafeMounter() *mount.SafeFormatAndMount {
 	fakeMounter := &mount.FakeMounter{MountPoints: []mount.MountPoint{}}
-	fakeExec := &exectesting.FakeExec{}
+	fakeExec := &exectesting.FakeExec{DisableScripts: true}
 	return &mount.SafeFormatAndMount{
 		Interface: fakeMounter,
 		Exec:      fakeExec,

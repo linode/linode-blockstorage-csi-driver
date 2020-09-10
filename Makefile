@@ -30,7 +30,7 @@ vet: fmt
 
 .PHONY: test
 test: vet
-	go test -v ./... -cover
+	go test -v ./... -cover $(TEST_ARGS)
 
 .PHONY: build-linux
 build-linux:
