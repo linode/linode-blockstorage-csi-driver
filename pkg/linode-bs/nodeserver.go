@@ -29,8 +29,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/kubernetes/pkg/util/mount"
-	volumeutils "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/mount"
 )
 
 const (
@@ -89,7 +88,7 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	if err := ns.Mounter.Interface.MakeDir(targetPath); err != nil {
+	if err := os.MkdirAll(targetPath, os.FileMode(0755)); err != nil {
 		glog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
 		return nil, err
 	}
@@ -146,7 +145,7 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Target Path must be provided")
 	}
 
-	err := volumeutils.UnmountMountPoint(targetPath, ns.Mounter.Interface, false /* bind mount */)
+	err := mount.CleanupMountPoint(targetPath, ns.Mounter.Interface, false /* bind mount */)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, targetPath))
 	}
@@ -202,7 +201,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := ns.Mounter.Interface.MakeDir(stagingTargetPath); err != nil {
+			if err := os.MkdirAll(stagingTargetPath, os.FileMode(0755)); err != nil {
 				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", stagingTargetPath, err))
 			}
 			notMnt = true
@@ -261,7 +260,7 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Staging Target Path must be provided")
 	}
 
-	err := volumeutils.UnmountMountPoint(stagingTargetPath, ns.Mounter.Interface, false /* bind mount */)
+	err := mount.CleanupMountPoint(stagingTargetPath, ns.Mounter.Interface, false /* bind mount */)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err))
 	}

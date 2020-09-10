@@ -30,10 +30,10 @@ vet: fmt
 
 .PHONY: test
 test: vet
-	go test -v ./... -cover
+	go test -v ./... -cover $(TEST_ARGS)
 
 .PHONY: build-linux
-build-linux: test
+build-linux:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
 
 .PHONY: docker-build
