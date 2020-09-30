@@ -35,6 +35,7 @@ module "k8s" {
   server_type_master = "\${var.server_type_master}"
   region = "\${var.region}"
   ssh_public_key = "\${var.ssh_public_key}"
+  k8s_version = "v1.15.12"
 }
 EOF
 
