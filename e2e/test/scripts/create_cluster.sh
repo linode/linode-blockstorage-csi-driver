@@ -20,7 +20,7 @@ variable "server_type_master" {
   default = "g6-standard-2"
 }
 variable "region" {
-  default = ""
+  default = "eu-west"
 }
 variable "ssh_public_key" {
   default = "${HOME}/.ssh/id_rsa.pub"
@@ -44,10 +44,6 @@ terraform workspace new ${CLUSTER_NAME}
 terraform init
 
 terraform apply \
- -var region=eu-west \
- -var server_type_master=g6-standard-2 \
- -var nodes=2 \
- -var server_type_node=g6-standard-2 \
  -auto-approve
 
 export KUBECONFIG="$(pwd)/${CLUSTER_NAME}.conf"
