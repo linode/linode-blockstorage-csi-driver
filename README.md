@@ -9,11 +9,9 @@ More information about the Kubernetes CSI can be found in the GitHub [Kubernetes
 
 ### Requirements
 
-* Kubernetes v1.13+
+* Kubernetes v1.15+
 * The node `hostname` must match the Linode Instance `label`
 * `--allow-privileged` must be enabled for the API server and kubelet
-* Should have the following [feature gates enabled](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/#overview): `CSINodeInfo`, `CSIDriverRegistry`
-* The following feature gates may be used in future versions: `BlockVolume`, `CSIBlockVolume`
 
 ### Secure a Linode API Access Token:
 
@@ -131,7 +129,6 @@ persistence
 ## Disclaimers
 
 * Until this driver has reached v1.0.0 it may not maintain compatibility between driver versions
-* This driver does not work with versions of Kubernetes earlier than 1.13
 * Requests for Persistent Volumes with a `require_size` less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10GiB), this is [in accordance with the CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume).  The upper-limit size constraint (`limit_bytes`) will also be honored so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
 
 ## Contribution Guidelines
