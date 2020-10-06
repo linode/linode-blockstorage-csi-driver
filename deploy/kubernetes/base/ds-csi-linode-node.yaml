@@ -54,7 +54,7 @@ spec:
             - name: registration-dir
               mountPath: /registration
         - name: csi-linode-plugin
-          image: linode/linode-blockstorage-csi-driver:{{ .Values.image.tag }}
+          image: linode/linode-blockstorage-csi-driver:latest
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"

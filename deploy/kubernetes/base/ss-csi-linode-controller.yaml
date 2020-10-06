@@ -72,7 +72,7 @@ spec:
           - name: socket-dir
             mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-plugin
-          image: linode/linode-blockstorage-csi-driver:{{ .Values.image.tag }}
+          image: linode/linode-blockstorage-csi-driver:latest
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"

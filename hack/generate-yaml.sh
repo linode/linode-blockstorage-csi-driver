@@ -10,18 +10,8 @@ if [[ -z "${TAG}" ]]; then
     exit 1
 fi
 
-# Get the last manifest in the folder
 cd $(dirname "$0")/../
-manifests=pkg/linode-bs/deploy/kubernetes/0
-last="$(ls -dq "${manifests}"* | tail -n 1)"
+file=./deploy/kubernetes/overlays/release/kustomization.yaml
+CSI_VERSION=$TAG envsubst < "$file.template" > $file
 
-# Build release manifest
-for manifest in "${manifests}"*; do
-    echo "# ${manifest}"
-    echo "$(cat ${manifest})" | sed -e "s|{{ .Values.image.tag }}|"${TAG}"|"
-
-    # Don't add the separator if it's the last manifest
-    if [[ "${manifest}" != "${last}" ]]; then
-        echo -e "---"
-    fi
-done
+kustomize build "$(dirname $file)"

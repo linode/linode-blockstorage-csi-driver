@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+namespace: kube-system
+patchesStrategicMerge:
+  - |-
+    kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: csi-attacher-role-cfg
+    $patch: delete
+  - |-
+    kind: Role
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: external-attacher-cfg
+    $patch: delete
+  - |-
+    kind: ServiceAccount
+    apiVersion: v1
+    metadata:
+      name: csi-attacher
+    $patch: delete
+patchesJson6902:
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRole
+      name: external-attacher-runner
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: external-attacher-role
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRoleBinding
+      name: csi-attacher-role
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: csi-controller-attacher-binding
+      - op: replace
+        path: /subjects/0/name
+        value: csi-controller-sa
+      - op: replace
+        path: /subjects/0/namespace
+        value: kube-system
+
