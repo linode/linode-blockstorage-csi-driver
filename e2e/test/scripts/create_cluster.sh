@@ -8,6 +8,7 @@ set -x
 export LINODE_API_TOKEN="$1"
 export CLUSTER_NAME="$2"
 export IMAGE="$3"
+export K8S_VERSION="$4"
 
 cat > cluster.tf <<EOF
 variable "server_type_node" {
@@ -35,7 +36,7 @@ module "k8s" {
   server_type_master = "\${var.server_type_master}"
   region = "\${var.region}"
   ssh_public_key = "\${var.ssh_public_key}"
-  k8s_version = "v1.15.12"
+  k8s_version = "$K8S_VERSION"
 }
 EOF
 

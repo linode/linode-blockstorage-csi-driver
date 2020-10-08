@@ -11,6 +11,7 @@ var (
 	Image          = "linode/linode-blockstorage-csi-driver:latest"
 	ApiToken       = ""
 	KubeConfigFile = ""
+	K8sVersion     = "v1.15.12"
 )
 
 type Framework struct {

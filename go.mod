@@ -7,7 +7,8 @@ require (
 	github.com/kubernetes-csi/csi-test/v3 v3.1.1
 	github.com/linode/linodego v0.21.0
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
-	google.golang.org/appengine v1.5.0 // indirect
+	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.31.1
 	k8s.io/apimachinery v0.19.2
 	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
