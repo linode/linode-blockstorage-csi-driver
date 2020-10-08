@@ -11,7 +11,6 @@ More information about the Kubernetes CSI can be found in the GitHub [Kubernetes
 
 * Kubernetes v1.15+
 * The node `hostname` must match the Linode Instance `label`
-* `--allow-privileged` must be enabled for the API server and kubelet
 
 ### Secure a Linode API Access Token:
 

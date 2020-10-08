@@ -19,9 +19,7 @@ test reuse-and-test: $(GOPATH)/bin/ginkgo check-token test-manifest
 
 clean: check-token
 	cd test; \
-	./scripts/delete_cluster.sh csi-linode-for-reuse; \
-	rm terraform.tfstate; \
-	rm -rf terraform.tfstate.d
+	./scripts/delete_cluster.sh csi-linode-for-reuse
 
 check-token:
 	@if test "$(LINODE_API_TOKEN)" = "" ; then \

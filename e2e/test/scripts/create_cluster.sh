@@ -27,9 +27,9 @@ variable "ssh_public_key" {
   default = "${HOME}/.ssh/id_rsa.pub"
 }
 module "k8s" {
-  source  = "git::https://github.com/linode/terraform-linode-k8s.git?ref=for-cli"
+  source  = "git::https://github.com/linode/terraform-linode-k8s.git?ref=master"
   linode_token = "$LINODE_API_TOKEN"
-  linode_group = "$CLUSTER_NAME"
+  cluster_name = "$CLUSTER_NAME"
   csi_image = "${IMAGE}"
   server_type_node = "\${var.server_type_node}"
   nodes = "\${var.nodes}"
