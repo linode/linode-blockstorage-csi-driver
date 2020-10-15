@@ -1,7 +1,7 @@
 package framework
 
 func CreateCluster(cluster string) error {
-	return RunScript("create_cluster.sh", ApiToken, cluster, Image, K8sVersion)
+	return RunScript("create_cluster.sh", ApiToken, cluster, K8sVersion)
 }
 
 func DeleteCluster(cluster string) error {

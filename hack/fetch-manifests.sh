@@ -32,6 +32,4 @@ function external_resizer {
 
 external_provisioner "1.6"
 external_attacher "2.2"
-# external_snapshotter "" We don't use it?
 external_resizer "0.5.0"
-# node_driver_registrar "1.3.0" No manifests to fetch
