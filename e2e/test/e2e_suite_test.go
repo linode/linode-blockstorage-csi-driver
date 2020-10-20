@@ -32,8 +32,8 @@ var (
 )
 
 func init() {
-	flag.StringVar(&framework.Image, "image", framework.Image, "registry/repository:tag")
 	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "linode api token")
+	flag.StringVar(&framework.K8sVersion, "k8s-version", framework.K8sVersion, "Kubernetes version")
 	flag.BoolVar(&reuse, "reuse", reuse, "Create a cluster and continue to use it")
 	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use an existing kubernetes cluster")
 	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", filepath.Join(homedir.HomeDir(), ".kube/config"), "To use existing cluster provide kubeconfig file")

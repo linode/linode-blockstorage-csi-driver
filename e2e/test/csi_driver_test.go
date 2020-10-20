@@ -102,10 +102,6 @@ var _ = Describe("CSIDriver", func() {
 		Context("Block Storage", func() {
 			Context("Volume Expansion", func() {
 				JustBeforeEach(func() {
-					By("Applying Manifest")
-					err = framework.ApplyManifest("apply", "manifest/linode-blockstorage-csi-driver.yaml")
-					Expect(err).NotTo(HaveOccurred())
-
 					By("Creating Persistent Volume Claim")
 					pvc = f.GetPersistentVolumeClaimObject(size, "linode-block-storage")
 					err = f.CreatePersistentVolumeClaim(pvc)
