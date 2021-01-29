@@ -32,4 +32,4 @@ function external_resizer {
 
 external_provisioner "1.6"
 external_attacher "2.2"
-external_resizer "0.5.0"
+external_resizer "1.0.1"

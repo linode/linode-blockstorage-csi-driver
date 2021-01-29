@@ -9,7 +9,7 @@ More information about the Kubernetes CSI can be found in the GitHub [Kubernetes
 
 ### Requirements
 
-* Kubernetes v1.15+
+* Kubernetes v1.16+
 * The node `hostname` must match the Linode Instance `label`
 
 ### Secure a Linode API Access Token:
