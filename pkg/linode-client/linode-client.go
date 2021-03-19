@@ -30,7 +30,6 @@ func NewLinodeClient(token, ua string, url string) *linodego.Client {
 	linodeClient := linodego.NewClient(nil)
 	linodeClient.SetUserAgent(ua)
 	linodeClient.SetToken(token)
-	linodeClient.SetDebug(true)
 
 	if url != "" {
 		linodeClient.SetBaseURL(url)
