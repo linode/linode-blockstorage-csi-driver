@@ -19,7 +19,7 @@ spec:
       initContainers:
         - name: init
           image: bitnami/kubectl:1.16.3-debian-10-r36
-          command: 
+          command:
             - /scripts/get-linode-id.sh
           env:
             - name: NODE_NAME
@@ -138,3 +138,10 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - operator: Exists
+          effect: NoExecute
