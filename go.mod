@@ -7,11 +7,28 @@ require (
 	github.com/kubernetes-csi/csi-test/v3 v3.1.1
 	github.com/linode/linodego v0.21.0
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
-	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
-	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.31.1
 	k8s.io/apimachinery v0.19.2
 	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
+)
+
+require (
+	github.com/go-logr/logr v0.2.0 // indirect
+	github.com/go-resty/resty/v2 v2.1.1-0.20191201195748-d7b97669fe48 // indirect
+	github.com/google/uuid v1.1.1 // indirect
+	github.com/hpcloud/tail v1.0.0 // indirect
+	github.com/onsi/ginkgo v1.11.0 // indirect
+	github.com/onsi/gomega v1.7.1 // indirect
+	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
+	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
+	golang.org/x/text v0.3.3 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
+	google.golang.org/protobuf v1.24.0 // indirect
+	gopkg.in/fsnotify.v1 v1.4.7 // indirect
+	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+	gopkg.in/yaml.v2 v2.2.8 // indirect
+	k8s.io/klog/v2 v2.2.0 // indirect
 )
 
 replace (
@@ -39,4 +56,4 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.2
 )
 
-go 1.15
+go 1.17
