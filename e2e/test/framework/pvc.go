@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/linode/linodego"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,4 +65,35 @@ func (f *Invocation) GetVolumeSize(pvc *core.PersistentVolumeClaim) (int, error)
 		return -1, err
 	}
 	return volume.Size, err
+}
+
+func (f *Invocation) GetVolumeID(pvc *core.PersistentVolumeClaim) (int, error) {
+	pv, err := f.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+	if err != nil {
+		return -1, err
+	}
+
+	volumeHandle := pv.Spec.CSI.VolumeHandle
+	volumeID, err := strconv.Atoi(strings.Split(volumeHandle, "-")[0])
+	if err != nil {
+		return -1, err
+	}
+	return volumeID, err
+}
+
+func (f *Invocation) IsVolumeDetached(volumeID int) (bool, error) {
+	volume, err := f.linodeClient.GetVolume(context.Background(), volumeID)
+	if err != nil {
+		return false, err
+	}
+	return volume.LinodeID == nil, err
+}
+
+func (f *Invocation) IsVolumeDeleted(volumeID int) (bool, error) {
+	_, err := f.linodeClient.GetVolume(context.Background(), volumeID)
+	originalErr, ok := err.(*linodego.Error)
+	if ok && originalErr.Code == 404 {
+		return true, nil
+	}
+	return false, err
 }

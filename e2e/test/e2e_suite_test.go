@@ -2,7 +2,6 @@ package test
 
 import (
 	"flag"
-	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 
 	"github.com/linode/linodego"
-	"golang.org/x/oauth2"
 
 	"path/filepath"
 
@@ -25,23 +23,24 @@ import (
 )
 
 var (
-	StorageClass = "linode-block-storage"
-	useExisting  = false
-	reuse        = false
-	clusterName  string
+	useExisting = false
+	reuse       = false
+	clusterName string
+	linodeDebug = false
+	linodeURL   = "https://api.linode.com"
 )
 
 func init() {
-	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "linode api token")
 	flag.StringVar(&framework.K8sVersion, "k8s-version", framework.K8sVersion, "Kubernetes version")
 	flag.BoolVar(&reuse, "reuse", reuse, "Create a cluster and continue to use it")
 	flag.BoolVar(&useExisting, "use-existing", useExisting, "Use an existing kubernetes cluster")
 	flag.StringVar(&framework.KubeConfigFile, "kubeconfig", filepath.Join(homedir.HomeDir(), ".kube/config"), "To use existing cluster provide kubeconfig file")
+	flag.DurationVar(&framework.Timeout, "timeout", 5*time.Minute, "Timeout for a test to complete successfully")
+	flag.DurationVar(&framework.RetryInterval, "retry-interval", 5*time.Second, "Amount of time to wait between requests")
+	flag.BoolVar(&linodeDebug, "linode-debug", linodeDebug, "When true, prints out HTTP requests and responses from the Linode API")
+	flag.StringVar(&framework.ApiToken, "api-token", "", "The authentication token to use when sending requests to the Linode API")
+	flag.StringVar(&linodeURL, "linode-url", linodeURL, "The Linode API URL to send requests to")
 }
-
-const (
-	TIMEOUT = 20 * time.Minute
-)
 
 var (
 	root *framework.Framework
@@ -49,23 +48,19 @@ var (
 
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
-	SetDefaultEventuallyTimeout(TIMEOUT)
+	SetDefaultEventuallyTimeout(framework.Timeout)
 
 	junitReporter := reporters.NewJUnitReporter("junit.xml")
 	RunSpecsWithDefaultAndCustomReporters(t, "e2e Suite", []Reporter{junitReporter})
 }
 
 var getLinodeClient = func() linodego.Client {
-	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: framework.ApiToken})
-
-	oauth2Client := &http.Client{
-		Transport: &oauth2.Transport{
-			Source: tokenSource,
-		},
-	}
-
-	linodeClient := linodego.NewClient(oauth2Client)
-	linodeClient.SetDebug(true)
+	linodeClient := linodego.NewClient(nil)
+	linodeClient.SetDebug(linodeDebug)
+	linodeClient.SetBaseURL(linodeURL)
+	linodeClient.SetAPIVersion("v4")
+	linodeClient.SetToken(framework.ApiToken)
+	linodeClient.SetUserAgent("csi-e2e")
 
 	return linodeClient
 }
@@ -89,6 +84,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	if !useExisting {
+		Expect(framework.K8sVersion).NotTo(BeEmpty(), "Please specify a Kubernetes version")
 		err := framework.CreateCluster(clusterName)
 		Expect(err).NotTo(HaveOccurred())
 		framework.KubeConfigFile = kubeConfigFile
@@ -100,10 +96,11 @@ var _ = BeforeSuite(func() {
 
 	// Clients
 	kubeClient := kubernetes.NewForConfigOrDie(config)
+	Expect(framework.ApiToken).NotTo(BeEmpty(), "API token is necessary")
 	linodeClient := getLinodeClient()
 
 	// Framework
-	root = framework.New(config, kubeClient, linodeClient, StorageClass)
+	root = framework.New(config, kubeClient, linodeClient)
 
 	By("Using Namespace " + root.Namespace())
 	err = root.CreateNamespace()
@@ -111,6 +108,13 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	if root == nil {
+		return
+	}
+
+	By("Deleting Namespace " + root.Namespace())
+	err := root.DeleteNamespace()
+	Expect(err).NotTo(HaveOccurred())
 	if !(useExisting || reuse) {
 		By("Deleting cluster")
 		err := framework.DeleteCluster(clusterName)

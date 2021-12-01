@@ -1,6 +1,8 @@
 package framework
 
 import (
+	"time"
+
 	"github.com/appscode/go/crypto/rand"
 	"github.com/linode/linodego"
 	"k8s.io/client-go/kubernetes"
@@ -10,15 +12,16 @@ import (
 var (
 	ApiToken       = ""
 	KubeConfigFile = ""
-	K8sVersion     = "v1.15.12"
+	K8sVersion     = ""
+	Timeout        time.Duration
+	RetryInterval  time.Duration
 )
 
 type Framework struct {
-	restConfig   *rest.Config
-	kubeClient   kubernetes.Interface
-	namespace    string
-	name         string
-	StorageClass string
+	restConfig *rest.Config
+	kubeClient kubernetes.Interface
+	namespace  string
+	name       string
 
 	linodeClient linodego.Client
 }
@@ -27,27 +30,29 @@ func New(
 	restConfig *rest.Config,
 	kubeClient kubernetes.Interface,
 	linodeClient linodego.Client,
-	storageClass string,
 ) *Framework {
 	return &Framework{
 		restConfig:   restConfig,
 		kubeClient:   kubeClient,
 		linodeClient: linodeClient,
 
-		name:         "csidriver",
-		namespace:    rand.WithUniqSuffix("csi"),
-		StorageClass: storageClass,
+		name:      "csidriver",
+		namespace: rand.WithUniqSuffix("csi"),
 	}
 }
 
 func (f *Framework) Invoke() *Invocation {
 	return &Invocation{
-		Framework: f,
-		app:       rand.WithUniqSuffix("csi-driver-e2e"),
+		Framework:     f,
+		Timeout:       Timeout,
+		RetryInterval: RetryInterval,
+		app:           rand.WithUniqSuffix("csi-driver-e2e"),
 	}
 }
 
 type Invocation struct {
 	*Framework
-	app string
+	Timeout       time.Duration
+	RetryInterval time.Duration
+	app           string
 }
