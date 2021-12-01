@@ -35,7 +35,7 @@ spec:
             mountPath: /scripts
       containers:
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.6.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
           args:
             - "--volume-name-prefix=pvc"
             - "--volume-name-uuid-length=16"
@@ -49,7 +49,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v2.2.0
+          image: k8s.gcr.io/sig-storage/csi-attacher:v3.3.0
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
@@ -61,7 +61,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-resizer
-          image: quay.io/k8scsi/csi-resizer:v0.5.0
+          image: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
           args:
           - "--v=2"
           - "--csi-address=$(ADDRESS)"
