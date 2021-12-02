@@ -38,7 +38,7 @@ func init() {
 	flag.DurationVar(&framework.Timeout, "timeout", 5*time.Minute, "Timeout for a test to complete successfully")
 	flag.DurationVar(&framework.RetryInterval, "retry-interval", 5*time.Second, "Amount of time to wait between requests")
 	flag.BoolVar(&linodeDebug, "linode-debug", linodeDebug, "When true, prints out HTTP requests and responses from the Linode API")
-	flag.StringVar(&framework.ApiToken, "api-token", "", "The authentication token to use when sending requests to the Linode API")
+	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "The authentication token to use when sending requests to the Linode API")
 	flag.StringVar(&linodeURL, "linode-url", linodeURL, "The Linode API URL to send requests to")
 }
 
