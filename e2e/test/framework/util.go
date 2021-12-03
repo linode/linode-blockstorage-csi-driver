@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"time"
 
 	"github.com/codeskyblue/go-sh"
 
@@ -16,8 +15,6 @@ import (
 
 const (
 	scriptDirectory = "scripts"
-	retryInterval   = 5 * time.Second
-	retryTimout     = 15 * time.Minute
 )
 
 func RunScript(script string, args ...string) error {

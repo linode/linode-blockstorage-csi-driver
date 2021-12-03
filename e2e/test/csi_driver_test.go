@@ -3,7 +3,6 @@ package test
 import (
 	"e2e_test/test/framework"
 	"strconv"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -13,12 +12,13 @@ import (
 
 var _ = Describe("CSIDriver", func() {
 	var (
-		err  error
-		pod  *core.Pod
-		pvc  *core.PersistentVolumeClaim
-		f    *framework.Invocation
-		size string
-		file = "/data/heredoc"
+		err          error
+		pod          *core.Pod
+		pvc          *core.PersistentVolumeClaim
+		f            *framework.Invocation
+		size         string
+		file         = "/data/heredoc"
+		storageClass = "linode-block-storage"
 	)
 	BeforeEach(func() {
 		f = root.Invoke()
@@ -51,7 +51,7 @@ var _ = Describe("CSIDriver", func() {
 		Eventually(func() string {
 			s, _ := f.GetVolumeSize(currentPVC)
 			return strconv.Itoa(s) + "Gi"
-		}).Should(Equal(size))
+		}, f.Timeout, f.RetryInterval).Should(Equal(size))
 	}
 
 	Describe("Test", func() {
@@ -59,7 +59,7 @@ var _ = Describe("CSIDriver", func() {
 			Context("Block Storage", func() {
 				JustBeforeEach(func() {
 					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass)
+					pvc = f.GetPersistentVolumeClaimObject(size, storageClass)
 					err = f.CreatePersistentVolumeClaim(pvc)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -74,15 +74,33 @@ var _ = Describe("CSIDriver", func() {
 					err = f.DeletePod(pod.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
+					By("Getting the Volume information")
+					currentPVC, err := f.GetPersistentVolumeClaim(pvc.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+					volumeID, err := f.GetVolumeID(currentPVC)
+					Expect(err).NotTo(HaveOccurred())
+
 					By("Waiting for the Volume to be Detached")
-					time.Sleep(2 * time.Minute)
+					Eventually(func() bool {
+						isAttached, err := f.IsVolumeDetached(volumeID)
+						if err != nil {
+							return false
+						}
+						return isAttached
+					}, f.Timeout, f.RetryInterval).Should(BeTrue())
 
 					By("Deleting the PVC")
 					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Waiting for the Volume to be Deleted")
-					time.Sleep(1 * time.Minute)
+					Eventually(func() bool {
+						isDeleted, err := f.IsVolumeDeleted(volumeID)
+						if err != nil {
+							return false
+						}
+						return isDeleted
+					}, f.Timeout, f.RetryInterval).Should(BeTrue())
 				})
 
 				Context("1Gi Storage", func() {
@@ -103,7 +121,7 @@ var _ = Describe("CSIDriver", func() {
 			Context("Volume Expansion", func() {
 				JustBeforeEach(func() {
 					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, "linode-block-storage")
+					pvc = f.GetPersistentVolumeClaimObject(size, storageClass)
 					err = f.CreatePersistentVolumeClaim(pvc)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -118,15 +136,33 @@ var _ = Describe("CSIDriver", func() {
 					err = f.DeletePod(pod.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
+					By("Getting the Volume information")
+					currentPVC, err := f.GetPersistentVolumeClaim(pvc.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+					volumeID, err := f.GetVolumeID(currentPVC)
+					Expect(err).NotTo(HaveOccurred())
+
 					By("Waiting for the Volume to be Detached")
-					time.Sleep(2 * time.Minute)
+					Eventually(func() bool {
+						isDetached, err := f.IsVolumeDetached(volumeID)
+						if err != nil {
+							return false
+						}
+						return isDetached
+					}, f.Timeout, f.RetryInterval).Should(BeTrue())
 
 					By("Deleting the PVC")
 					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Waiting for the Volume to be Deleted")
-					time.Sleep(1 * time.Minute)
+					Eventually(func() bool {
+						isDeleted, err := f.IsVolumeDeleted(volumeID)
+						if err != nil {
+							return false
+						}
+						return isDeleted
+					}, f.Timeout, f.RetryInterval).Should(BeTrue())
 				})
 
 				Context("Expanding Storage from 10Gi to 15Gi", func() {
