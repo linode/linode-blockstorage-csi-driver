@@ -15,6 +15,7 @@ spec:
         app: csi-linode-node
         role: csi-linode
     spec:
+      priorityClassName: system-node-critical
       serviceAccount: csi-node-sa
       initContainers:
         - name: init
