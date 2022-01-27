@@ -10,7 +10,7 @@ import (
 	"kmodules.xyz/client-go/tools/exec"
 )
 
-func (f *Invocation) GetPodObject(name, namespace, pvc string) *core.Pod {
+func GetPodObject(name, namespace, pvc string) *core.Pod {
 	return &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

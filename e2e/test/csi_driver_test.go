@@ -28,7 +28,7 @@ var _ = Describe("Linode CSI Driver", func() {
 			BeforeEach(func() {
 				f = root.Invoke()
 				By("Getting the StatefulSet manifest w/ non-root container")
-				sts = f.GetStatefulSetObject("redis-test", f.Namespace(), storageClass)
+				sts = framework.GetStatefulSetObject("redis-test", f.Namespace(), storageClass)
 
 				By("Creating the StatefulSet in the cluster")
 				Eventually(func() error {
@@ -183,13 +183,13 @@ var _ = Describe("Linode CSI Driver", func() {
 			JustBeforeEach(func() {
 				f = root.Invoke()
 				By("Creating the Persistent Volume Claim")
-				pvc = f.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass)
+				pvc = framework.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass)
 				Eventually(func() error {
 					return f.CreatePersistentVolumeClaim(pvc)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Creating Pod with PVC")
-				pod = f.GetPodObject("busybox-test", f.Namespace(), pvc.Name)
+				pod = framework.GetPodObject("busybox-test", f.Namespace(), pvc.Name)
 				Eventually(func() error {
 					return f.CreatePod(pod)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())

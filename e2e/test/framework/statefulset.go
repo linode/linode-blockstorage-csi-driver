@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Invocation) GetStatefulSetObject(name, namespace, storageClass string) *appsv1.StatefulSet {
+func GetStatefulSetObject(name, namespace, storageClass string) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
