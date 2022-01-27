@@ -21,12 +21,13 @@ spec:
       initContainers:
         - name: init
           image: bitnami/kubectl:1.16.3-debian-10-r36
-          command: 
+          command:
             - /scripts/get-linode-id.sh
           env:
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
+                  apiVersion: v1
                   fieldPath: spec.nodeName
           volumeMounts:
           - name: linode-info
@@ -35,8 +36,10 @@ spec:
             mountPath: /scripts
       containers:
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.6.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+          imagePullPolicy: IfNotPresent
           args:
+            - "--default-fstype=ext4"
             - "--volume-name-prefix=pvc"
             - "--volume-name-uuid-length=16"
             - "--csi-address=$(ADDRESS)"
@@ -44,24 +47,24 @@ spec:
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v2.2.0
+          image: k8s.gcr.io/sig-storage/csi-attacher:v3.3.0
+          imagePullPolicy: IfNotPresent
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: linode-csi-resizer
-          image: quay.io/k8scsi/csi-resizer:v0.5.0
+        - name: csi-resizer
+          image: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
+          imagePullPolicy: IfNotPresent
           args:
           - "--v=2"
           - "--csi-address=$(ADDRESS)"
@@ -73,7 +76,7 @@ spec:
             mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: linode-csi-plugin
           image: linode/linode-blockstorage-csi-driver:latest
-          args :
+          args:
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--token=$(LINODE_TOKEN)"
             - "--url=$(LINODE_API_URL)"
@@ -86,17 +89,16 @@ spec:
             - name: LINODE_API_URL
               value: https://api.linode.com/v4
             - name: LINODE_BS_PREFIX
-              value:
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
+                  apiVersion: v1
                   fieldPath: spec.nodeName
             - name: LINODE_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: linode
                   key: token
-          imagePullPolicy: "Always"
           volumeMounts:
             - name: linode-info
               mountPath: /linode-info
@@ -104,6 +106,13 @@ spec:
               mountPath: /scripts
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
       volumes:
         - name: socket-dir
           emptyDir: {}

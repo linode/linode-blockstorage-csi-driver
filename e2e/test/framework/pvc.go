@@ -11,11 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Invocation) GetPersistentVolumeClaimObject(size, storageClass string) *core.PersistentVolumeClaim {
+func GetPersistentVolumeClaimObject(name, namespace, size, storageClass string) *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      f.app,
-			Namespace: f.namespace,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: []core.PersistentVolumeAccessMode{

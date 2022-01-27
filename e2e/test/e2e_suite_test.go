@@ -113,7 +113,7 @@ var _ = AfterSuite(func() {
 	}
 
 	By("Deleting Namespace " + root.Namespace())
-	err := root.DeleteNamespace()
+	err := root.DeleteNamespace(root.Namespace())
 	Expect(err).NotTo(HaveOccurred())
 	if !(useExisting || reuse) {
 		By("Deleting cluster")
