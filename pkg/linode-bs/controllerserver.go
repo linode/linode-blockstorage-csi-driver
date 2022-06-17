@@ -227,7 +227,11 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 	}
 
 	if _, err := linodeCS.CloudProvider.AttachVolume(ctx, volumeID, opts); err != nil {
-		return nil, status.Errorf(codes.Internal, "error attaching volume: %s", err)
+		retCode := codes.Internal
+		if apiErr, ok := err.(*linodego.Error); ok && strings.Contains(apiErr.Message, "is already attached") {
+			retCode = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
+		}
+		return nil, status.Errorf(retCode, "error attaching volume: %s", err)
 	}
 
 	glog.V(4).Infoln("waiting for volume to attach")
