@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+PLATFORM ?= linux/amd64
 REGISTRY_NAME=index.docker.io/linode
 IMAGE_NAME=linode-blockstorage-csi-driver
 IMAGE_VERSION?=canary
@@ -32,13 +33,9 @@ vet: fmt
 test: vet
 	go test -v ./... -cover $(TEST_ARGS)
 
-.PHONY: build-linux
-build-linux:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion=$(REV) -extldflags "-static"' -o _output/linode ./app/linode
-
 .PHONY: docker-build
-docker-build: build-linux
-	docker build -t $(IMAGE_TAG) -f ./app/linode/Dockerfile .
+docker-build:
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(REV) -f ./app/linode/Dockerfile .
 
 .PHONY: docker-push
 docker-push:
