@@ -84,6 +84,10 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	luksEncrypted := "false"
+        if req.Parameters[LuksEncryptedAttribute] == "true" {
+                luksEncrypted = "true"
+        }
 
 	if len(volumes) != 0 {
 		if len(volumes) > 1 {
@@ -101,6 +105,13 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
 				CapacityBytes: int64(volume.Size * gigabyte),
+				VolumeContext: map[string]string{
+					LuksEncryptedAttribute: luksEncrypted,
+					PublishInfoVolumeName:  volumeName,
+					LuksCipherAttribute:  req.Parameters[LuksCipherAttribute],
+					LuksKeySizeAttribute: req.Parameters[LuksKeySizeAttribute],
+				},
+
 			},
 		}, nil
 	}
@@ -137,6 +148,12 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 						"topology.linode.com/region": vol.Region,
 					},
 				},
+			},
+			VolumeContext: map[string]string{
+				LuksEncryptedAttribute: luksEncrypted,
+				PublishInfoVolumeName:  volumeName,
+				LuksCipherAttribute:  req.Parameters[LuksCipherAttribute],
+				LuksKeySizeAttribute: req.Parameters[LuksKeySizeAttribute],
 			},
 		},
 	}
