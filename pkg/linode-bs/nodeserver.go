@@ -319,6 +319,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
+	glog.V(4).Infof("NodeUnstageVolume called with req: %#v", req)
 	// Validate arguments
 	volumeID := req.GetVolumeId()
 	stagingTargetPath := req.GetStagingTargetPath()
