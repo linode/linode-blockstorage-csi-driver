@@ -1,6 +1,8 @@
+The ability to encrypt a PVC with a user owned secret provides an additional security layer that gives control of the data to the cluster owner instead of the platform provider.
+
 ## Requirements
 
-1.  Updated Linode CSI driver with LUKS support deployed to your cluster
+1.  Linode CSI driver with LUKS support deployed to your cluster
 2.  /tmp tmpfs mount added for csi-linode-node DaemonSet, will otherwise refuse to manage secrets with cryptSetup.
 3.  StorageClass with LUKS enabled.
 
@@ -8,9 +10,9 @@
 
 1.  Resize is possible with similar steps to resizing PVCs on LKE and are
 not handled by driver.  Need cryptSetup resize + resize2fs on LKE node.
-2.  Key rotation process is not handled by driver.
+2.  Key rotation process is not handled by driver but is possible via similar steps to out of band resize operations.
 3.  Encryption is only possible on a new/empty PVC.
-4.  LUKS key is currently pulled from a native Kubernetes secret.  Take note of how your cluster handles secrets in etcd.
+4.  LUKS key is currently pulled from a native Kubernetes secret.  Take note of how your cluster handles secrets in etcd.  The CSI driver is careful to otherwise keep the secret on an ephemeral tmpfs mount and otherwise refuses to continue.
 
 ## Example StorageClass
 
