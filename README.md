@@ -7,10 +7,14 @@ More information about the Kubernetes CSI can be found in the GitHub [Kubernetes
 
 ## Deployment
 
+There are two ways of deploying CSI. The recommended way is to use Helm and second way is to use manually set secrets on the kubernetes cluster then use kubectl to deploy using the given [`yaml` file](https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver.yaml). 
+
 ### Requirements
 
 * Kubernetes v1.16+
 * The node `hostname` must match the Linode Instance `label`
+* [LINODE_API_TOKEN](https://cloud.linode.com/profile/tokens) (See 'Secure a Linode API Access Token' below).
+* Linode [REGION](https://api.linode.com/v4/regions).
 
 ### Secure a Linode API Access Token:
 
@@ -22,7 +26,54 @@ This token will need:
 * Read/Write access to Linodes (to attach and detach volumes)
 * A sufficient "Expiry" to allow for continued use of your volumes
 
-### Create a Kubernetes secret
+### [Recommended] Using Helm to deploy the CSI Driver
+
+Use the helm chart located under './helm-chart/csi-driver'. This dir has the manifest for Linode Block Storage CSI Driver.
+
+#### To deploy the CSI Driver run the following:
+```sh
+git clone git@github.com:linode/linode-blockstorage-csi-driver.git
+
+cd linode-blockstorage-csi-driver
+
+helm install linode-csi-driver ./helm-chart/csi-driver --set apiToken=$LINODE_API_TOKEN,region=$REGION
+```
+_See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
+
+#### Uninstall
+
+To uninstall linode-csi-driver from kubernetes cluster, run the following command:
+
+```sh
+
+helm uninstall linode-csi-driver
+
+```
+_See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command documentation._
+
+#### Upgrade
+
+To upgrade when new changes are made to the helm chart, run the following command:
+
+```sh
+
+helm upgrade linode-csi-driver ./helm-chart/csi-driver --install --set apiToken=$LINODE_API_TOKEN,region=$REGION
+
+```
+_See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documentation._
+
+#### Configurations
+
+There are other variables that can be set to a different value. For list of all the modifiable variables/values, take a look at './helm-chart/csi-driver/values.yaml'. 
+
+Values can be set/overrided by using the '--set var=value,...' flag or by passing in a custom-values.yaml using '-f custom-values.yaml'.
+
+Recommendation: Use custom-values.yaml to override the variables to avoid any errors with template rendering
+
+
+### Using Kubectl to deploy CSI
+
+#### Create a kubernetes secret:
 
 Run the following commands to stash a `LINODE_TOKEN` in your Kubernetes cluster:
 
@@ -54,7 +105,7 @@ NAME                  TYPE                                  DATA      AGE
 linode          Opaque                                2         18h
 ```
 
-### Deploy the CSI
+#### Deploying CSI through kubectl:
 
 The following command will deploy the CSI driver with the related Kubernetes volume attachment, driver registration, and provisioning sidecars:
 

@@ -1,0 +1,7 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: linode-block-storage
+  namespace: {{ required ".Values.namespace required" .Values.namespace }}
+allowVolumeExpansion: true
+provisioner: linodebs.csi.linode.com
