@@ -9,6 +9,13 @@ export LINODE_API_TOKEN="$1"
 export CLUSTER_NAME="$2"
 export K8S_VERSION="$3"
 
+if [[ -z "$4" ]]
+then
+  export REGION="eu-west"
+else
+  export REGION="$4"
+fi
+
 TEST_MANIFEST=$(realpath "$(dirname "$0")/../manifest/linode-blockstorage-csi-driver.yaml")
 
 cat > cluster.tf <<EOF
@@ -22,7 +29,7 @@ variable "server_type_master" {
   default = "g6-standard-2"
 }
 variable "region" {
-  default = "eu-west"
+  default = "$REGION"
 }
 variable "ssh_public_key" {
   default = "${HOME}/.ssh/id_rsa.pub"

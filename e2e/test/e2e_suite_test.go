@@ -15,8 +15,7 @@ import (
 
 	"e2e_test/test/framework"
 
-	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -28,6 +27,7 @@ var (
 	clusterName string
 	linodeDebug = false
 	linodeURL   = "https://api.linode.com"
+	region      = "us-east"
 )
 
 func init() {
@@ -40,6 +40,7 @@ func init() {
 	flag.BoolVar(&linodeDebug, "linode-debug", linodeDebug, "When true, prints out HTTP requests and responses from the Linode API")
 	flag.StringVar(&framework.ApiToken, "api-token", os.Getenv("LINODE_API_TOKEN"), "The authentication token to use when sending requests to the Linode API")
 	flag.StringVar(&linodeURL, "linode-url", linodeURL, "The Linode API URL to send requests to")
+	flag.StringVar(&region, "region", region, "Region to create cluster in")
 }
 
 var (
@@ -50,8 +51,7 @@ func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
 	SetDefaultEventuallyTimeout(framework.Timeout)
 
-	junitReporter := reporters.NewJUnitReporter("junit.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "e2e Suite", []Reporter{junitReporter})
+	RunSpecs(t, "e2e Suite")
 }
 
 var getLinodeClient = func() linodego.Client {
@@ -85,7 +85,7 @@ var _ = BeforeSuite(func() {
 
 	if !useExisting {
 		Expect(framework.K8sVersion).NotTo(BeEmpty(), "Please specify a Kubernetes version")
-		err := framework.CreateCluster(clusterName)
+		err := framework.CreateCluster(clusterName, region, framework.K8sVersion)
 		Expect(err).NotTo(HaveOccurred())
 		framework.KubeConfigFile = kubeConfigFile
 	}
