@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-linode-node
+  namespace: {{ required ".Values.namespace required" .Values.namespace }}
+  labels:
+    app: csi-linode-node
+spec:
+  selector:
+    matchLabels:
+      app: csi-linode-node
+  template:
+    metadata:
+      labels:
+        app: csi-linode-node
+        role: csi-linode
+    spec:
+      containers:
+      - args:
+        - --v=2
+        - --csi-address=$(ADDRESS)
+        - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+        env:
+        - name: ADDRESS
+          value: /csi/csi.sock
+        - name: DRIVER_REG_SOCK_PATH
+          value: /var/lib/kubelet/plugins/linodebs.csi.linode.com/csi.sock
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        image: {{ .Values.csiNodeDriverRegistrar.image}}:{{ .Values.csiNodeDriverRegistrar.tag}}
+        name: csi-node-driver-registrar
+        volumeMounts:
+        - mountPath: /csi
+          name: plugin-dir
+        - mountPath: /registration
+          name: registration-dir
+      - args:
+        - --endpoint=$(CSI_ENDPOINT)
+        - --token=$(LINODE_TOKEN)
+        - --url=$(LINODE_API_URL)
+        - --node=$(NODE_NAME)
+        - --v=2
+        env:
+        - name: CSI_ENDPOINT
+          value: unix:///csi/csi.sock
+        - name: LINODE_API_URL
+          value: https://api.linode.com/v4
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: LINODE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: linode
+        image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
+        name: csi-linode-plugin
+        securityContext:
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
+        volumeMounts:
+        - mountPath: /linode-info
+          name: linode-info
+        - mountPath: /scripts
+          name: get-linode-id
+        - mountPath: /csi
+          name: plugin-dir
+        - mountPath: /var/lib/kubelet
+          mountPropagation: Bidirectional
+          name: pods-mount-dir
+        - mountPath: /dev
+          name: device-dir
+      hostNetwork: true
+      initContainers:
+      - command:
+        - /scripts/get-linode-id.sh
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
+        name: init
+        volumeMounts:
+        - mountPath: /linode-info
+          name: linode-info
+        - mountPath: /scripts
+          name: get-linode-id
+      priorityClassName: system-node-critical
+      serviceAccount: csi-node-sa
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      volumes:
+      - emptyDir: {}
+        name: linode-info
+      - configMap:
+          defaultMode: 493
+          name: get-linode-id
+        name: get-linode-id
+      - hostPath:
+          path: /var/lib/kubelet/plugins_registry/
+          type: DirectoryOrCreate
+        name: registration-dir
+      - hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+        name: kubelet-dir
+      - hostPath:
+          path: /var/lib/kubelet/plugins/linodebs.csi.linode.com
+          type: DirectoryOrCreate
+        name: plugin-dir
+      - hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+        name: pods-mount-dir
+      - hostPath:
+          path: /dev
+        name: device-dir
+      - hostPath:
+          path: /etc/udev
+          type: Directory
+        name: udev-rules-etc
+      - hostPath:
+          path: /lib/udev
+          type: Directory
+        name: udev-rules-lib
+      - hostPath:
+          path: /run/udev
+          type: Directory
+        name: udev-socket
+      - hostPath:
+          path: /sys
+          type: Directory
+        name: sys
