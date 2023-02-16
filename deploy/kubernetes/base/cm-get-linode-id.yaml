@@ -20,3 +20,5 @@ data:
       exit 0
     fi
     echo "Provider ID not found"
+    # Exit here so that we wait for the CCM to initialize the provider ID
+    exit 1
