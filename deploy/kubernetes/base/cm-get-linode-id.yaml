@@ -11,7 +11,12 @@ data:
     id="$(kubectl get node/"${NODE_NAME}" -o jsonpath='{.spec.providerID}')"
     if [[ ! -z "${id}" ]]; then
       echo "${id}"
-      echo -n "${id:9}" > /linode-info/linode-id
+      if [[  "${id}" =~ "linode://" ]]; then
+        echo -n "${id:9}" > /linode-info/linode-id
+      else
+        echo "Provider ID: ${id} does not have linode:// prefix."
+        echo "Not populating /linode-info/linode-id file"
+      fi
       exit 0
     fi
     echo "Provider ID not found"
