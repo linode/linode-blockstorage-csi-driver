@@ -6,7 +6,7 @@ set -o nounset
 set -x
 
 cluster_name="$1"
-terraform destroy -force
+terraform apply -destroy -auto-approve
 
 rm cluster.tf
 
