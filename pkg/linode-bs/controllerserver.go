@@ -58,6 +58,27 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	contentSource := req.GetVolumeContentSource()
+	var sourceVolumeInfo *common.LinodeVolumeKey
+
+	if contentSource != nil {
+		if _, ok := contentSource.GetType().(*csi.VolumeContentSource_Volume); !ok {
+			return nil, status.Error(codes.InvalidArgument, "Unsupported volume content source type")
+		}
+
+		sourceVolume := contentSource.GetVolume()
+		if sourceVolume == nil {
+			return nil, status.Error(codes.InvalidArgument, "Error retrieving volume from the volume content source")
+		}
+
+		volumeInfo, err := common.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
+		if err != nil {
+			return nil, status.Error(codes.Internal, "Error parsing Linode volume info from volume content source")
+		}
+
+		sourceVolumeInfo = volumeInfo
+	}
+
 	// to avoid mangled requests for existing volumes with hyphen,
 	// we only strip them out on creation when k8s invented the name
 	// this is still problematic because we strip "-" from volume-name-prefixes
@@ -105,17 +126,45 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		}, nil
 	}
 
-	volumeReq := linodego.VolumeCreateOptions{
-		Region: linodeCS.MetadataService.GetZone(),
-		Label:  volumeName,
-		Size:   int(size / gigabyte),
-	}
+	var vol *linodego.Volume
 
-	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
+	linodeVolumeSize := int(size / gigabyte)
 
-	vol, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	if contentSource == nil {
+		volumeReq := linodego.VolumeCreateOptions{
+			Region: linodeCS.MetadataService.GetZone(),
+			Label:  volumeName,
+			Size:   linodeVolumeSize,
+		}
+
+		glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
+
+		newVolume, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		vol = newVolume
+	} else {
+		glog.V(4).Infoln("cloning volume", map[string]interface{}{
+			"source_vol_id": sourceVolumeInfo.VolumeID,
+		})
+
+		newVolume, err := linodeCS.CloudProvider.CloneVolume(ctx, sourceVolumeInfo.VolumeID, volumeName)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		glog.V(4).Infoln("resizing volume", map[string]interface{}{
+			"source_vol_id": sourceVolumeInfo.VolumeID,
+			"new_size":      linodeVolumeSize,
+		})
+
+		if err = linodeCS.CloudProvider.ResizeVolume(ctx, sourceVolumeInfo.VolumeID, linodeVolumeSize); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		vol = newVolume
 	}
 
 	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)

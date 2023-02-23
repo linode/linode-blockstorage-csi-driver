@@ -14,6 +14,7 @@ type LinodeClient interface {
 	GetVolume(context.Context, int) (*linodego.Volume, error)
 
 	CreateVolume(context.Context, linodego.VolumeCreateOptions) (*linodego.Volume, error)
+	CloneVolume(context.Context, int, string) (*linodego.Volume, error)
 
 	AttachVolume(context.Context, int, *linodego.VolumeAttachOptions) (*linodego.Volume, error)
 	DetachVolume(context.Context, int) error
