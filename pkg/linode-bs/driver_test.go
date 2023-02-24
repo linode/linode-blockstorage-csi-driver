@@ -62,7 +62,12 @@ func TestDriverSuite(t *testing.T) {
 
 	mounter := mountmanager.NewFakeSafeMounter()
 	deviceUtils := mountmanager.NewFakeDeviceUtils()
-	fakeCloudProvider := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), ts.URL)
+
+	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), ts.URL)
+	if err != nil {
+		t.Fatalf("Failed to setup Linode client: %s", err)
+	}
+
 	// TODO fake metadata
 	ms, err := metadata.NewMetadataService(fakeCloudProvider, fake.instance.Label)
 	if err != nil {

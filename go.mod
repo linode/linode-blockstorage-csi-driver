@@ -5,7 +5,7 @@ require (
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.4.2
 	github.com/kubernetes-csi/csi-test/v3 v3.1.1
-	github.com/linode/linodego v0.21.0
+	github.com/linode/linodego v1.14.1
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
 	google.golang.org/grpc v1.31.1
 	k8s.io/apimachinery v0.19.2
@@ -26,6 +26,7 @@ require (
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
+	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	k8s.io/klog/v2 v2.2.0 // indirect
@@ -56,4 +57,4 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.2
 )
 
-go 1.17
+go 1.18

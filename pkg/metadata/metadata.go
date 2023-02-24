@@ -51,13 +51,13 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 		// Search for Linode instance by ID
 		linode, err = getLinodeByID(linodeClient, linodeInfo)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get linode by id: %s", err)
 		}
 	} else {
 		// Search for Linode instance by label
 		linode, err = getLinodeByLabel(linodeClient, linodeInfo)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get linode by label: %s", err)
 		}
 	}
 
@@ -84,7 +84,7 @@ func getLinodeByLabel(client linodeclient.LinodeClient, label string) (*linodego
 	jsonFilter, _ := json.Marshal(map[string]string{"label": label})
 	linodes, err := client.ListInstances(context.Background(), linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list instances with filter %s: %s", string(jsonFilter), err)
 	} else if len(linodes) != 1 {
 		return nil, fmt.Errorf("Could not identify a Linode with label %q", label)
 	}

@@ -25,7 +25,7 @@ csiResizer:
   pullPolicy: IfNotPresent
 
 csiLinodePlugin:
-  image: linode/linode-blockstorage-csi-driver 
+  image: linode/linode-blockstorage-csi-driver
   tag: v0.5.0
   pullPolicy: IfNotPresent
 

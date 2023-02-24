@@ -60,7 +60,8 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 
 	// Attempt to get info about the source volume.
 	// sourceVolumeInfo will be null if no content source is defined.
-	sourceVolumeInfo, err := linodeCS.attemptGetContentSourceVolume(ctx, req.GetVolumeContentSource())
+	contentSource := req.GetVolumeContentSource()
+	sourceVolumeInfo, err := linodeCS.attemptGetContentSourceVolume(ctx, contentSource)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +129,6 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, err
 	}
 
-	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -149,6 +148,17 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 				},
 			},
 		},
+	}
+
+	// Append the content source to the response
+	if sourceVolumeInfo != nil {
+		resp.Volume.ContentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: contentSource.GetVolume().GetVolumeId(),
+				},
+			},
+		}
 	}
 
 	glog.V(4).Infoln("volume created", map[string]interface{}{"response": resp})
@@ -408,6 +418,7 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 	} {
 		caps = append(caps, newCap(capability))
 	}
@@ -537,6 +548,12 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
+		ctx, result.ID, linodego.VolumeActive, waitTimeout); err != nil {
+		return nil, status.Error(
+			codes.Internal, fmt.Sprintf("failed to wait for fresh volume to be active: %s", err))
+	}
+
 	return result, nil
 }
 
@@ -554,16 +571,30 @@ func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
 
 	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
 		ctx, result.ID, linodego.VolumeActive, waitTimeout); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, "failed to wait for cloned volume (%d) active: %s", result.ID, err)
 	}
 
-	glog.V(4).Infoln("resizing volume", map[string]interface{}{
-		"source_vol_id": sourceID,
-		"new_size":      sizeGB,
-	})
+	if result.Size != sizeGB {
+		glog.V(4).Infoln("cloning volume", map[string]interface{}{
+			"volume_id": result.ID,
+			"old_size":  result.Size,
+			"new_size":  sizeGB,
+		})
 
-	if err = linodeCS.CloudProvider.ResizeVolume(ctx, sourceID, sizeGB); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		resizePoller, err := linodeCS.CloudProvider.NewEventPoller(
+			ctx, result.ID, "volume", linodego.ActionVolumeResize)
+
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to create event poller: %s", err)
+		}
+
+		if err := linodeCS.CloudProvider.ResizeVolume(ctx, result.ID, sizeGB); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to resize cloned volume (%d): %s", result.ID, err)
+		}
+
+		if _, err := resizePoller.WaitForFinished(ctx, waitTimeout); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to wait for resize operation: %s", err)
+		}
 	}
 
 	return result, nil
