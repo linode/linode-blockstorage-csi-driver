@@ -552,6 +552,11 @@ func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
+		ctx, result.ID, linodego.VolumeActive, waitTimeout); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	glog.V(4).Infoln("resizing volume", map[string]interface{}{
 		"source_vol_id": sourceID,
 		"new_size":      sizeGB,
