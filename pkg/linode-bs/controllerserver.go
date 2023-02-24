@@ -575,25 +575,14 @@ func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
 	}
 
 	if result.Size != sizeGB {
-		glog.V(4).Infoln("cloning volume", map[string]interface{}{
+		glog.V(4).Infoln("resizing volume", map[string]interface{}{
 			"volume_id": result.ID,
 			"old_size":  result.Size,
 			"new_size":  sizeGB,
 		})
 
-		resizePoller, err := linodeCS.CloudProvider.NewEventPoller(
-			ctx, result.ID, "volume", linodego.ActionVolumeResize)
-
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to create event poller: %s", err)
-		}
-
 		if err := linodeCS.CloudProvider.ResizeVolume(ctx, result.ID, sizeGB); err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to resize cloned volume (%d): %s", result.ID, err)
-		}
-
-		if _, err := resizePoller.WaitForFinished(ctx, waitTimeout); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to wait for resize operation: %s", err)
 		}
 	}
 
