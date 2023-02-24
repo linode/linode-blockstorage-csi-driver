@@ -25,6 +25,7 @@ rules:
   - storage.k8s.io
   resources:
   - volumeattachments
+  - volumeattachments/status
   verbs:
   - get
   - list
