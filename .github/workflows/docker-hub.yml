@@ -7,9 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@61b9e3751b92087fd0b06925ba6dd6314e06f089 # pin@master
-      - name: Build
-        run: make build-linux
-      - name: Publish latest to Registry
+      - name: Build and Publish latest release to Registry
         uses: elgohr/Publish-Docker-Github-Action@13c6c46d98bc92e6c046454248cd28630400846a # pin@master
         with:
           name: linode/linode-blockstorage-csi-driver
