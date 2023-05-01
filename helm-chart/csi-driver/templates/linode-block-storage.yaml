@@ -3,5 +3,9 @@ kind: StorageClass
 metadata:
   name: linode-block-storage
   namespace: {{ required ".Values.namespace required" .Values.namespace }}
+{{- if eq .Values.defaultStorageClass "linode-block-storage" }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+{{- end }}
 allowVolumeExpansion: true
 provisioner: linodebs.csi.linode.com

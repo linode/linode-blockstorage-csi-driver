@@ -8,6 +8,10 @@ region: ""
 # Default namespace is "kube-system" but it can be set to another namespace
 namespace: kube-system
 
+# Default storageClass is "linode-block-storage-retain" but it can be set to
+# "linode-block-storage" or left as an empty string
+defaultStorageClass: linode-block-storage-retain
+
 # Images - Default 
 csiProvisioner:
   image: registry.k8s.io/sig-storage/csi-provisioner
