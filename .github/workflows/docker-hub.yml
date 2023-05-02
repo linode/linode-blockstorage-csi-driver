@@ -1,9 +1,11 @@
-name: Publish Docker Release
+name: Docker build and publish
 on:
   push:
+  pull_request:
   workflow_dispatch:
   release:
     types: [ published ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
