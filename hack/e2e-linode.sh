@@ -8,10 +8,6 @@ CSI_MOUNTPOINT="/mnt"
 APP=linode
 
 SKIP="WithCapacity"
-# TODO(PR): do we need to skip these tests in GHA? Will we run e2e in GHA?
-if [ x${TRAVIS} = x"true" ] ; then
-	SKIP="WithCapacity|NodeUnpublishVolume|NodePublishVolume"
-fi
 
 # Get csi-sanity
 ./hack/get-sanity.sh
