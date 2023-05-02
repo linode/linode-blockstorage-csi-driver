@@ -8,9 +8,6 @@ CSI_MOUNTPOINT="/mnt"
 APP=linode
 
 SKIP="WithCapacity"
-if [ x${TRAVIS} = x"true" ] ; then
-	SKIP="WithCapacity|NodeUnpublishVolume|NodePublishVolume"
-fi
 
 # Get csi-sanity
 ./hack/get-sanity.sh
