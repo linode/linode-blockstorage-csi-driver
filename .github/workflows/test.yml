@@ -1,6 +1,7 @@
-name: Test and build
-# TODO(PR): maybe merge this with the Docker Hub pipeline and only push to DockerHub in some cases
+name: Test
+# TODO(PR): we're missing golangci-lint run
 on: push # TODO(PR): change
+
 jobs:
   test_and_build:
     runs-on: ubuntu-latest

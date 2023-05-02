@@ -22,6 +22,7 @@ IMAGE_TAG      ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 export GO111MODULE=on
 
 .PHONY: fmt
+# TODO(PR): does this actually check or just format?
 fmt:
 	go fmt ./...
 
@@ -30,7 +31,7 @@ vet: fmt
 	go vet ./...
 
 .PHONY: test
-test: vet
+test: vet verify
 	go test -v ./... -cover $(TEST_ARGS)
 
 .PHONY: docker-build
