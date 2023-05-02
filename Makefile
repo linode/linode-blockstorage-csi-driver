@@ -18,17 +18,21 @@ IMAGE_NAME     ?= linode-blockstorage-csi-driver
 REV            := $(shell git describe --long --tags --dirty)
 IMAGE_VERSION  ?= $(REV)
 IMAGE_TAG      ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
+GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.52-alpine
 
 export GO111MODULE=on
 
 .PHONY: fmt
-# TODO(PR): does this actually check or just format?
 fmt:
 	go fmt ./...
 
 .PHONY: vet
 vet: fmt
 	go vet ./...
+
+.PHONY: lint
+lint: vet
+	docker run --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
 
 .PHONY: test
 test: vet verify

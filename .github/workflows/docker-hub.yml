@@ -22,5 +22,5 @@ jobs:
           tags: "latest,${{ github.event.release.tag_name }}"
           dockerfile: "./app/linode/Dockerfile"
           buildargs: REV
-          # TODO(PR): use no_push to build on each commit, but only push on release
+          # only push to Docker Hub on release, not on push
           no_push: ${{ github.event_name == 'push' }}
