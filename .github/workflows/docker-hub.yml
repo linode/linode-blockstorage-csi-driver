@@ -1,5 +1,6 @@
 name: Publish Docker Release
 on:
+  push:
   release:
     types: [ published ]
 jobs:
@@ -14,9 +15,12 @@ jobs:
       - name: Build and Publish latest release to Registry
         uses: elgohr/Publish-Docker-Github-Action@43dc228e327224b2eda11c8883232afd5b34943b # pin@v5
         with:
-          name: linode/linode-blockstorage-csi-driver
+          # TODO(PR): revert the username, we're just being safe for now
+          name: okokes/linode-blockstorage-csi-driver
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           tags: "latest,${{ github.event.release.tag_name }}"
           dockerfile: "./app/linode/Dockerfile"
           buildargs: REV
+          # TODO(PR): use no_push to build on each commit, but only push on release
+          no_push: ${{ github.event_name == 'push' }}

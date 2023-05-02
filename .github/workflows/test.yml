@@ -1,0 +1,22 @@
+name: Test and build
+# TODO(PR): maybe merge this with the Docker Hub pipeline and only push to DockerHub in some cases
+on: push # TODO(PR): change
+jobs:
+  test_and_build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.18', '1.19', '1.20']
+    steps:
+      - uses: actions/checkout@v3
+        # TODO(PR): drop?
+        # with:
+        #   fetch-depth: 0
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+      # TODO(PR): we may need this in case we want to run a plain `make build`
+      # - name: Save revision
+      #   run: echo "REV=$(git describe --long --tags --dirty)" >> $GITHUB_ENV
+      - name: Test
+        run: make test

@@ -14,6 +14,7 @@ COPY pkg ./pkg
 ENV GO111MODULE=on
 RUN go mod download
 
+# TODO(PR): make build?
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' -o /bin/linode-blockstorage-csi-driver /linode
 
 FROM alpine:3.16.2
