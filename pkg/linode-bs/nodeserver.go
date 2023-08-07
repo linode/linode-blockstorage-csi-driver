@@ -27,6 +27,7 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"golang.org/x/net/context"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
@@ -304,5 +305,27 @@ func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInf
 }
 
 func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not yet implemented")
+	var statfs unix.Statfs_t
+	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
+	err := unix.Statfs(req.VolumePath, &statfs)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get stats: %v", err.Error())
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Available: int64(statfs.Bavail) * int64(statfs.Bsize),
+				Total:     int64(statfs.Blocks) * int64(statfs.Bsize),
+				Used:      (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize),
+				Unit:      csi.VolumeUsage_BYTES,
+			},
+			{
+				Available: int64(statfs.Ffree),
+				Total:     int64(statfs.Files),
+				Used:      int64(statfs.Files) - int64(statfs.Ffree),
+				Unit:      csi.VolumeUsage_INODES,
+			},
+		},
+	}, nil
 }
