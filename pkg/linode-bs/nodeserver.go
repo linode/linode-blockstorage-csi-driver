@@ -305,6 +305,10 @@ func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInf
 }
 
 func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	if req.VolumeId == "" || req.VolumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume ID or path empty")
+	}
+
 	var statfs unix.Statfs_t
 	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
 	err := unix.Statfs(req.VolumePath, &statfs)
