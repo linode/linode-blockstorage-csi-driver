@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -313,6 +314,9 @@ func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.Nod
 	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
 	err := unix.Statfs(req.VolumePath, &statfs)
 	if err != nil {
+		if errors.Is(err, unix.ENOENT) {
+			return nil, status.Errorf(codes.NotFound, "volume path not found: %v", err.Error())
+		}
 		return nil, status.Errorf(codes.Internal, "failed to get stats: %v", err.Error())
 	}
 
