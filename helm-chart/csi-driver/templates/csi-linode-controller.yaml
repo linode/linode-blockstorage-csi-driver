@@ -78,8 +78,8 @@ spec:
         - name: LINODE_TOKEN
           valueFrom:
             secretKeyRef:
-              key: token
-              name: linode
+              name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
+              key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         name: linode-csi-plugin
         volumeMounts:
