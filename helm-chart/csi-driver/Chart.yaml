@@ -3,4 +3,4 @@ name: linode-blockstorage-csi-driver
 description: The Container Storage Interface (CSI) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to manage the life-cycle of persistant storage claims.
 type: application
 version: 1.0.0
-appVersion: "0.5.0"
+appVersion: "0.5.3"

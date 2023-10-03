@@ -107,10 +107,16 @@ linode          Opaque                                2         18h
 
 #### Deploying CSI through kubectl:
 
-The following command will deploy the CSI driver with the related Kubernetes volume attachment, driver registration, and provisioning sidecars:
+The following command will deploy the latest version of the CSI driver with all related Kubernetes volume attachment, driver registration, and provisioning sidecars:
 
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver.yaml
+```
+
+If you need a specific [release](https://github.com/linode/linode-blockstorage-csi-driver/releases) of the CSI driver you can specify the release version in the URL like the following:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-v0.5.3.yaml
 ```
 
 This deployment is a concatenation of all of the `yaml` files in [pkg/linode-bs/deploy/kubernetes/](https://github.com/linode/linode-blockstorage-csi-driver/tree/master/pkg/linode-bs/deploy/kubernetes/).
