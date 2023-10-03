@@ -36,7 +36,7 @@ csiResizer:
 
 csiLinodePlugin:
   image: linode/linode-blockstorage-csi-driver 
-  tag: v0.5.0
+  tag: v0.5.3
   pullPolicy: IfNotPresent
 
 kubectl:
