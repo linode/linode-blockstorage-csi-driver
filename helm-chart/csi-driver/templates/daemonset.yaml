@@ -87,8 +87,16 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
+        securityContext:
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
         name: init
         volumeMounts:
+        - mountPath: /dev
+          name: device-dir
         - mountPath: /linode-info
           name: linode-info
         - mountPath: /scripts
