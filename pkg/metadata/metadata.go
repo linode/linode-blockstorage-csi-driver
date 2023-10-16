@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
+
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linodego"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,6 +66,7 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 		linode, err = getLinodeByLabel(linodeClient, linodeInfo)
 		if err != nil {
 			// check for IBM cloud Satellite environment
+			glog.Warningf("Unable to get the linodeID by label [%s] Getting linode for IBM cloud satellite", linodeInfo)
 			linode, err = getLinodeIDforSatellite(linodeClient, linodeInfo)
 			if err != nil {
 				return nil, err
@@ -109,6 +112,7 @@ func getLinodeByLabel(client linodeclient.LinodeClient, label string) (*linodego
 
 func getLinodeIDforSatellite(client linodeclient.LinodeClient, nodeName string) (*linodego.Instance, error) {
 
+	// Get the provider ID for ginen node
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("Error loading in-cluster config: %v\n", err)
@@ -125,7 +129,12 @@ func getLinodeIDforSatellite(client linodeclient.LinodeClient, nodeName string) 
 
 	providerID := node.Spec.ProviderID
 
+	//Get the linodeID for IBM satellite only if the providerID starts with ibm://
+
 	if strings.HasPrefix(providerID, providerIDPrefixIBM) {
+
+		//The node name for IBM cloud satelllte is in this formant --> 192-168-78-34
+		//Convert the name to IPv4 and find the linode instance by IPv4
 
 		ipaddress := strings.ReplaceAll(nodeName, "-", ".")
 		instances, err := client.ListInstances(context.Background(), &linodego.ListOptions{Filter: "{\"ipv4\": \"" + ipaddress + "\"}"})

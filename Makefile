@@ -35,7 +35,7 @@ test: vet
 
 .PHONY: docker-build
 docker-build:
-	docker build --platform=$(PLATFORM) -t $(IMAGE_TAG) --build-arg REV=$(REV) -f ./app/linode/Dockerfile .
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(REV) -f ./app/linode/Dockerfile .
 
 .PHONY: docker-push
 docker-push:

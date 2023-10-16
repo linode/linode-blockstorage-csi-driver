@@ -370,7 +370,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:v0.5.2
+        image: prgavali/linode-blockstorage-csi-driver:v0.5.3-1-g50fad1d
         name: linode-csi-plugin
         volumeMounts:
         - mountPath: /linode-info
@@ -471,7 +471,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:v0.5.2
+        image: prgavali/linode-blockstorage-csi-driver:v0.5.3-1-g50fad1d
         imagePullPolicy: Always
         name: csi-linode-plugin
         securityContext:
