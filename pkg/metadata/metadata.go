@@ -7,10 +7,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"strings"
 
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linodego"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
+
+const providerIDPrefixIBM = "ibm://"
 
 type MetadataService interface {
 	GetZone() string
@@ -57,7 +63,11 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 		// Search for Linode instance by label
 		linode, err = getLinodeByLabel(linodeClient, linodeInfo)
 		if err != nil {
-			return nil, err
+			// check for IBM cloud Satellite environment
+			linode, err = getLinodeIDforSatellite(linodeClient, linodeInfo)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -95,6 +105,40 @@ func getLinodeByLabel(client linodeclient.LinodeClient, label string) (*linodego
 		}
 	}
 	return nil, errors.New("User has no Linode instances with the given label")
+}
+
+func getLinodeIDforSatellite(client linodeclient.LinodeClient, nodeName string) (*linodego.Instance, error) {
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("Error loading in-cluster config: %v\n", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating Kubernetes client: %v\n", err)
+	}
+
+	node, err := clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("Error listing pods: %v\n", err)
+	}
+
+	providerID := node.Spec.ProviderID
+
+	if strings.HasPrefix(providerID, providerIDPrefixIBM) {
+
+		ipaddress := strings.ReplaceAll(nodeName, "-", ".")
+		instances, err := client.ListInstances(context.Background(), &linodego.ListOptions{Filter: "{\"ipv4\": \"" + ipaddress + "\"}"})
+		if err != nil {
+			return nil, fmt.Errorf("Error getting instances: %s", err.Error())
+		}
+		if len(instances) != 1 {
+			return nil, fmt.Errorf("Error finding a single instance with IP address %s. Found %d instances", ipaddress, len(instances))
+		}
+		return &instances[0], nil
+	} else {
+		return nil, fmt.Errorf("Not a IBM Cloud Satellite")
+	}
 }
 
 func (manager *metadataServiceManager) GetZone() string {

@@ -370,7 +370,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:latest
+        image: linode/linode-blockstorage-csi-driver:v0.5.2
         name: linode-csi-plugin
         volumeMounts:
         - mountPath: /linode-info
@@ -471,7 +471,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:latest
+        image: linode/linode-blockstorage-csi-driver:v0.5.2
         imagePullPolicy: Always
         name: csi-linode-plugin
         securityContext:
@@ -560,7 +560,7 @@ spec:
           type: Directory
         name: sys
 ---
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: linodebs.csi.linode.com
