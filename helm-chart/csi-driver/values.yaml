@@ -40,8 +40,8 @@ csiLinodePlugin:
   pullPolicy: IfNotPresent
 
 kubectl:
-  image: bitnami/kubectl
-  tag: 1.25.6-debian-11-r7
+  image: alpine/k8s # This needs to be alpine based and have both kubectl and curl installed.
+  tag: 1.25.14
 
 csiNodeDriverRegistrar:
   image: registry.k8s.io/sig-storage/csi-node-driver-registrar
