@@ -18,7 +18,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -32,8 +34,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
-	"os/exec"
-	"strings"
 )
 
 const (
@@ -48,7 +48,6 @@ type LinodeNodeServer struct {
 	MetadataService metadata.MetadataService
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
-	luksContext	LuksContext
 }
 
 var _ csi.NodeServer = &LinodeNodeServer{}
@@ -168,11 +167,6 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Target Path must be provided")
 	}
-	mountSources, merr := getMountSources(targetPath)
-        if merr != nil {
-                return nil, merr
-        }
-	glog.V(4).Info("mountSources: ", mountSources)
 
 	err := mount.CleanupMountPoint(targetPath, ns.Mounter.Interface, false /* bind mount */)
 	if err != nil {
@@ -181,19 +175,10 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 
 	glog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath ", req, targetPath)
 
-	for _, source := range mountSources {
-		isLuksMapping, mappingName, lerr := isLuksMapping(source)
-		if lerr != nil {
-			return nil, lerr
-		}
-		if isLuksMapping {
-			glog.V(4).Infof("lukeClose ", mappingName)
-			lerr := luksClose(mappingName)
-			if lerr != nil {
-				return nil, lerr
-			}
-		}
+	if err := closeMountSources(targetPath); err != nil {
+		return nil, err
 	}
+
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -241,8 +226,6 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 
 	glog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
 
-	luksContext := getLuksContext(req.Secrets, req.VolumeContext, VolumeLifecycleNodeStageVolume)
-
 	// Part 2: Check if mount already exists at targetpath
 	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
 	if err != nil {
@@ -282,37 +265,36 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		return nil, status.Error(codes.Unimplemented, "Block volume support is not yet implemented")
 	}
 
-	glog.V(4).Info("luksContext encrypted ", luksContext.EncryptionEnabled)
-	formatted, err := blkidValid(devicePath)
-	glog.V(4).Info("luks volume formatted  ", formatted)
-	if (!formatted && luksContext.EncryptionEnabled) {
-		err := luksContext.validate()
-                if err != nil {
-                        return nil, err
-                }
+	fmtAndMountSource := devicePath
+	luksContext := getLuksContext(req.Secrets, req.VolumeContext, VolumeLifecycleNodeStageVolume)
+	if luksContext.EncryptionEnabled {
+		glog.V(4).Info("luksContext encryption enabled")
+		formatted, err := blkidValid(devicePath)
+		if err != nil {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to validate blkid (%q): %v", devicePath, err))
+		}
+		if !formatted {
+			glog.V(4).Info("luks volume now formatting: ", devicePath)
+			if err := luksContext.validate(); err != nil {
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to luks format validation (%q): %v", devicePath, err))
+			}
+			if err := luksFormat(devicePath, luksContext); err != nil {
+				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to luks format (%q): %v", devicePath, err))
+			}
+		}
 
-                err = luksFormat(devicePath, luksContext)
-                if err != nil {
-                        return nil, err
-                }
-	}
-	if (luksContext.EncryptionEnabled) {
 		luksSource, err := luksPrepareMount(devicePath, luksContext)
-		glog.V(4).Info("luksSource ", luksSource);
-		err = ns.Mounter.FormatAndMount(luksSource, stagingTargetPath, fstype, options)
 		if err != nil {
-		return nil, status.Error(codes.Internal,
-				fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
-					devicePath, stagingTargetPath, fstype, options, err))
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to prepare luks mount (%q): %v", devicePath, err))
 		}
-	} else {
+		fmtAndMountSource = luksSource
+	}
 
-		err = ns.Mounter.FormatAndMount(devicePath, stagingTargetPath, fstype, options)
-		if err != nil {
+	glog.V(4).Info("formatting and mounting the drive")
+	if err := ns.Mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fstype, options); err != nil {
 		return nil, status.Error(codes.Internal,
-				fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
-					devicePath, stagingTargetPath, fstype, options, err))
-		}
+			fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
+				devicePath, stagingTargetPath, fstype, options, err))
 	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
@@ -331,31 +313,39 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 	if len(stagingTargetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Staging Target Path must be provided")
 	}
-	mountSources, merr := getMountSources(stagingTargetPath)
-        if merr != nil {
-                return nil, merr
-        }
-	glog.V(4).Info("mountSources: ", mountSources)
 
 	err := mount.CleanupMountPoint(stagingTargetPath, ns.Mounter.Interface, false /* bind mount */)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err))
 	}
 
+	if err := closeMountSources(stagingTargetPath); err != nil {
+		return nil, err
+	}
+
+	return &csi.NodeUnstageVolumeResponse{}, nil
+}
+
+func closeMountSources(path string) error {
+	mountSources, err := getMountSources(path)
+	if err != nil {
+		return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to to get mount sources %s: %v", path, err))
+	}
+	glog.V(4).Info("closing mount sources: ", mountSources)
 	for _, source := range mountSources {
-		isLuksMapping, mappingName, lerr := isLuksMapping(source)
-		if lerr != nil {
-			return nil, lerr
+		isLuksMapping, mappingName, err := isLuksMapping(source)
+		if err != nil {
+			return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err))
 		}
 		if isLuksMapping {
-			glog.V(4).Infof("lukeClose ", mappingName)
-			lerr := luksClose(mappingName)
-			if lerr != nil {
-				return nil, lerr
+			glog.V(4).Infof("luksClose ", mappingName)
+			if err := luksClose(mappingName); err != nil {
+				return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to close luks mount %s: %v", path, err))
 			}
 		}
 	}
-	return &csi.NodeUnstageVolumeResponse{}, nil
+
+	return nil
 }
 
 func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {

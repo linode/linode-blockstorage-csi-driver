@@ -2,12 +2,11 @@ package linodebs
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-
-	"encoding/json"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
@@ -84,10 +83,15 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	luksEncrypted := "false"
-        if req.Parameters[LuksEncryptedAttribute] == "true" {
-                luksEncrypted = "true"
-        }
+
+	var volumeContext map[string]string
+	if req.Parameters[LuksEncryptedAttribute] == "true" {
+		// if luks encryption is enabled add a volume context
+		volumeContext[LuksEncryptedAttribute] = "true"
+		volumeContext[PublishInfoVolumeName] = volumeName
+		volumeContext[LuksCipherAttribute] = req.Parameters[LuksCipherAttribute]
+		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
+	}
 
 	if len(volumes) != 0 {
 		if len(volumes) > 1 {
@@ -105,13 +109,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
 				CapacityBytes: int64(volume.Size * gigabyte),
-				VolumeContext: map[string]string{
-					LuksEncryptedAttribute: luksEncrypted,
-					PublishInfoVolumeName:  volumeName,
-					LuksCipherAttribute:  req.Parameters[LuksCipherAttribute],
-					LuksKeySizeAttribute: req.Parameters[LuksKeySizeAttribute],
-				},
-
+				VolumeContext: volumeContext,
 			},
 		}, nil
 	}
@@ -149,12 +147,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 					},
 				},
 			},
-			VolumeContext: map[string]string{
-				LuksEncryptedAttribute: luksEncrypted,
-				PublishInfoVolumeName:  volumeName,
-				LuksCipherAttribute:  req.Parameters[LuksCipherAttribute],
-				LuksKeySizeAttribute: req.Parameters[LuksKeySizeAttribute],
-			},
+			VolumeContext: volumeContext,
 		},
 	}
 

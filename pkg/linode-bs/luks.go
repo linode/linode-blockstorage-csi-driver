@@ -14,31 +14,43 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
 */
+
+// luks utilities from https://github.com/cloudscale-ch/csi-cloudscale/blob/master/driver/luks_util.go with some modifications for this driver
 
 package linodebs
 
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
+
+	"github.com/golang/glog"
 )
 
+type VolumeLifecycle string
+
+type LuksContext struct {
+	EncryptionEnabled bool
+	EncryptionKey     string
+	EncryptionCipher  string
+	EncryptionKeySize string
+	VolumeName        string
+	VolumeLifecycle   VolumeLifecycle
+}
+
 const (
-        driverName = "linodebs.csi.linode.com"
-)
-const (
+	driverName = "linodebs.csi.linode.com"
+
 	// PublishInfoVolumeName is used to pass the volume name from
 	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
 	PublishInfoVolumeName = driverName + "/volume-name"
- )
 
-const (
 	// LuksEncryptedAttribute is used to pass the information if the volume should be
 	// encrypted with luks to `NodeStageVolume`
 	LuksEncryptedAttribute = driverName + "/luks-encrypted"
@@ -53,25 +65,12 @@ const (
 
 	// LuksKeyAttribute is the key of the luks key used in the map of secrets passed from the CO
 	LuksKeyAttribute = "luksKey"
-)
 
-type VolumeLifecycle string
-
-const (
 	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
 	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
 	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
 	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
 )
-
-type LuksContext struct {
-	EncryptionEnabled bool
-	EncryptionKey     string
-	EncryptionCipher  string
-	EncryptionKeySize string
-	VolumeName        string
-	VolumeLifecycle   VolumeLifecycle
-}
 
 func (ctx *LuksContext) validate() error {
 	if !ctx.EncryptionEnabled {
@@ -350,7 +349,7 @@ func writeLuksKey(key string) (string, error) {
 	}
 	_, err = tmpFile.WriteString(key)
 	if err != nil {
-		glog.Error("Unable to write luks key file");
+		glog.Error("Unable to write luks key file")
 		return "", err
 	}
 	return tmpFile.Name(), nil
@@ -368,38 +367,37 @@ func checkTmpFs(dir string) bool {
 	return strings.TrimSpace(string(out)) == "tmpfs"
 }
 
-
 func blkidValid(source string) (bool, error) {
-        if source == "" {
-                return false, errors.New("invalid source")
-        }
+	if source == "" {
+		return false, errors.New("invalid source")
+	}
 
-        blkidCmd := "blkid"
-        _, err := exec.LookPath(blkidCmd)
-        if err != nil {
-                if err == exec.ErrNotFound {
-                        return false, fmt.Errorf("%q executable invalid", blkidCmd)
-                }
-                return false, err
-        }
+	blkidCmd := "blkid"
+	_, err := exec.LookPath(blkidCmd)
+	if err != nil {
+		if err == exec.ErrNotFound {
+			return false, fmt.Errorf("%q executable invalid", blkidCmd)
+		}
+		return false, err
+	}
 
-        blkidArgs := []string{source}
+	blkidArgs := []string{source}
 
-        exitCode := 0
-        cmd := exec.Command(blkidCmd, blkidArgs...)
-        err = cmd.Run()
-        if err != nil {
-                exitError, ok := err.(*exec.ExitError)
-                if !ok {
-                        return false, fmt.Errorf("checking blkdid failed: %v cmd: %q, args: %q", err, blkidCmd, blkidArgs)
-                }
-                ws := exitError.Sys().(syscall.WaitStatus)
-                exitCode = ws.ExitStatus()
-                if exitCode == 2 {
-                        return false, nil
-                }
-                return false, fmt.Errorf("checking blkdid failed")
-        }
+	exitCode := 0
+	cmd := exec.Command(blkidCmd, blkidArgs...)
+	err = cmd.Run()
+	if err != nil {
+		exitError, ok := err.(*exec.ExitError)
+		if !ok {
+			return false, fmt.Errorf("checking blkdid failed: %v cmd: %q, args: %q", err, blkidCmd, blkidArgs)
+		}
+		ws := exitError.Sys().(syscall.WaitStatus)
+		exitCode = ws.ExitStatus()
+		if exitCode == 2 {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking blkdid failed")
+	}
 
-        return true, nil
+	return true, nil
 }
