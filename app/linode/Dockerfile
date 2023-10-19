@@ -11,11 +11,12 @@ COPY go.sum .
 COPY app/linode/main.go .
 COPY pkg ./pkg
 
+ENV GO111MODULE=on
 RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' -o /bin/linode-blockstorage-csi-driver /linode
 
-FROM alpine
+FROM alpine:3.16.2
 LABEL maintainers="Linode"
 LABEL description="Linode CSI Driver"
 

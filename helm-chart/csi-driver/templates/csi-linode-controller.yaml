@@ -78,8 +78,8 @@ spec:
         - name: LINODE_TOKEN
           valueFrom:
             secretKeyRef:
-              key: token
-              name: linode
+              name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
+              key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         name: linode-csi-plugin
         volumeMounts:
@@ -89,6 +89,7 @@ spec:
           name: get-linode-id
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
+      hostNetwork: true
       initContainers:
       - command:
         - /scripts/get-linode-id.sh
@@ -99,8 +100,16 @@ spec:
               apiVersion: v1
               fieldPath: spec.nodeName
         image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
+        securityContext:
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+          privileged: true
         name: init
         volumeMounts:
+        - mountPath: /dev
+          name: dev
         - mountPath: /linode-info
           name: linode-info
         - mountPath: /scripts
@@ -122,3 +131,7 @@ spec:
           defaultMode: 493
           name: get-linode-id
         name: get-linode-id
+      - hostPath:
+          path: /dev
+          type: Directory
+        name: dev
