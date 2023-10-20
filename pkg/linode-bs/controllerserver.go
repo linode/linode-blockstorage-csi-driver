@@ -92,7 +92,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	var volumeContext map[string]string
+	volumeContext := make(map[string]string)
 	if req.Parameters[LuksEncryptedAttribute] == "true" {
 		// if luks encryption is enabled add a volume context
 		volumeContext[LuksEncryptedAttribute] = "true"

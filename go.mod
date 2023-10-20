@@ -1,14 +1,16 @@
+go 1.20
+
 module github.com/linode/linode-blockstorage-csi-driver
 
 require (
 	github.com/container-storage-interface/spec v1.3.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/protobuf v1.4.2
+	github.com/golang/glog v1.1.2
+	github.com/golang/protobuf v1.5.2
 	github.com/kubernetes-csi/csi-test/v3 v3.1.1
 	github.com/linode/linodego v1.23.0
-	golang.org/x/net v0.15.0
-	golang.org/x/sys v0.12.0
-	google.golang.org/grpc v1.31.1
+	golang.org/x/net v0.17.0
+	golang.org/x/sys v0.13.0
+	google.golang.org/grpc v1.53.0
 	k8s.io/apimachinery v0.19.2
 	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
 )
@@ -16,13 +18,13 @@ require (
 require (
 	github.com/go-logr/logr v0.2.0 // indirect
 	github.com/go-resty/resty/v2 v2.7.0 // indirect
-	github.com/google/uuid v1.1.1 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.11.0 // indirect
 	github.com/onsi/gomega v1.7.1 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
-	google.golang.org/protobuf v1.24.0 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
@@ -55,5 +57,3 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.19.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.2
 )
-
-go 1.18
