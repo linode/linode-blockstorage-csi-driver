@@ -28,10 +28,6 @@ var (
 	vendorVersion = "test-vendor"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func TestDriverSuite(t *testing.T) {
 	socket := "/tmp/csi.sock"
 	endpoint := "unix://" + socket

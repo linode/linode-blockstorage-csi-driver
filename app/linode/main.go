@@ -14,12 +14,9 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"time"
-
 	"flag"
+	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
@@ -47,7 +44,6 @@ func init() {
 
 func main() {
 	flag.Parse()
-	rand.Seed(time.Now().UnixNano())
 	handle()
 	os.Exit(0)
 }
