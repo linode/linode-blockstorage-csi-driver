@@ -62,7 +62,10 @@ func handle() {
 
 	//Initialize Linode Driver (Move setup to main?)
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
-	cloudProvider := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
+	cloudProvider, err := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
+	if err != nil {
+		glog.Fatalf("Failed to set up linode client: %s", err)
+	}
 
 	mounter := mountmanager.NewSafeMounter()
 	deviceUtils := mountmanager.NewDeviceUtils()

@@ -58,6 +58,14 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// Attempt to get info about the source volume.
+	// sourceVolumeInfo will be null if no content source is defined.
+	contentSource := req.GetVolumeContentSource()
+	sourceVolumeInfo, err := linodeCS.attemptGetContentSourceVolume(ctx, contentSource)
+	if err != nil {
+		return nil, err
+	}
+
 	// to avoid mangled requests for existing volumes with hyphen,
 	// we only strip them out on creation when k8s invented the name
 	// this is still problematic because we strip "-" from volume-name-prefixes
@@ -105,20 +113,21 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		}, nil
 	}
 
-	volumeReq := linodego.VolumeCreateOptions{
-		Region: linodeCS.MetadataService.GetZone(),
-		Label:  volumeName,
-		Size:   int(size / gigabyte),
+	var vol *linodego.Volume
+	volumeSizeGB := int(size / gigabyte)
+
+	if sourceVolumeInfo != nil {
+		// Clone the volume
+		vol, err = linodeCS.cloneLinodeVolume(ctx, volumeName, volumeSizeGB, sourceVolumeInfo.VolumeID)
+	} else {
+		// Create the volume from scratch
+		vol, err = linodeCS.createLinodeVolume(ctx, volumeName, volumeSizeGB)
 	}
 
-	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
-
-	vol, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
+	// Error handling for the above function calls
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
-
-	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -139,6 +148,17 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 				},
 			},
 		},
+	}
+
+	// Append the content source to the response
+	if sourceVolumeInfo != nil {
+		resp.Volume.ContentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: contentSource.GetVolume().GetVolumeId(),
+				},
+			},
+		}
 	}
 
 	glog.V(4).Infoln("volume created", map[string]interface{}{"response": resp})
@@ -398,6 +418,7 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 	} {
 		caps = append(caps, newCap(capability))
 	}
@@ -475,6 +496,97 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 	glog.V(4).Info("volume is resized")
 	return resp, nil
 
+}
+
+// attemptGetContentSourceVolume attempts to get information about the Linode volume to clone from.
+func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(
+	ctx context.Context, contentSource *csi.VolumeContentSource) (*common.LinodeVolumeKey, error) {
+	// No content source was defined; no clone operation
+	if contentSource == nil {
+		return nil, nil
+	}
+
+	if _, ok := contentSource.GetType().(*csi.VolumeContentSource_Volume); !ok {
+		return nil, status.Error(codes.InvalidArgument, "Unsupported volume content source type")
+	}
+
+	sourceVolume := contentSource.GetVolume()
+	if sourceVolume == nil {
+		return nil, status.Error(codes.InvalidArgument, "Error retrieving volume from the volume content source")
+	}
+
+	volumeInfo, err := common.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Error parsing Linode volume info from volume content source")
+	}
+
+	volumeData, err := linodeCS.CloudProvider.GetVolume(ctx, volumeInfo.VolumeID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Error retrieving source volume from Linode API")
+	}
+
+	if volumeData.Region != linodeCS.MetadataService.GetZone() {
+		return nil, status.Error(codes.InvalidArgument, "Source volume region cannot differ from destination volume region")
+	}
+
+	return volumeInfo, nil
+}
+
+// createLinodeVolume creates a Linode volume and returns the result
+func (linodeCS *LinodeControllerServer) createLinodeVolume(
+	ctx context.Context, label string, sizeGB int) (*linodego.Volume, error) {
+	volumeReq := linodego.VolumeCreateOptions{
+		Region: linodeCS.MetadataService.GetZone(),
+		Label:  label,
+		Size:   sizeGB,
+	}
+
+	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
+
+	result, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
+		ctx, result.ID, linodego.VolumeActive, waitTimeout); err != nil {
+		return nil, status.Error(
+			codes.Internal, fmt.Sprintf("failed to wait for fresh volume to be active: %s", err))
+	}
+
+	return result, nil
+}
+
+// cloneLinodeVolume clones a Linode volume and returns the result
+func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
+	ctx context.Context, label string, sizeGB, sourceID int) (*linodego.Volume, error) {
+	glog.V(4).Infoln("cloning volume", map[string]interface{}{
+		"source_vol_id": sourceID,
+	})
+
+	result, err := linodeCS.CloudProvider.CloneVolume(ctx, sourceID, label)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
+		ctx, result.ID, linodego.VolumeActive, waitTimeout); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to wait for cloned volume (%d) active: %s", result.ID, err)
+	}
+
+	if result.Size != sizeGB {
+		glog.V(4).Infoln("resizing volume", map[string]interface{}{
+			"volume_id": result.ID,
+			"old_size":  result.Size,
+			"new_size":  sizeGB,
+		})
+
+		if err := linodeCS.CloudProvider.ResizeVolume(ctx, result.ID, sizeGB); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to resize cloned volume (%d): %s", result.ID, err)
+		}
+	}
+
+	return result, nil
 }
 
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size
