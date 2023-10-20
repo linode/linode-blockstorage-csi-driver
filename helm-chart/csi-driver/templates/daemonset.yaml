@@ -77,6 +77,8 @@ spec:
           name: pods-mount-dir
         - mountPath: /dev
           name: device-dir
+        - mountPath: /tmp
+          name: tmp
       hostNetwork: true
       initContainers:
       - command:
@@ -152,3 +154,7 @@ spec:
           path: /sys
           type: Directory
         name: sys
+      - hostPath:
+          path: /tmp
+          type: Directory
+        name: tmp

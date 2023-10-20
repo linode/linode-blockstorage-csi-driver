@@ -96,6 +96,8 @@ spec:
               mountPropagation: "Bidirectional"
             - mountPath: /dev
               name: device-dir
+            - mountPath: /tmp
+              name: tmp
       volumes:
         - name: linode-info
           emptyDir: {}
@@ -138,6 +140,10 @@ spec:
         - name: sys
           hostPath:
             path: /sys
+            type: Directory
+        - name: tmp
+          hostPath:
+            path: /tmp
             type: Directory
       tolerations:
         - operator: Exists

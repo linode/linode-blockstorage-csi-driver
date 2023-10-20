@@ -24,7 +24,6 @@ package linodebs
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -343,7 +342,7 @@ func writeLuksKey(key string) (string, error) {
 	if !checkTmpFs("/tmp") {
 		return "", errors.New("temporary directory /tmp is not a tmpfs volume; refusing to write luks key to a volume backed by a disk")
 	}
-	tmpFile, err := ioutil.TempFile("/tmp", "luks-")
+	tmpFile, err := os.CreateTemp("/tmp", "luks-")
 	if err != nil {
 		return "", err
 	}

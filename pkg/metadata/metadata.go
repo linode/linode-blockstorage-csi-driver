@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
@@ -38,7 +38,7 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 	isID := false
 
 	// Attempt to get the Linode ID information
-	data, err := ioutil.ReadFile("/linode-info/linode-id")
+	data, err := os.ReadFile("/linode-info/linode-id")
 	if err == nil {
 		// File read was successful, use Linode ID to create metadata service
 		linodeInfo = string(data)
