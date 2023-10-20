@@ -2,9 +2,11 @@ package linodeclient
 
 import (
 	"context"
-	"github.com/linode/linodego"
+	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/linode/linodego"
 )
 
 type LinodeClient interface {
@@ -61,7 +63,7 @@ func getAPIURLComponents(apiURL string) (string, string, error) {
 	}
 
 	version := ""
-	host := u.Host
+	host := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	if strings.ReplaceAll(u.Path, "/", "") == "" {
 		pathSegments := strings.Split(u.Path, "/")
