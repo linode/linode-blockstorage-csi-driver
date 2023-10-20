@@ -220,39 +220,39 @@ func luksClose(volume string) error {
 
 // checks if the given volume is formatted by checking if it is a luks volume and
 // if the luks volume, once opened, contains a filesystem
-func isLuksVolumeFormatted(volume string, ctx LuksContext) (bool, error) {
-	isLuks, err := isLuks(volume)
-	if err != nil {
-		return false, err
-	}
-	if !isLuks {
-		return false, nil
-	}
-
-	filename, err := writeLuksKey(ctx.EncryptionKey)
-	if err != nil {
-		return false, err
-	}
-	defer func() {
-		e := os.Remove(filename)
-		if e != nil {
-			glog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
-		}
-	}()
-
-	err = luksOpen(volume, filename, ctx)
-	if err != nil {
-		return false, err
-	}
-	defer func() {
-		e := luksClose(ctx.VolumeName)
-		if e != nil {
-			glog.Errorf("cannot close luks device: %s", e.Error())
-		}
-	}()
-
-	return blkidValid(volume)
-}
+//func isLuksVolumeFormatted(volume string, ctx LuksContext) (bool, error) {
+//	isLuks, err := isLuks(volume)
+//	if err != nil {
+//		return false, err
+//	}
+//	if !isLuks {
+//		return false, nil
+//	}
+//
+//	filename, err := writeLuksKey(ctx.EncryptionKey)
+//	if err != nil {
+//		return false, err
+//	}
+//	defer func() {
+//		e := os.Remove(filename)
+//		if e != nil {
+//			glog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
+//		}
+//	}()
+//
+//	err = luksOpen(volume, filename, ctx)
+//	if err != nil {
+//		return false, err
+//	}
+//	defer func() {
+//		e := luksClose(ctx.VolumeName)
+//		if e != nil {
+//			glog.Errorf("cannot close luks device: %s", e.Error())
+//		}
+//	}()
+//
+//	return blkidValid(volume)
+//}
 
 func luksOpen(volume string, keyFile string, ctx LuksContext) error {
 	// check if the luks volume is already open
@@ -281,21 +281,21 @@ func luksOpen(volume string, keyFile string, ctx LuksContext) error {
 }
 
 // runs cryptsetup isLuks for a given volume
-func isLuks(volume string) (bool, error) {
-	cryptsetupCmd, err := getCryptsetupCmd()
-	if err != nil {
-		return false, err
-	}
-	cryptsetupArgs := []string{"--batch-mode", "isLuks", volume}
-
-	// cryptsetup isLuks exits with code 0 if the target is a luks volume; otherwise it returns
-	// a non-zero exit code which exec.Command interprets as an error
-	_, err = exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-	if err != nil {
-		return false, nil
-	}
-	return true, nil
-}
+//func isLuks(volume string) (bool, error) {
+//	cryptsetupCmd, err := getCryptsetupCmd()
+//	if err != nil {
+//		return false, err
+//	}
+//	cryptsetupArgs := []string{"--batch-mode", "isLuks", volume}
+//
+//	// cryptsetup isLuks exits with code 0 if the target is a luks volume; otherwise it returns
+//	// a non-zero exit code which exec.Command interprets as an error
+//	_, err = exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
+//	if err != nil {
+//		return false, nil
+//	}
+//	return true, nil
+//}
 
 // check is a given mapping under /dev/mapper is a luks volume
 func isLuksMapping(volume string) (bool, string, error) {
