@@ -1,27 +1,17 @@
-apiVersion: apps/v1
-kind: Deployment
+kind: Pod
+apiVersion: v1
 metadata:
-  name: nginx-block
-  labels:
-    app: nginx
+  name: csi-block-example-pod
 spec:
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: nginx:1.7.9
-        ports:
-        - containerPort: 80
-        volumeDevices:
-          - name: disk-pvc
-            devicePath: /dev/sdc
-      volumes:
-        - name: disk-pvc
-          persistentVolumeClaim:
-            claimName: block-pvc
+  containers:
+    - name: csi-block-example-container
+      image: busybox
+      volumeMounts:
+      volumeDevices:
+        - name: csi-block-example-volume
+          devicePath: /dev/linode/csi-block-example-dev
+      command: [ "/bin/sh", "-c", "stat /dev/linode/csi-block-example-dev && sleep 1000000" ]
+  volumes:
+    - name: csi-block-example-volume
+      persistentVolumeClaim:
+        claimName: csi-block-example-pvc

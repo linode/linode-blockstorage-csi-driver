@@ -21,7 +21,7 @@ import (
 const gigabyte = 1024 * 1024 * 1024
 const minProviderVolumeBytes = 10 * gigabyte
 const waitTimeout = 300
-const DevicePathKey = "devicePath"
+const devicePathKey = "devicePath"
 
 type LinodeControllerServer struct {
 	Driver          *LinodeDriver
@@ -270,9 +270,9 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
+	glog.V(4).Infof("volume %d is attached to instance %d with path '%s'", volume.ID, *volume.LinodeID, volume.FilesystemPath)
 
-	pvInfo := map[string]string{DevicePathKey: volume.FilesystemPath}
+	pvInfo := map[string]string{devicePathKey: volume.FilesystemPath}
 	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
 }
 

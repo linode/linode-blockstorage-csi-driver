@@ -127,5 +127,5 @@ func (f *Invocation) CheckIfFileIsInPod(filename string, pod *core.Pod) error {
 }
 
 func MkfsInPod(pod *core.Pod) error {
-	return runCommand("kubectl", "exec", "--kubeconfig", KubeConfigFile, "-it", "-n", pod.Namespace, pod.Name, "--", "/bin/bash", "-c", "mkfs.ext3 -F /dev/block")
+	return runCommand("kubectl", "exec", "--kubeconfig", KubeConfigFile, "-it", "-n", pod.Namespace, pod.Name, "--", "/bin/bash", "-c", "mkfs.ext4 -F /dev/block")
 }
