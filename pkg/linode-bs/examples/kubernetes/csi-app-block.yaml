@@ -1,0 +1,17 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: csi-block-example-pod
+spec:
+  containers:
+    - name: csi-block-example-container
+      image: busybox
+      volumeMounts:
+      volumeDevices:
+        - name: csi-block-example-volume
+          devicePath: /dev/linode/csi-block-example-dev
+      command: [ "/bin/sh", "-c", "stat /dev/linode/csi-block-example-dev && sleep 1000000" ]
+  volumes:
+    - name: csi-block-example-volume
+      persistentVolumeClaim:
+        claimName: csi-block-example-pvc

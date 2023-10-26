@@ -21,6 +21,7 @@ import (
 const gigabyte = 1024 * 1024 * 1024
 const minProviderVolumeBytes = 10 * gigabyte
 const waitTimeout = 300
+const devicePathKey = "devicePath"
 
 type LinodeControllerServer struct {
 	Driver          *LinodeDriver
@@ -269,9 +270,10 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("volume %d is attached to instance %d", volume.ID, *volume.LinodeID)
+	glog.V(4).Infof("volume %d is attached to instance %d with path '%s'", volume.ID, *volume.LinodeID, volume.FilesystemPath)
 
-	return &csi.ControllerPublishVolumeResponse{}, nil
+	pvInfo := map[string]string{devicePathKey: volume.FilesystemPath}
+	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
@@ -310,7 +312,7 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 
 // ValidateVolumeCapabilities checks whether the volume capabilities requested are supported.
 func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	volumeID, statusErr := common.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}

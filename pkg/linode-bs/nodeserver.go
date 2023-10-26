@@ -18,11 +18,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
@@ -57,10 +58,12 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 
 	// Validate Arguments
 	targetPath := req.GetTargetPath()
+	targetPathDir := filepath.Dir(targetPath)
 	stagingTargetPath := req.GetStagingTargetPath()
 	readOnly := req.GetReadonly()
 	volumeID := req.GetVolumeId()
 	volumeCapability := req.GetVolumeCapability()
+
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume ID must be provided")
 	}
@@ -72,6 +75,14 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	}
 	if volumeCapability == nil {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume Capability must be provided")
+	}
+
+	// Set mount options:
+	//  - bind mount to the full path to allow duplicate mounts of the same PD.
+	//  - read-only if specified
+	options := []string{"bind"}
+	if readOnly {
+		options = append(options, "ro")
 	}
 
 	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
@@ -90,17 +101,38 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	if err := os.MkdirAll(targetPath, os.FileMode(0755)); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
-		return nil, err
+	if blk := volumeCapability.GetBlock(); blk != nil {
+		// VolumeMode: Block
+		glog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", targetPathDir)
+		if err := os.MkdirAll(targetPathDir, os.FileMode(0755)); err != nil {
+			glog.Errorf("mkdir failed on disk %s (%v)", targetPathDir, err)
+			return nil, err
+		}
+
+		// Update staging path to devicePath
+		stagingTargetPath = req.PublishContext["devicePath"]
+		glog.V(5).Infof("NodePublishVolume[block]: set stagingTargetPath to devicePath %s", stagingTargetPath)
+
+		// Make file to bind mount device to file
+		glog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", targetPath)
+		file, err := os.OpenFile(targetPath, os.O_CREATE, 0660)
+		if err != nil {
+			if removeErr := os.Remove(targetPath); removeErr != nil {
+				return nil, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", targetPath, err)
+			}
+			return nil, status.Errorf(codes.Internal, "Failed to create file %s: %v", targetPath, err)
+		}
+		file.Close()
+	} else {
+		// VolumeMode: Filesystem
+		glog.V(5).Infof("NodePublishVolume[filesystem]: making targetPath %s", targetPath)
+		if err := os.MkdirAll(targetPath, os.FileMode(0755)); err != nil {
+			glog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
+			return nil, err
+		}
 	}
 
-	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	options := []string{"bind"}
-	if readOnly {
-		options = append(options, "ro")
-	}
-
+	// Mount Source to Target
 	err = ns.Mounter.Interface.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
 		notMnt, mntErr := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
@@ -129,7 +161,7 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume mount of disk failed: %v", err))
 	}
 
-	glog.V(4).Infof("Successfully mounted %s", targetPath)
+	glog.V(4).Infof("NodePublishVolume successfully mounted %s", targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -246,7 +278,12 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 
 		*/
 		return &csi.NodeStageVolumeResponse{}, nil
+	}
 
+	// VolumeMode=block
+	// Do nothing else with the mount point for stage
+	if blk := volumeCapability.GetBlock(); blk != nil {
+		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	// Part 3: Mount device to stagingTargetPath
@@ -258,9 +295,6 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 			fstype = mnt.FsType
 		}
 		options = append(options, mnt.MountFlags...)
-	} else if blk := volumeCapability.GetBlock(); blk != nil {
-		// TODO(#64): Block volume support
-		return nil, status.Error(codes.Unimplemented, "Block volume support is not yet implemented")
 	}
 
 	fmtAndMountSource := devicePath

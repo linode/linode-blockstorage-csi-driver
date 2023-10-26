@@ -4,6 +4,7 @@ import (
 	"e2e_test/test/framework"
 	"fmt"
 	"strconv"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -54,6 +55,70 @@ var _ = Describe("Linode CSI Driver", func() {
 					}
 					return nil
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
+			})
+		})
+	})
+
+	Describe("Test", func() {
+		Context("Simple", func() {
+			Context("Block Storage", func() {
+				JustBeforeEach(func() {
+					By("Creating Persistent Volume Claim")
+					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, false)
+					err = f.CreatePersistentVolumeClaim(pvc)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Creating Pod with PVC")
+					pod = f.GetPodObject(podName1, pvc.Name)
+					err = f.CreatePod(pod)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pod with PVC")
+					err = f.DeletePod(pod.Name)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Waiting for the Volume to be Detached")
+					waitForOperation()
+
+					By("Deleting the PVC")
+					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Waiting for the Volume to be Deleted")
+					waitForOperation()
+				})
+
+				Context("1Gi Storage", func() {
+					BeforeEach(func() {
+						size = "1Gi"
+					})
+					It("should write and read", func() {
+						writeFile(file)
+						readFile(file)
+					})
+				})
+
+				Context("10Gi Storage", func() {
+					BeforeEach(func() {
+						size = "10Gi"
+					})
+					It("should write and read", func() {
+						writeFile(file)
+						readFile(file)
+					})
+				})
+
+				Context("20Gi Storage", func() {
+					BeforeEach(func() {
+						size = "20Gi"
+					})
+					It("should write and read", func() {
+						writeFile(file)
+						readFile(file)
+					})
+				})
 			})
 
 			AfterEach(func() {
@@ -261,6 +326,52 @@ var _ = Describe("Linode CSI Driver", func() {
 					writeFile(file)
 					expandVolume("15Gi")
 					readFile(file)
+				})
+			})
+		})
+	})
+
+	Describe("Test", func() {
+		Context("Block Storage", func() {
+			Context("in Raw Block Mode", func() {
+				JustBeforeEach(func() {
+					By("Creating Persistent Volume Claim")
+					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, true)
+					err = f.CreatePersistentVolumeClaim(pvc)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Creating Pod with PVC")
+					pod = f.GetPodObjectWithBlockVolume(pvc.Name)
+					err = f.CreatePod(pod)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					By("Deleting the Pod with PVC")
+					err = f.DeletePod(pod.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Waiting for the Volume to be Detached")
+					time.Sleep(2 * time.Minute)
+
+					By("Deleting the PVC")
+					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("Waiting for the Volume to be Deleted")
+					time.Sleep(1 * time.Minute)
+				})
+
+				Context("Creating Raw Block Storage", func() {
+					BeforeEach(func() {
+						size = "10Gi"
+					})
+
+					It("should check that raw block storage works", func() {
+						By("Creating a ext3 Filesystem on the Pod")
+						err := framework.MkfsInPod(pod)
+						Expect(err).NotTo(HaveOccurred())
+					})
 				})
 			})
 		})
