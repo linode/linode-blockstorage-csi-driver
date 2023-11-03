@@ -35,21 +35,15 @@ Tips for a faster merge:
  * add tests!
 
 ## Cutting Releases
-
- Everytime a commit is merged into master, a new patch release is [automatically drafted](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/release-drafter.yml) with a changelog. You can modify (tag name, changelog, title, etc.) and publish the release via the [releases page](https://github.com/linode/linode-blockstorage-csi-driver/releases).
-
- When a release is published, the [release workflow](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml) builds and pushes the docker image to Dockerhub.
+When a release is published, the [release workflow](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/release.yml) builds and pushes the docker image to Dockerhub.
 
 ## Code of Conduct
-
 This project follows the [Linode Community Code of Conduct](https://www.linode.com/community/questions/conduct). 
 
 ## Vulnerability Reporting
-
 If you discover a potential security issue in this project we ask that you notify Linode Security via our [vulnerability reporting process](https://hackerone.com/linode). Please do **not** create a public github issue.
 
 ## Licensing
-
 See the [LICENSE file](/LICENSE) for our project's licensing.
 
 

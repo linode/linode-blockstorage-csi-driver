@@ -1,26 +1,14 @@
-# Copyright 2017 The Kubernetes Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 PLATFORM       ?= linux/amd64
 REGISTRY_NAME  ?= index.docker.io/linode
 IMAGE_NAME     ?= linode-blockstorage-csi-driver
-REV            := $(shell git describe --long --tags --dirty)
+REV            := $(shell git describe --long --tags --dirty 2> /dev/null || echo "dev")
 IMAGE_VERSION  ?= $(REV)
 IMAGE_TAG      ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.52-alpine
+RELEASE_DIR    ?= release
 
-export GO111MODULE=on
+.PHONY: ci
+ci: vet lint test build
 
 .PHONY: fmt
 fmt:
@@ -37,6 +25,10 @@ lint: vet
 .PHONY: test
 test: vet verify
 	go test -v ./... -cover $(TEST_ARGS)
+
+.PHONY: build
+build:
+	go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' ./app/linode/main.go
 
 .PHONY: docker-build
 docker-build:
@@ -55,3 +47,13 @@ verify:
 clean:
 	@GOOS=linux go clean -i -r -x ./...
 	-rm -rf _output
+	-rm -rf $(RELEASE_DIR)
+	-rm -rf ./linode-blockstorage-csi-driver
+
+.PHONY: release
+release:
+	mkdir -p $(RELEASE_DIR)
+	./hack/release-yaml.sh $(IMAGE_VERSION)
+	cp ./pkg/linode-bs/deploy/releases/linode-blockstorage-csi-driver-$(IMAGE_VERSION).yaml ./$(RELEASE_DIR)
+	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
+	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
