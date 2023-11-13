@@ -214,7 +214,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: csi-encrypt-example-luks-key
-  namespace: default
+  namespace: csi-encrypt-example
 stringData:
   luksKey: "SECRETGOESHERE"  
 ```
