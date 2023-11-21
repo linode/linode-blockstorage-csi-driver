@@ -23,7 +23,6 @@ _cgo_export.*
 _output
 _testmain.go
 linode-blockstorage-csi-driver
-linode-blockstorage-csi-driver
 
 *.exe
 *.test
@@ -32,6 +31,7 @@ linode-blockstorage-csi-driver
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+release/
 .idea/
 dist/
 .vscode/
