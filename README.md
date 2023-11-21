@@ -28,13 +28,13 @@ This token will need:
 
 Use the helm chart located under './helm-chart/csi-driver'. This dir has the manifest for Linode Block Storage CSI Driver.
 
-#### To deploy the CSI Driver run the following:
+#### To deploy the CSI Driver from the release artifact
 ```sh
-git clone git@github.com:linode/linode-blockstorage-csi-driver.git
+export VERSION=v0.6.0
+export LINODE_API_TOKEN=<linodeapitoken>
+export REGION=<linoderegion>
 
-cd linode-blockstorage-csi-driver
-
-helm install linode-csi-driver ./helm-chart/csi-driver --set apiToken=$LINODE_API_TOKEN,region=$REGION
+helm install linode-csi-driver --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-blockstorage-csi-driver/releases/download/$VERSION/helm-chart-$VERSION.tgz
 ```
 _See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
 
@@ -43,9 +43,7 @@ _See [helm install](https://helm.sh/docs/helm/helm_install/) for command documen
 To uninstall linode-csi-driver from kubernetes cluster, run the following command:
 
 ```sh
-
 helm uninstall linode-csi-driver
-
 ```
 _See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command documentation._
 
@@ -54,9 +52,11 @@ _See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command doc
 To upgrade when new changes are made to the helm chart, run the following command:
 
 ```sh
+export VERSION=v0.6.0
+export LINODE_API_TOKEN=<linodeapitoken>
+export REGION=<linoderegion>
 
-helm upgrade linode-csi-driver ./helm-chart/csi-driver --install --set apiToken=$LINODE_API_TOKEN,region=$REGION
-
+helm upgrade linode-csi-driver --install --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-blockstorage-csi-driver/releases/download/$VERSION/helm-chart-$VERSION.tgz
 ```
 _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documentation._
 
@@ -214,7 +214,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: csi-encrypt-example-luks-key
-  namespace: default
+  namespace: csi-encrypt-example
 stringData:
   luksKey: "SECRETGOESHERE"  
 ```
