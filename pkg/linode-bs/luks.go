@@ -65,6 +65,10 @@ const (
 	// LuksKeyAttribute is the key of the luks key used in the map of secrets passed from the CO
 	LuksKeyAttribute = "luksKey"
 
+	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
+	// created volumes
+	VolumeTags = driverName + "/volumeTags"
+
 	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
 	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
 	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
@@ -257,7 +261,7 @@ func luksClose(volume string) error {
 func luksOpen(volume string, keyFile string, ctx LuksContext) error {
 	// check if the luks volume is already open
 	if _, err := os.Stat("/dev/mapper/" + ctx.VolumeName); !os.IsNotExist(err) {
-		glog.V(4).Info("luks volume is already open %s", volume)
+		glog.V(4).Infof("luks volume is already open %s", volume)
 		return nil
 	}
 

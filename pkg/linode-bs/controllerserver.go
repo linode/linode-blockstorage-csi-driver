@@ -102,6 +102,8 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
+	tags := req.Parameters[VolumeTags]
+
 	if len(volumes) != 0 {
 		if len(volumes) > 1 {
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("duplicate volume %q exists", volumeName))
@@ -131,7 +133,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		vol, err = linodeCS.cloneLinodeVolume(ctx, volumeName, volumeSizeGB, sourceVolumeInfo.VolumeID)
 	} else {
 		// Create the volume from scratch
-		vol, err = linodeCS.createLinodeVolume(ctx, volumeName, volumeSizeGB)
+		vol, err = linodeCS.createLinodeVolume(ctx, volumeName, volumeSizeGB, tags)
 	}
 
 	// Error handling for the above function calls
@@ -546,11 +548,13 @@ func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(
 
 // createLinodeVolume creates a Linode volume and returns the result
 func (linodeCS *LinodeControllerServer) createLinodeVolume(
-	ctx context.Context, label string, sizeGB int) (*linodego.Volume, error) {
+	ctx context.Context, label string, sizeGB int, tags string) (*linodego.Volume, error) {
+
 	volumeReq := linodego.VolumeCreateOptions{
 		Region: linodeCS.MetadataService.GetZone(),
 		Label:  label,
 		Size:   sizeGB,
+		Tags:   strings.Split(tags, ","),
 	}
 
 	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})

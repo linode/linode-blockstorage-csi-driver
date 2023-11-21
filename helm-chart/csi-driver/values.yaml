@@ -18,6 +18,9 @@ namespace: kube-system
 # "linode-block-storage" or left as an empty string
 defaultStorageClass: linode-block-storage-retain
 
+# set these value to a comma seperated string if you'd like to add tags to the created volumes
+# volumeTags:
+
 # Images - Default 
 csiProvisioner:
   image: registry.k8s.io/sig-storage/csi-provisioner

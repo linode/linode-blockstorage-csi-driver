@@ -203,7 +203,7 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, targetPath))
 	}
 
-	glog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath ", req, targetPath)
+	glog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, targetPath)
 
 	if err := closeMountSources(targetPath); err != nil {
 		return nil, err
@@ -370,7 +370,7 @@ func closeMountSources(path string) error {
 			return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err))
 		}
 		if isLuksMapping {
-			glog.V(4).Infof("luksClose ", mappingName)
+			glog.V(4).Infof("luksClose %s", mappingName)
 			if err := luksClose(mappingName); err != nil {
 				return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to close luks mount %s: %v", path, err))
 			}

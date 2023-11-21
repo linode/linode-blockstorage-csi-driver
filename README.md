@@ -246,6 +246,25 @@ spec:
       storage: 10Gi
   storageClassName: linode-block-storage-retain-luks
 ```
+### Adding Tags to created volumes
+This feature gives users the ability to add tags to volumes created by a specific storageClass, to allow for better tracking of volumes.
+Tags are added as a comma seperated string value for a parameter `linodebs.csi.linode.com/volumeTags`
+
+#### Example StorageClass
+```
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  name: linode-block-storage
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+parameters:
+    linodebs.csi.linode.com/volumeTags: "test, foo, yolo"
+```
+
 
 ## Disclaimers
 
