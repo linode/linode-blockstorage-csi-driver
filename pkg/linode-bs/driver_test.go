@@ -245,6 +245,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Size:           v.Size,
 				FilesystemPath: path,
 				Status:         linodego.VolumeActive,
+				Tags:           v.Tags,
 				Created:        &now,
 				Updated:        &now,
 			}
