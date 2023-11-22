@@ -18,10 +18,28 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const gigabyte = 1024 * 1024 * 1024
-const minProviderVolumeBytes = 10 * gigabyte
-const waitTimeout = 300
-const devicePathKey = "devicePath"
+type VolumeLifecycle string
+
+const (
+	gigabyte               = 1024 * 1024 * 1024
+	driverName             = "linodebs.csi.linode.com"
+	devicePathKey          = "devicePath"
+	waitTimeout            = 300
+	minProviderVolumeBytes = 10 * gigabyte
+
+	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
+	// created volumes
+	VolumeTags = driverName + "/volumeTags"
+
+	// PublishInfoVolumeName is used to pass the volume name from
+	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
+	PublishInfoVolumeName = driverName + "/volume-name"
+
+	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
+	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
+	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
+	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
+)
 
 type LinodeControllerServer struct {
 	Driver          *LinodeDriver

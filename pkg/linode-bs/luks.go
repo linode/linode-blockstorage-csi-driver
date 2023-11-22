@@ -32,8 +32,6 @@ import (
 	"github.com/golang/glog"
 )
 
-type VolumeLifecycle string
-
 type LuksContext struct {
 	EncryptionEnabled bool
 	EncryptionKey     string
@@ -44,12 +42,6 @@ type LuksContext struct {
 }
 
 const (
-	driverName = "linodebs.csi.linode.com"
-
-	// PublishInfoVolumeName is used to pass the volume name from
-	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
-	PublishInfoVolumeName = driverName + "/volume-name"
-
 	// LuksEncryptedAttribute is used to pass the information if the volume should be
 	// encrypted with luks to `NodeStageVolume`
 	LuksEncryptedAttribute = driverName + "/luks-encrypted"
@@ -64,15 +56,6 @@ const (
 
 	// LuksKeyAttribute is the key of the luks key used in the map of secrets passed from the CO
 	LuksKeyAttribute = "luksKey"
-
-	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
-	// created volumes
-	VolumeTags = driverName + "/volumeTags"
-
-	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
-	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
-	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
-	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
 )
 
 func (ctx *LuksContext) validate() error {
