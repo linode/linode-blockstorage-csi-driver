@@ -19,7 +19,9 @@ namespace: kube-system
 defaultStorageClass: linode-block-storage-retain
 
 # set these value to a comma seperated string if you'd like to add tags to the created volumes
-# volumeTags:
+#volumeTags:
+# - example
+# - test
 
 # Images - Default 
 
