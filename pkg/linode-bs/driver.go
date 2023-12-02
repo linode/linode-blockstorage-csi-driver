@@ -24,10 +24,10 @@ import (
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 
-	"github.com/golang/glog"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 )
 
@@ -112,7 +112,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 func (linodeDriver *LinodeDriver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_AccessMode_Mode) error {
 	var vca []*csi.VolumeCapability_AccessMode
 	for _, c := range vc {
-		glog.V(4).Infof("Enabling volume access mode: %v", c.String())
+		klog.V(4).Infof("Enabling volume access mode: %v", c.String())
 		vca = append(vca, NewVolumeCapabilityAccessMode(c))
 	}
 	linodeDriver.vcap = vca
@@ -122,7 +122,7 @@ func (linodeDriver *LinodeDriver) AddVolumeCapabilityAccessModes(vc []csi.Volume
 func (linodeDriver *LinodeDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) error {
 	var csc []*csi.ControllerServiceCapability
 	for _, c := range cl {
-		glog.V(4).Infof("Enabling controller service capability: %v", c.String())
+		klog.V(4).Infof("Enabling controller service capability: %v", c.String())
 		csc = append(csc, NewControllerServiceCapability(c))
 	}
 	linodeDriver.cscap = csc
@@ -132,7 +132,7 @@ func (linodeDriver *LinodeDriver) AddControllerServiceCapabilities(cl []csi.Cont
 func (linodeDriver *LinodeDriver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_Type) error {
 	var nsc []*csi.NodeServiceCapability
 	for _, n := range nl {
-		glog.V(4).Infof("Enabling node service capability: %v", n.String())
+		klog.V(4).Infof("Enabling node service capability: %v", n.String())
 		nsc = append(nsc, NewNodeServiceCapability(n))
 	}
 	linodeDriver.nscap = nsc
@@ -178,9 +178,9 @@ func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.
 }
 
 func (linodeDriver *LinodeDriver) Run(endpoint string) {
-	glog.V(4).Infof("Driver: %v", linodeDriver.name)
+	klog.V(4).Infof("Driver: %v", linodeDriver.name)
 	if len(linodeDriver.bsPrefix) > 0 {
-		glog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.bsPrefix)
+		klog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.bsPrefix)
 	}
 
 	linodeDriver.readyMu.Lock()

@@ -4,25 +4,24 @@ go 1.20
 
 require (
 	github.com/container-storage-interface/spec v1.3.0
-	github.com/golang/glog v1.1.2
-	github.com/golang/protobuf v1.5.2
 	github.com/linode/linodego v1.23.0
 	golang.org/x/net v0.17.0
 	golang.org/x/sys v0.13.0
 	google.golang.org/grpc v1.53.0
+	google.golang.org/protobuf v1.28.1
 	k8s.io/apimachinery v0.19.2
+	k8s.io/klog/v2 v2.110.1
 	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
 )
 
 require (
-	github.com/go-logr/logr v0.2.0 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-resty/resty/v2 v2.7.0 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/klog/v2 v2.2.0 // indirect
 )
 
 replace (

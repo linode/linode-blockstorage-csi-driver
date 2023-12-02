@@ -8,9 +8,8 @@ import (
 
 	"github.com/codeskyblue/go-sh"
 
-	"github.com/golang/glog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -31,7 +30,7 @@ func runCommand(cmd string, args ...string) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Env = append(c.Env, append(os.Environ())...)
-	glog.Infof("Running command %v\n", cmd)
+	klog.Infof("Running command %v\n", cmd)
 	return c.Run()
 }
 

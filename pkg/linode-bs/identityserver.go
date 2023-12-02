@@ -16,11 +16,11 @@ package linodebs
 
 import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	"k8s.io/klog/v2"
 )
 
 type LinodeIdentityServer struct {
@@ -29,7 +29,7 @@ type LinodeIdentityServer struct {
 
 // GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
 func (linodeIdentity *LinodeIdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	glog.V(5).Infof("Using default GetPluginInfo")
+	klog.V(5).Infof("Using default GetPluginInfo")
 
 	if linodeIdentity.Driver.name == "" {
 		return nil, status.Error(codes.Unavailable, "Driver name not configured")
@@ -42,7 +42,7 @@ func (linodeIdentity *LinodeIdentityServer) GetPluginInfo(ctx context.Context, r
 }
 
 func (linodeIdentity *LinodeIdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	glog.V(5).Infof("Using default GetPluginCapabilities")
+	klog.V(5).Infof("Using default GetPluginCapabilities")
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -71,12 +71,12 @@ func (linodeIdentity *LinodeIdentityServer) GetPluginCapabilities(ctx context.Co
 }
 
 func (linodeIdentity *LinodeIdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	glog.V(4).Infof("Probe called with args: %#v", req)
+	klog.V(4).Infof("Probe called with args: %#v", req)
 	linodeIdentity.Driver.readyMu.Lock()
 	defer linodeIdentity.Driver.readyMu.Unlock()
 
 	return &csi.ProbeResponse{
-		Ready: &wrappers.BoolValue{
+		Ready: &wrapperspb.BoolValue{
 			Value: linodeIdentity.Driver.ready,
 		},
 	}, nil

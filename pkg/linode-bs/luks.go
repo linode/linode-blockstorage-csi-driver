@@ -29,7 +29,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 type LuksContext struct {
@@ -126,7 +126,7 @@ func luksFormat(source string, ctx LuksContext) error {
 	defer func() {
 		e := os.Remove(filename)
 		if e != nil {
-			glog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
+			klog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
 		}
 	}()
 
@@ -140,7 +140,7 @@ func luksFormat(source string, ctx LuksContext) error {
 		"luksFormat", source,
 	}
 
-	glog.V(4).Info("executing cryptsetup luksFormat command ", cryptsetupArgs)
+	klog.V(4).Info("executing cryptsetup luksFormat command ", cryptsetupArgs)
 
 	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 	if err != nil {
@@ -149,7 +149,7 @@ func luksFormat(source string, ctx LuksContext) error {
 	}
 
 	// open the luks partition
-	glog.V(4).Info("luksOpen ", source, filename)
+	klog.V(4).Info("luksOpen ", source, filename)
 	err = luksOpen(source, filename, ctx)
 	if err != nil {
 		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
@@ -159,11 +159,11 @@ func luksFormat(source string, ctx LuksContext) error {
 	defer func() {
 		e := luksClose(ctx.VolumeName)
 		if e != nil {
-			glog.Errorf("cannot close luks device: %s", e.Error())
+			klog.Errorf("cannot close luks device: %s", e.Error())
 		}
 	}()
 
-	glog.V(4).Info("The LUKS volume name is ", ctx.VolumeName)
+	klog.V(4).Info("The LUKS volume name is ", ctx.VolumeName)
 
 	return nil
 }
@@ -177,7 +177,7 @@ func luksPrepareMount(source string, ctx LuksContext) (string, error) {
 	defer func() {
 		e := os.Remove(filename)
 		if e != nil {
-			glog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
+			klog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
 		}
 	}()
 
@@ -195,7 +195,7 @@ func luksClose(volume string) error {
 	}
 	cryptsetupArgs := []string{"--batch-mode", "close", volume}
 
-	glog.V(4).Info("executing cryptsetup close command")
+	klog.V(4).Info("executing cryptsetup close command")
 
 	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 	if err != nil {
@@ -223,7 +223,7 @@ func luksClose(volume string) error {
 //	defer func() {
 //		e := os.Remove(filename)
 //		if e != nil {
-//			glog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
+//			klog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
 //		}
 //	}()
 //
@@ -234,7 +234,7 @@ func luksClose(volume string) error {
 //	defer func() {
 //		e := luksClose(ctx.VolumeName)
 //		if e != nil {
-//			glog.Errorf("cannot close luks device: %s", e.Error())
+//			klog.Errorf("cannot close luks device: %s", e.Error())
 //		}
 //	}()
 //
@@ -244,7 +244,7 @@ func luksClose(volume string) error {
 func luksOpen(volume string, keyFile string, ctx LuksContext) error {
 	// check if the luks volume is already open
 	if _, err := os.Stat("/dev/mapper/" + ctx.VolumeName); !os.IsNotExist(err) {
-		glog.V(4).Infof("luks volume is already open %s", volume)
+		klog.V(4).Infof("luks volume is already open %s", volume)
 		return nil
 	}
 
@@ -258,7 +258,7 @@ func luksOpen(volume string, keyFile string, ctx LuksContext) error {
 		"--key-file", keyFile,
 		volume, ctx.VolumeName,
 	}
-	glog.V(4).Info("executing cryptsetup luksOpen command")
+	klog.V(4).Info("executing cryptsetup luksOpen command")
 	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
@@ -335,7 +335,7 @@ func writeLuksKey(key string) (string, error) {
 	}
 	_, err = tmpFile.WriteString(key)
 	if err != nil {
-		glog.Error("Unable to write luks key file")
+		klog.Error("Unable to write luks key file")
 		return "", err
 	}
 	return tmpFile.Name(), nil

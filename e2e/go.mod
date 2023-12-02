@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/appscode/go v0.0.0-20190112082056-52eaa8008e2e
 	github.com/codeskyblue/go-sh v0.0.0-20171228145154-cf804ac79dff
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/linode/linodego v1.23.0
 	github.com/onsi/ginkgo/v2 v2.3.1
 	github.com/onsi/gomega v1.22.0
@@ -13,6 +12,7 @@ require (
 	k8s.io/api v0.0.0-20180904230853-4e7be11eab3f
 	k8s.io/apimachinery v0.15.7
 	k8s.io/client-go v8.0.0+incompatible
+	k8s.io/klog/v2 v2.110.1
 	kmodules.xyz/client-go v0.0.0-20190330080556-5dcc4cecf4c9
 )
 
@@ -21,8 +21,10 @@ require (
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/elazarl/goproxy v0.0.0-20190410145444-c548f45dcf1d // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect

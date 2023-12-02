@@ -26,5 +26,4 @@ func NewSafeMounter() *mount.SafeFormatAndMount {
 		Interface: realMounter,
 		Exec:      realExec,
 	}
-
 }
