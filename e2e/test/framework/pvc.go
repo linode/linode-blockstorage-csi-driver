@@ -11,11 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Invocation) GetPersistentVolumeClaimObject(size, storageClass string, isblock bool) *core.PersistentVolumeClaim {
+func (f *Invocation) GetPersistentVolumeClaimObject(name, namespace, size, storageClass string, isBlock bool) *core.PersistentVolumeClaim {
 
 	var volType core.PersistentVolumeMode
 
-	if isblock {
+	if isBlock {
 		volType = core.PersistentVolumeBlock
 	} else {
 		volType = core.PersistentVolumeFilesystem

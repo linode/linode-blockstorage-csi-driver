@@ -6,6 +6,7 @@ import (
 	"github.com/appscode/go/wait"
 	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kmodules.xyz/client-go/tools/exec"
 )
@@ -105,6 +106,16 @@ func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error {
 			return true, nil
 		}
 		return false, nil
+	})
+}
+
+func (f *Invocation) WaitForDelete(meta metav1.ObjectMeta) error {
+	return wait.PollImmediate(f.RetryInterval, f.Timeout, func() (bool, error) {
+		_, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
 	})
 }
 

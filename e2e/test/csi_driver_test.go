@@ -22,8 +22,8 @@ var _ = Describe("Linode CSI Driver", func() {
 				storageClass = "linode-block-storage"
 				sts          *appsv1.StatefulSet
 				pod          *core.Pod
-				pvc          *core.PersistentVolumeClaim
-				file         = "/data/file.txt"
+				// pvc          *core.PersistentVolumeClaim
+				// file         = "/data/file.txt"
 			)
 
 			BeforeEach(func() {
@@ -49,7 +49,7 @@ var _ = Describe("Linode CSI Driver", func() {
 				By("Checking that there is a PVC created for the StatefulSet")
 				Eventually(func() error {
 					var err error
-					pvc, err = f.GetPersistentVolumeClaim(metav1.ObjectMeta{Name: "data-redis-test-0", Namespace: f.Namespace()})
+					_, err = f.GetPersistentVolumeClaim(metav1.ObjectMeta{Name: "data-redis-test-0", Namespace: f.Namespace()})
 					if err != nil {
 						return err
 					}
@@ -61,33 +61,71 @@ var _ = Describe("Linode CSI Driver", func() {
 
 	Describe("Test", func() {
 		Context("Simple", func() {
+			var (
+				f    *framework.Invocation
+				size string
+				// storageClass = "linode-block-storage"
+				sts          *appsv1.StatefulSet
+				pod          *core.Pod
+				pvc          *core.PersistentVolumeClaim
+				file         = "/data/file.txt"
+				storageClass = "linode-block-storage"
+
+				writeFile = func(filename string) {
+					By("Writing a file into the Pod")
+					err := f.WriteFileIntoPod(filename, pod)
+					Expect(err).NotTo(HaveOccurred())
+				}
+
+				readFile = func(filename string) {
+					By("Checking if the created file is in the Pod")
+					err := f.CheckIfFileIsInPod(filename, pod)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			)
 			Context("Block Storage", func() {
 				JustBeforeEach(func() {
 					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, false)
-					err = f.CreatePersistentVolumeClaim(pvc)
+					pvc = f.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass, false)
+					err := f.CreatePersistentVolumeClaim(pvc)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Creating Pod with PVC")
-					pod = f.GetPodObject(podName1, pvc.Name)
+					pod = framework.GetPodObject("test-pod", f.Namespace(), pvc.Name)
 					err = f.CreatePod(pod)
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				AfterEach(func() {
 					By("Deleting the Pod with PVC")
-					err = f.DeletePod(pod.Name)
+					err := f.DeletePod(pod.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Waiting for the Volume to be Detached")
-					waitForOperation()
+					volumeID, err := f.GetVolumeID(pvc)
+
+					Eventually(func() bool {
+						isAttached, err := f.IsVolumeDetached(volumeID)
+						if err != nil {
+							return false
+						}
+						return isAttached
+					}, f.Timeout, f.RetryInterval).Should(BeTrue())
 
 					By("Deleting the PVC")
 					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Waiting for the Volume to be Deleted")
-					waitForOperation()
+					Expect(err).NotTo(HaveOccurred())
+
+					Eventually(func() bool {
+						isDeleted, err := f.IsVolumeDeleted(volumeID)
+						if err != nil {
+							return false
+						}
+						return isDeleted
+					}, f.Timeout, f.RetryInterval).Should(BeTrue())
 				})
 
 				Context("1Gi Storage", func() {
@@ -248,7 +286,7 @@ var _ = Describe("Linode CSI Driver", func() {
 			JustBeforeEach(func() {
 				f = root.Invoke()
 				By("Creating the Persistent Volume Claim")
-				pvc = framework.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass)
+				pvc = f.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass, false)
 				Eventually(func() error {
 					return f.CreatePersistentVolumeClaim(pvc)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
@@ -333,11 +371,20 @@ var _ = Describe("Linode CSI Driver", func() {
 
 	Describe("Test", func() {
 		Context("Block Storage", func() {
+			var (
+				f    *framework.Invocation
+				pod  *core.Pod
+				pvc  *core.PersistentVolumeClaim
+				size string
+				// file         = "/data/heredoc"
+				storageClass = "linode-block-storage"
+			)
+
 			Context("in Raw Block Mode", func() {
 				JustBeforeEach(func() {
 					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, true)
-					err = f.CreatePersistentVolumeClaim(pvc)
+					pvc = f.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass, true)
+					err := f.CreatePersistentVolumeClaim(pvc)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Creating Pod with PVC")
@@ -348,7 +395,7 @@ var _ = Describe("Linode CSI Driver", func() {
 
 				AfterEach(func() {
 					By("Deleting the Pod with PVC")
-					err = f.DeletePod(pod.ObjectMeta)
+					err := f.DeletePod(pod.ObjectMeta)
 					Expect(err).NotTo(HaveOccurred())
 
 					By("Waiting for the Volume to be Detached")
