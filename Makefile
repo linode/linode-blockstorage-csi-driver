@@ -21,6 +21,7 @@ vet: fmt
 .PHONY: lint
 lint: vet
 	docker run --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
+	docker run --rm -v $(PWD):/app -w /app/e2e ${GOLANGCI_LINT_IMG} golangci-lint run -v
 
 .PHONY: test
 test: vet verify
