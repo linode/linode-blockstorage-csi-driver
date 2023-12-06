@@ -44,6 +44,7 @@ func init() {
 }
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Parse()
 	if err := handle(); err != nil {
 		klog.Fatal(err)
