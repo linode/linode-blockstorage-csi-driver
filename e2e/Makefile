@@ -2,13 +2,17 @@ export GO111MODULE=on
 
 IMAGE_VERSION=canary
 K8S_VERSION?=""
+GINKGO_PATH := $(shell go env GOPATH)/bin/ginkgo
 
 .PHONY: test clean check-token install-terraform test-manifest
 
 test-manifest:
 	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
 
-test: $(GOPATH)/bin/ginkgo check-token test-manifest
+${GINKGO_PATH}:
+	go install github.com/onsi/ginkgo/v2/ginkgo@v2.3.1
+
+test: ${GINKGO_PATH} check-token test-manifest
 	go list -m; \
 	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
