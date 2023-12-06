@@ -71,7 +71,6 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 }
 
 func getLinodeByID(client linodeclient.LinodeClient, id string) (*linodego.Instance, error) {
-
 	linodeID, err := strconv.Atoi(id)
 	if err != nil {
 		return nil, fmt.Errorf("Error processing ID %s: %v", id, err)

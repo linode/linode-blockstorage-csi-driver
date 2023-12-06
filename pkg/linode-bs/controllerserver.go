@@ -9,13 +9,13 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	"github.com/linode/linodego"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2"
 )
 
 type VolumeLifecycle string
@@ -95,7 +95,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 
 	volumeName := preKey.GetNormalizedLabelWithPrefix(linodeCS.Driver.bsPrefix)
 
-	glog.V(4).Infoln("create volume called", map[string]interface{}{
+	klog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
 		"storage_size_giga_bytes": size / gigabyte,
 		"volume_name":             volumeName,
@@ -133,7 +133,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 
 		key := common.CreateLinodeVolumeKey(volume.ID, volume.Label)
 
-		glog.V(4).Info("volume already created")
+		klog.V(4).Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
@@ -163,7 +163,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
+	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
 	key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
 	resp := &csi.CreateVolumeResponse{
@@ -192,7 +192,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		}
 	}
 
-	glog.V(4).Infoln("volume created", map[string]interface{}{"response": resp})
+	klog.V(4).Infoln("volume created", map[string]interface{}{"response": resp})
 	return resp, nil
 }
 
@@ -203,7 +203,7 @@ func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *c
 		return nil, statusErr
 	}
 
-	glog.V(4).Infoln("delete volume called", map[string]interface{}{
+	klog.V(4).Infoln("delete volume called", map[string]interface{}{
 		"volume_id": volID,
 		"method":    "delete_volume",
 	})
@@ -221,7 +221,7 @@ func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *c
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	glog.V(4).Info("volume is deleted")
+	klog.V(4).Info("volume is deleted")
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -246,7 +246,7 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		return nil, status.Errorf(codes.InvalidArgument, "ControllerPublishVolume Volume capability is not compatible: %v", req)
 	}
 
-	glog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
+	klog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
 		"volume_id": volumeID,
 		"node_id":   linodeID,
 		"cap":       cap,
@@ -285,12 +285,12 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		return nil, status.Errorf(retCode, "error attaching volume: %s", err)
 	}
 
-	glog.V(4).Infoln("waiting for volume to attach")
+	klog.V(4).Infoln("waiting for volume to attach")
 	volume, err := linodeCS.CloudProvider.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("volume %d is attached to instance %d with path '%s'", volume.ID, *volume.LinodeID, volume.FilesystemPath)
+	klog.V(4).Infof("volume %d is attached to instance %d with path '%s'", volume.ID, *volume.LinodeID, volume.FilesystemPath)
 
 	pvInfo := map[string]string{devicePathKey: volume.FilesystemPath}
 	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
@@ -308,7 +308,7 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 		return nil, statusErr
 	}
 
-	glog.V(4).Infoln("controller unpublish volume called", map[string]interface{}{
+	klog.V(4).Infoln("controller unpublish volume called", map[string]interface{}{
 		"volume_id": volumeID,
 		"node_id":   linodeID,
 		"method":    "controller_unpublish_volume",
@@ -321,12 +321,12 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 		return nil, status.Errorf(codes.Internal, "Error detaching volume: %s", err)
 	}
 
-	glog.V(4).Infoln("waiting for detaching volume")
+	klog.V(4).Infoln("waiting for detaching volume")
 	if _, err := linodeCS.CloudProvider.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	glog.V(4).Info("volume is detached")
+	klog.V(4).Info("volume is detached")
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
@@ -350,7 +350,7 @@ func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.C
 		return nil, err
 	}
 
-	glog.V(4).Infoln("validate volume capabilities called", map[string]interface{}{
+	klog.V(4).Infoln("validate volume capabilities called", map[string]interface{}{
 		"volume_id":           req.VolumeId,
 		"volume_capabilities": req.VolumeCapabilities,
 		"method":              "validate_volume_capabilities",
@@ -360,7 +360,7 @@ func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.C
 	if validVolumeCapabilities(volumeCapabilities) {
 		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
 	}
-	glog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": resp})
+	klog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": resp})
 
 	return resp, nil
 }
@@ -387,7 +387,7 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
-	glog.V(4).Infoln("list volumes called", map[string]interface{}{
+	klog.V(4).Infoln("list volumes called", map[string]interface{}{
 		"list_opts":          listOpts,
 		"req_starting_token": req.StartingToken,
 		"method":             "list_volumes",
@@ -423,7 +423,7 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 		NextToken: nextToken,
 	}
 
-	glog.V(4).Infoln("volumes listed", map[string]interface{}{"response": resp})
+	klog.V(4).Infoln("volumes listed", map[string]interface{}{"response": resp})
 	return resp, nil
 }
 
@@ -459,7 +459,7 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 		Capabilities: caps,
 	}
 
-	glog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
+	klog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
 		"response": resp,
 		"method":   "controller_get_capabilities",
 	})
@@ -494,7 +494,7 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	glog.V(4).Infoln("expand volume called", map[string]interface{}{
+	klog.V(4).Infoln("expand volume called", map[string]interface{}{
 		"volume_id": volumeID,
 		"method":    "controller_expand_volume",
 	})
@@ -519,13 +519,13 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	glog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
+	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
 	resp := &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         size,
 		NodeExpansionRequired: false,
 	}
-	glog.V(4).Info("volume is resized")
+	klog.V(4).Info("volume is resized")
 	return resp, nil
 
 }
@@ -575,7 +575,7 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 		Tags:   strings.Split(tags, ","),
 	}
 
-	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
+	klog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
 
 	result, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
 	if err != nil {
@@ -594,7 +594,7 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 // cloneLinodeVolume clones a Linode volume and returns the result
 func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
 	ctx context.Context, label string, sizeGB, sourceID int) (*linodego.Volume, error) {
-	glog.V(4).Infoln("cloning volume", map[string]interface{}{
+	klog.V(4).Infoln("cloning volume", map[string]interface{}{
 		"source_vol_id": sourceID,
 	})
 
@@ -609,7 +609,7 @@ func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
 	}
 
 	if result.Size != sizeGB {
-		glog.V(4).Infoln("resizing volume", map[string]interface{}{
+		klog.V(4).Infoln("resizing volume", map[string]interface{}{
 			"volume_id": result.ID,
 			"old_size":  result.Size,
 			"new_size":  sizeGB,

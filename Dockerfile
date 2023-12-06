@@ -7,8 +7,7 @@ WORKDIR /linode
 
 COPY go.mod .
 COPY go.sum .
-
-COPY app/linode/main.go .
+COPY main.go .
 COPY pkg ./pkg
 
 RUN go mod download

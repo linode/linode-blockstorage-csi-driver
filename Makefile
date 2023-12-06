@@ -4,7 +4,7 @@ IMAGE_NAME     ?= linode-blockstorage-csi-driver
 REV            := $(shell git describe --long --tags --dirty 2> /dev/null || echo "dev")
 IMAGE_VERSION  ?= $(REV)
 IMAGE_TAG      ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
-GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.52-alpine
+GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.55-alpine
 RELEASE_DIR    ?= release
 
 .PHONY: ci
@@ -29,11 +29,11 @@ test: vet verify
 
 .PHONY: build
 build:
-	go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' ./app/linode/main.go
+	go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' ./main.go
 
 .PHONY: docker-build
 docker-build:
-	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(REV) -f ./app/linode/Dockerfile .
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(REV) -f ./Dockerfile .
 
 .PHONY: docker-push
 docker-push:

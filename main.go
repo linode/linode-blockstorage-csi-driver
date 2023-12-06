@@ -14,15 +14,16 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
 	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -44,15 +45,20 @@ func init() {
 
 func main() {
 	flag.Parse()
-	handle()
+	if err := handle(); err != nil {
+		klog.Fatal(err)
+	}
 	os.Exit(0)
 }
 
-func handle() {
+func handle() error {
 	if vendorVersion == "" {
-		glog.Fatalf("vendorVersion must be set at compile time")
+		return errors.New("vendorVersion must be set at compile time")
 	}
-	glog.V(4).Infof("Driver vendor version %v", vendorVersion)
+	if *token == "" {
+		return errors.New("linode token required")
+	}
+	klog.V(4).Infof("Driver vendor version %v", vendorVersion)
 
 	linodeDriver := driver.GetLinodeDriver()
 
@@ -60,7 +66,7 @@ func handle() {
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
 	cloudProvider, err := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
 	if err != nil {
-		glog.Fatalf("Failed to set up linode client: %s", err)
+		return fmt.Errorf("failed to set up linode client: %s", err)
 	}
 
 	mounter := mountmanager.NewSafeMounter()
@@ -68,7 +74,7 @@ func handle() {
 
 	ms, err := metadataservice.NewMetadataService(cloudProvider, *node)
 	if err != nil {
-		glog.Fatalf("Failed to set up metadata service: %v", err)
+		return fmt.Errorf("failed to set up metadata service: %v", err)
 	}
 
 	prefix := ""
@@ -76,10 +82,11 @@ func handle() {
 		prefix = *bsPrefix
 	}
 
-	err = linodeDriver.SetupLinodeDriver(cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion, prefix)
-	if err != nil {
-		glog.Fatalf("Failed to initialize Linode CSI Driver: %v", err)
+	if err := linodeDriver.SetupLinodeDriver(
+		cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion, prefix); err != nil {
+		return fmt.Errorf("failed to initialize Linode CSI Driver: %v", err)
 	}
 
 	linodeDriver.Run(*endpoint)
+	return nil
 }
