@@ -572,7 +572,10 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 		Region: linodeCS.MetadataService.GetZone(),
 		Label:  label,
 		Size:   sizeGB,
-		Tags:   strings.Split(tags, ","),
+	}
+
+	if tags != "" {
+		volumeReq.Tags = strings.Split(tags, ",")
 	}
 
 	glog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
