@@ -601,7 +601,7 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
-			"failed to create linode volume: %w", err,
+			"failed to create linode volume: %s", err,
 		)
 	}
 
@@ -619,7 +619,7 @@ func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
-			"failed to clone linode volume %d into new volume: %w", sourceID, err,
+			"failed to clone linode volume %d into new volume: %s", sourceID, err,
 		)
 	}
 
