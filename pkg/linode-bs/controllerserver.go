@@ -25,6 +25,7 @@ const (
 	driverName             = "linodebs.csi.linode.com"
 	devicePathKey          = "devicePath"
 	waitTimeout            = 300
+	cloneReadinessTimeout  = 900
 	minProviderVolumeBytes = 10 * gigabyte
 
 	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
@@ -140,10 +141,16 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		}
 	}
 
-	// Always wait for the volume to be active
+	statusPollTimeout := waitTimeout
+
+	// If we're cloning the volume we should extend the timeout
+	if sourceVolumeInfo != nil {
+		statusPollTimeout = cloneReadinessTimeout
+	}
+
 	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
-		ctx, vol.ID, linodego.VolumeActive, waitTimeout); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to wait for cloned volume (%d) active: %s", vol.ID, err)
+		ctx, vol.ID, linodego.VolumeActive, statusPollTimeout); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to wait for volume (%d) active: %s", vol.ID, err)
 	}
 
 	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
