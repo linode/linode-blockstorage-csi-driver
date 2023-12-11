@@ -64,6 +64,9 @@ var _ = Describe("Linode CSI Driver", func() {
 					volumeID   int
 				)
 				Eventually(func() error {
+					if pvc == nil {
+						return nil
+					}
 					var err error
 					currentPVC, err = f.GetPersistentVolumeClaim(pvc.ObjectMeta)
 					if err != nil {
@@ -92,6 +95,9 @@ var _ = Describe("Linode CSI Driver", func() {
 
 				By("Deleting the PVC")
 				Eventually(func() error {
+					if pvc == nil {
+						return nil
+					}
 					return f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
