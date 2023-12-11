@@ -73,33 +73,15 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 	linodeDriver.bsPrefix = bsPrefix
 
 	// Adding Capabilities
-	vcam := []csi.VolumeCapability_AccessMode_Mode{
-		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-		// csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
-	}
+	vcam := volumeCapabilitiesAccessMode()
 	if err := linodeDriver.AddVolumeCapabilityAccessModes(vcam); err != nil {
 		return err
 	}
-	csc := []csi.ControllerServiceCapability_RPC_Type{
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
-		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		// csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
-		// csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
-		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
-		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
-		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
-	}
+	csc := controllerCapabilities()
 	if err := linodeDriver.AddControllerServiceCapabilities(csc); err != nil {
 		return err
 	}
-	ns := []csi.NodeServiceCapability_RPC_Type{
-		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
-		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
-		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-	}
+	ns := nodeCapabilities()
 	if err := linodeDriver.AddNodeServiceCapabilities(ns); err != nil {
 		return err
 	}

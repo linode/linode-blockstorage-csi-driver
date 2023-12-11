@@ -435,29 +435,8 @@ func (linodeCS *LinodeControllerServer) ControllerGetVolume(ctx context.Context,
 
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by this Plugin
 func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
-		return &csi.ControllerServiceCapability{
-			Type: &csi.ControllerServiceCapability_Rpc{
-				Rpc: &csi.ControllerServiceCapability_RPC{
-					Type: cap,
-				},
-			},
-		}
-	}
-
-	var caps []*csi.ControllerServiceCapability
-	for _, capability := range []csi.ControllerServiceCapability_RPC_Type{
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
-		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
-		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
-	} {
-		caps = append(caps, newCap(capability))
-	}
-
 	resp := &csi.ControllerGetCapabilitiesResponse{
-		Capabilities: caps,
+		Capabilities: linodeCS.Driver.cscap,
 	}
 
 	klog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
