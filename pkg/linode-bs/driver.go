@@ -89,6 +89,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.Li
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 	}
 	if err := linodeDriver.AddControllerServiceCapabilities(csc); err != nil {
 		return err
