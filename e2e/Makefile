@@ -8,7 +8,7 @@ K8S_VERSION?=""
 test-manifest:
 	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
 
-test: $(GOPATH)/bin/ginkgo check-token test-manifest
+test:  check-token test-manifest
 	go list -m; \
 	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 

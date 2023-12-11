@@ -81,13 +81,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Detached")
-				Eventually(func() bool {
-					isAttached, err := f.IsVolumeDetached(volumeID)
+				Eventually(func() error {
+					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isAttached
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if !isDetached {
+						return fmt.Errorf("volume %d is not detached", volumeID)
+					}
+					return nil
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Deleting the PVC")
 				Eventually(func() error {
