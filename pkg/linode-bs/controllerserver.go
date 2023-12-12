@@ -40,6 +40,9 @@ const (
 	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
 	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
 	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
+
+	// Linode Volume Topology Region Label
+	VolumeTopologyRegion string = "topology.linode.com/region"
 )
 
 type LinodeControllerServer struct {
@@ -163,7 +166,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 			AccessibleTopology: []*csi.Topology{
 				{
 					Segments: map[string]string{
-						"topology.linode.com/region": vol.Region,
+						VolumeTopologyRegion: vol.Region,
 					},
 				},
 			},
