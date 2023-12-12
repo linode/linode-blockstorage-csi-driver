@@ -395,7 +395,7 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 
 		var publishInfoVolumeName []string = make([]string, 0, 1)
 		if vol.LinodeID != nil {
-			publishInfoVolumeName = append(publishInfoVolumeName, fmt.Sprintf("%d", vol.LinodeID))
+			publishInfoVolumeName = append(publishInfoVolumeName, fmt.Sprintf("%d", *vol.LinodeID))
 		}
 
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
