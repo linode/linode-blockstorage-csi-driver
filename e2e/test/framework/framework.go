@@ -1,7 +1,10 @@
 package framework
 
 import (
+	"fmt"
 	"time"
+
+	core "k8s.io/api/core/v1"
 
 	"github.com/appscode/go/crypto/rand"
 	"github.com/linode/linodego"
@@ -15,6 +18,9 @@ var (
 	K8sVersion     = ""
 	Timeout        time.Duration
 	RetryInterval  time.Duration
+
+	VolumeTypeRequiredError = fmt.Errorf("volumeType is required and must be one of [%s, %s]",
+		core.PersistentVolumeFilesystem, core.PersistentVolumeBlock)
 )
 
 type Framework struct {

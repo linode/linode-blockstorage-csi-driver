@@ -182,14 +182,20 @@ var _ = Describe("Linode CSI Driver", func() {
 			JustBeforeEach(func() {
 				f = root.Invoke()
 				r := strconv.Itoa(rand.Intn(1024))
+				var err error
+
 				By("Creating the Persistent Volume Claim")
-				pvc = f.GetPersistentVolumeClaimObject("test-pvc-"+r, f.Namespace(), size, storageClass, volumeType)
+				pvc, err = f.GetPersistentVolumeClaimObject("test-pvc-"+r, f.Namespace(), size, storageClass, volumeType)
+				Expect(err).NotTo(HaveOccurred())
+
 				Eventually(func() error {
 					return f.CreatePersistentVolumeClaim(pvc)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Creating Pod with PVC")
-				pod = framework.GetPodObject("test-pod"+r, f.Namespace(), pvc.Name, volumeType)
+				pod, err = f.GetPodObject("test-pod"+r, f.Namespace(), pvc.Name, volumeType)
+				Expect(err).NotTo(HaveOccurred())
+
 				Eventually(func() error {
 					return f.CreatePod(pod)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())

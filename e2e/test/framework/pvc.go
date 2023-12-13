@@ -13,8 +13,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Invocation) GetPersistentVolumeClaimObject(name, namespace, size, storageClass string, volumeType core.PersistentVolumeMode) *core.PersistentVolumeClaim {
-	return &core.PersistentVolumeClaim{
+func (f *Invocation) GetPersistentVolumeClaimObject(
+	name, namespace, size, storageClass string, volumeType core.PersistentVolumeMode,
+) (*core.PersistentVolumeClaim, error) {
+	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -23,7 +25,6 @@ func (f *Invocation) GetPersistentVolumeClaimObject(name, namespace, size, stora
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadWriteOnce,
 			},
-			VolumeMode:       &volumeType,
 			StorageClassName: &storageClass,
 			Resources: core.ResourceRequirements{
 				Requests: core.ResourceList{
@@ -32,6 +33,15 @@ func (f *Invocation) GetPersistentVolumeClaimObject(name, namespace, size, stora
 			},
 		},
 	}
+
+	switch volumeType {
+	case core.PersistentVolumeFilesystem, core.PersistentVolumeBlock:
+		pvc.Spec.VolumeMode = &volumeType
+	default:
+		return nil, VolumeTypeRequiredError
+	}
+
+	return pvc, nil
 }
 
 func (f *Invocation) GetPersistentVolumeClaim(meta metav1.ObjectMeta) (*core.PersistentVolumeClaim, error) {

@@ -12,8 +12,8 @@ import (
 	"kmodules.xyz/client-go/tools/exec"
 )
 
-func GetPodObject(name, namespace, pvc string, volumeType core.PersistentVolumeMode) *core.Pod {
-	pod := core.Pod{
+func (f *Invocation) GetPodObject(name, namespace, pvc string, volumeType core.PersistentVolumeMode) (*core.Pod, error) {
+	pod := &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -39,59 +39,26 @@ func GetPodObject(name, namespace, pvc string, volumeType core.PersistentVolumeM
 		},
 	}
 
-	if volumeType == core.PersistentVolumeFilesystem {
+	switch volumeType {
+	case core.PersistentVolumeFilesystem:
 		pod.Spec.Containers[0].VolumeMounts = []core.VolumeMount{
 			{
 				MountPath: "/data",
 				Name:      "csi-volume",
 			},
 		}
-	}
-
-	if volumeType == core.PersistentVolumeBlock {
+	case core.PersistentVolumeBlock:
 		pod.Spec.Containers[0].VolumeDevices = []core.VolumeDevice{
 			{
 				Name:       "csi-volume",
 				DevicePath: "/dev/block",
 			},
 		}
+	default:
+		return nil, VolumeTypeRequiredError
 	}
 
-	return &pod
-}
-
-func (f *Invocation) GetPodObjectWithBlockVolume(pvc string) *core.Pod {
-	return &core.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      f.app,
-			Namespace: f.namespace,
-		},
-		Spec: core.PodSpec{
-			Containers: []core.Container{
-				{
-					Name:  f.app,
-					Image: "ubuntu",
-					VolumeDevices: []core.VolumeDevice{
-						{
-							DevicePath: "/dev/block",
-							Name:       "csi-volume",
-						},
-					},
-					Command: []string{"sleep", "1000000"},
-				},
-			},
-			Volumes: []core.Volume{
-				{
-					Name: "csi-volume",
-					VolumeSource: core.VolumeSource{
-						PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvc,
-						},
-					},
-				},
-			},
-		},
-	}
+	return pod, nil
 }
 
 func (f *Invocation) CreatePod(pod *core.Pod) error {
@@ -100,12 +67,11 @@ func (f *Invocation) CreatePod(pod *core.Pod) error {
 		return err
 	}
 	return f.WaitForReady(pod.ObjectMeta)
-
 }
 
 func (f *Invocation) DeletePod(meta metav1.ObjectMeta) error {
 	err := f.kubeClient.CoreV1().Pods(meta.Namespace).Delete(meta.Name, deleteInForeground())
-	if err != nil && apierrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	return err
@@ -125,16 +91,6 @@ func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error {
 			return true, nil
 		}
 		return false, nil
-	})
-}
-
-func (f *Invocation) WaitForDelete(meta metav1.ObjectMeta) error {
-	return wait.PollImmediate(f.RetryInterval, f.Timeout, func() (bool, error) {
-		_, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
 	})
 }
 
