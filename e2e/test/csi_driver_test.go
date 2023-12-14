@@ -3,8 +3,8 @@ package test
 import (
 	"e2e_test/test/framework"
 	"fmt"
+	"math/rand"
 	"strconv"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,11 +19,11 @@ var _ = Describe("Linode CSI Driver", func() {
 		Context("Using VolumeClaimTemplates and a non-root container", func() {
 			var (
 				f            *framework.Invocation
-				storageClass = "linode-block-storage"
 				sts          *appsv1.StatefulSet
 				pod          *core.Pod
 				pvc          *core.PersistentVolumeClaim
 				file         = "/data/file.txt"
+				storageClass = "linode-block-storage"
 			)
 
 			BeforeEach(func() {
@@ -56,77 +56,8 @@ var _ = Describe("Linode CSI Driver", func() {
 					return nil
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
-		})
-	})
-
-	Describe("Test", func() {
-		Context("Simple", func() {
-			Context("Block Storage", func() {
-				JustBeforeEach(func() {
-					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, false)
-					err = f.CreatePersistentVolumeClaim(pvc)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Creating Pod with PVC")
-					pod = f.GetPodObject(podName1, pvc.Name)
-					err = f.CreatePod(pod)
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				AfterEach(func() {
-					By("Deleting the Pod with PVC")
-					err = f.DeletePod(pod.Name)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Waiting for the Volume to be Detached")
-					waitForOperation()
-
-					By("Deleting the PVC")
-					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Waiting for the Volume to be Deleted")
-					waitForOperation()
-				})
-
-				Context("1Gi Storage", func() {
-					BeforeEach(func() {
-						size = "1Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						readFile(file)
-					})
-				})
-
-				Context("10Gi Storage", func() {
-					BeforeEach(func() {
-						size = "10Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						readFile(file)
-					})
-				})
-
-				Context("20Gi Storage", func() {
-					BeforeEach(func() {
-						size = "20Gi"
-					})
-					It("should write and read", func() {
-						writeFile(file)
-						readFile(file)
-					})
-				})
-			})
 
 			AfterEach(func() {
-				By("Deleting the StatefulSet")
-				Eventually(func() error {
-					return f.DeleteStatefulSet(sts.ObjectMeta)
-				}, f.Timeout, f.RetryInterval).Should(Succeed())
-
 				By("Getting the Volume information")
 				var (
 					currentPVC *core.PersistentVolumeClaim
@@ -145,13 +76,18 @@ var _ = Describe("Linode CSI Driver", func() {
 					return nil
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
+				By("Deleting the StatefulSet")
+				Eventually(func() error {
+					return f.DeleteStatefulSet(sts.ObjectMeta)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
+
 				By("Waiting for the Volume to be Detached")
 				Eventually(func() bool {
-					isAttached, err := f.IsVolumeDetached(volumeID)
+					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
 						return false
 					}
-					return isAttached
+					return isDetached
 				}, f.Timeout, f.RetryInterval).Should(BeTrue())
 
 				By("Deleting the PVC")
@@ -212,60 +148,60 @@ var _ = Describe("Linode CSI Driver", func() {
 			size         string
 			file         = "/data/heredoc"
 			storageClass = "linode-block-storage"
-		)
-
-		var writeFile = func(filename string) {
-			By("Writing a file into the Pod")
-			err := f.WriteFileIntoPod(filename, pod)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
-		var readFile = func(filename string) {
-			By("Checking if the created file is in the Pod")
-			err := f.CheckIfFileIsInPod(filename, pod)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
-		var expandVolume = func(size string) {
-			By("Expanding size of the Persistent Volume")
-			currentPVC, err := f.GetPersistentVolumeClaim(pvc.ObjectMeta)
-			Expect(err).NotTo(HaveOccurred())
-
-			currentPVC.Spec.Resources.Requests = core.ResourceList{
-				core.ResourceName(core.ResourceStorage): resource.MustParse(size),
+			volumeType   core.PersistentVolumeMode
+			writeFile    = func(filename string) {
+				By("Writing a file into the Pod")
+				err := f.WriteFileIntoPod(filename, pod)
+				Expect(err).NotTo(HaveOccurred())
 			}
-			err = f.UpdatePersistentVolumeClaim(currentPVC)
-			Expect(err).NotTo(HaveOccurred())
+			readFile = func(filename string) {
+				By("Checking if the created file is in the Pod")
+				err := f.CheckIfFileIsInPod(filename, pod)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			expandVolume = func(size string) {
+				By("Expanding size of the Persistent Volume")
+				currentPVC, err := f.GetPersistentVolumeClaim(pvc.ObjectMeta)
+				Expect(err).NotTo(HaveOccurred())
 
-			By("Checking if Volume expansion occurred")
-			Eventually(func() string {
-				s, _ := f.GetVolumeSize(currentPVC)
-				return strconv.Itoa(s) + "Gi"
-			}, f.Timeout, f.RetryInterval).Should(Equal(size))
-		}
+				currentPVC.Spec.Resources.Requests = core.ResourceList{
+					core.ResourceStorage: resource.MustParse(size),
+				}
+				err = f.UpdatePersistentVolumeClaim(currentPVC)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Checking if Volume expansion occurred")
+				Eventually(func() string {
+					s, _ := f.GetVolumeSize(currentPVC)
+					return strconv.Itoa(s) + "Gi"
+				}, f.Timeout, f.RetryInterval).Should(Equal(size))
+			}
+		)
 
 		Context("Using a Pod with a PVC mounted", func() {
 			JustBeforeEach(func() {
 				f = root.Invoke()
+				r := strconv.Itoa(rand.Intn(1024))
+				var err error
+
 				By("Creating the Persistent Volume Claim")
-				pvc = framework.GetPersistentVolumeClaimObject("test-pvc", f.Namespace(), size, storageClass)
+				pvc, err = f.GetPersistentVolumeClaimObject("test-pvc-"+r, f.Namespace(), size, storageClass, volumeType)
+				Expect(err).NotTo(HaveOccurred())
+
 				Eventually(func() error {
 					return f.CreatePersistentVolumeClaim(pvc)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Creating Pod with PVC")
-				pod = framework.GetPodObject("busybox-test", f.Namespace(), pvc.Name)
+				pod, err = f.GetPodObject("test-pod"+r, f.Namespace(), pvc.Name, volumeType)
+				Expect(err).NotTo(HaveOccurred())
+
 				Eventually(func() error {
 					return f.CreatePod(pod)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 
 			AfterEach(func() {
-				By("Deleting the Pod with PVC")
-				Eventually(func() error {
-					return f.DeletePod(pod.ObjectMeta)
-				}, f.Timeout, f.RetryInterval).Should(Succeed())
-
 				By("Getting the Volume information")
 				var (
 					currentPVC *core.PersistentVolumeClaim
@@ -284,13 +220,18 @@ var _ = Describe("Linode CSI Driver", func() {
 					return nil
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
+				By("Deleting the Pod with PVC")
+				Eventually(func() error {
+					return f.DeletePod(pod.ObjectMeta)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
+
 				By("Waiting for the Volume to be Detached")
 				Eventually(func() bool {
-					isAttached, err := f.IsVolumeDetached(volumeID)
+					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
 						return false
 					}
-					return isAttached
+					return isDetached
 				}, f.Timeout, f.RetryInterval).Should(BeTrue())
 
 				By("Deleting the PVC")
@@ -308,8 +249,10 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(BeTrue())
 			})
 
-			Context("1Gi Storage", func() {
+			// filesystem
+			Context("1Gi Filesystem Storage", func() {
 				BeforeEach(func() {
+					volumeType = core.PersistentVolumeFilesystem
 					size = "1Gi"
 				})
 				It("should write and read", func() {
@@ -318,8 +261,9 @@ var _ = Describe("Linode CSI Driver", func() {
 				})
 			})
 
-			Context("Expanding Storage from 10Gi to 15Gi", func() {
+			Context("Expanding Filesystem Storage from 10Gi to 15Gi", func() {
 				BeforeEach(func() {
+					volumeType = core.PersistentVolumeFilesystem
 					size = "10Gi"
 				})
 				It("should write and read", func() {
@@ -328,50 +272,27 @@ var _ = Describe("Linode CSI Driver", func() {
 					readFile(file)
 				})
 			})
-		})
-	})
 
-	Describe("Test", func() {
-		Context("Block Storage", func() {
-			Context("in Raw Block Mode", func() {
-				JustBeforeEach(func() {
-					By("Creating Persistent Volume Claim")
-					pvc = f.GetPersistentVolumeClaimObject(size, f.StorageClass, true)
-					err = f.CreatePersistentVolumeClaim(pvc)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Creating Pod with PVC")
-					pod = f.GetPodObjectWithBlockVolume(pvc.Name)
-					err = f.CreatePod(pod)
-					Expect(err).NotTo(HaveOccurred())
+			// raw block
+			Context("1Gi Raw Block Storage", func() {
+				BeforeEach(func() {
+					volumeType = core.PersistentVolumeBlock
+					size = "1Gi"
 				})
 
-				AfterEach(func() {
-					By("Deleting the Pod with PVC")
-					err = f.DeletePod(pod.ObjectMeta)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Waiting for the Volume to be Detached")
-					time.Sleep(2 * time.Minute)
-
-					By("Deleting the PVC")
-					err = f.DeletePersistentVolumeClaim(pvc.ObjectMeta)
-					Expect(err).NotTo(HaveOccurred())
-
-					By("Waiting for the Volume to be Deleted")
-					time.Sleep(1 * time.Minute)
+				It("should check that raw block storage works", func() {
+					By("Creating a ext4 Filesystem on the Pod")
+					Expect(f.MkfsInPod(pod)).NotTo(HaveOccurred())
 				})
+			})
 
-				Context("Creating Raw Block Storage", func() {
-					BeforeEach(func() {
-						size = "10Gi"
-					})
-
-					It("should check that raw block storage works", func() {
-						By("Creating a ext3 Filesystem on the Pod")
-						err := framework.MkfsInPod(pod)
-						Expect(err).NotTo(HaveOccurred())
-					})
+			Context("Expanding Raw Block Storage from 10Gi to 15Gi", func() {
+				BeforeEach(func() {
+					volumeType = core.PersistentVolumeBlock
+					size = "10Gi"
+				})
+				It("should write and read", func() {
+					expandVolume("15Gi")
 				})
 			})
 		})

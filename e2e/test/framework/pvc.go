@@ -5,23 +5,18 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/linode/linodego"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (f *Invocation) GetPersistentVolumeClaimObject(size, storageClass string, isblock bool) *core.PersistentVolumeClaim {
-
-	var volType core.PersistentVolumeMode
-
-	if isblock {
-		volType = core.PersistentVolumeBlock
-	} else {
-		volType = core.PersistentVolumeFilesystem
-	}
-
-	return &core.PersistentVolumeClaim{
+func (f *Invocation) GetPersistentVolumeClaimObject(
+	name, namespace, size, storageClass string, volumeType core.PersistentVolumeMode,
+) (*core.PersistentVolumeClaim, error) {
+	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -30,15 +25,23 @@ func (f *Invocation) GetPersistentVolumeClaimObject(size, storageClass string, i
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadWriteOnce,
 			},
-			VolumeMode:       &volType,
 			StorageClassName: &storageClass,
 			Resources: core.ResourceRequirements{
 				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceStorage): resource.MustParse(size),
+					core.ResourceStorage: resource.MustParse(size),
 				},
 			},
 		},
 	}
+
+	switch volumeType {
+	case core.PersistentVolumeFilesystem, core.PersistentVolumeBlock:
+		pvc.Spec.VolumeMode = &volumeType
+	default:
+		return nil, VolumeTypeRequiredError
+	}
+
+	return pvc, nil
 }
 
 func (f *Invocation) GetPersistentVolumeClaim(meta metav1.ObjectMeta) (*core.PersistentVolumeClaim, error) {
@@ -56,7 +59,11 @@ func (f *Invocation) CreatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim
 }
 
 func (f *Invocation) DeletePersistentVolumeClaim(meta metav1.ObjectMeta) error {
-	return f.kubeClient.CoreV1().PersistentVolumeClaims(meta.Namespace).Delete(meta.Name, nil)
+	err := f.kubeClient.CoreV1().PersistentVolumeClaims(meta.Namespace).Delete(meta.Name, nil)
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (f *Invocation) GetVolumeSize(pvc *core.PersistentVolumeClaim) (int, error) {
@@ -92,14 +99,24 @@ func (f *Invocation) GetVolumeID(pvc *core.PersistentVolumeClaim) (int, error) {
 }
 
 func (f *Invocation) IsVolumeDetached(volumeID int) (bool, error) {
+	if volumeID <= 0 {
+		return true, nil
+	}
 	volume, err := f.linodeClient.GetVolume(context.Background(), volumeID)
 	if err != nil {
+		originalErr, ok := err.(*linodego.Error)
+		if ok && originalErr.Code == 404 {
+			return true, nil
+		}
 		return false, err
 	}
 	return volume.LinodeID == nil, err
 }
 
 func (f *Invocation) IsVolumeDeleted(volumeID int) (bool, error) {
+	if volumeID <= 0 {
+		return true, nil
+	}
 	_, err := f.linodeClient.GetVolume(context.Background(), volumeID)
 	originalErr, ok := err.(*linodego.Error)
 	if ok && originalErr.Code == 404 {

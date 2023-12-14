@@ -7,7 +7,6 @@ import (
 	"path"
 
 	"github.com/codeskyblue/go-sh"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
@@ -29,7 +28,7 @@ func runCommand(cmd string, args ...string) error {
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	c.Env = append(c.Env, append(os.Environ())...)
+	c.Env = append(c.Env, os.Environ()...)
 	klog.Infof("Running command %v\n", cmd)
 	return c.Run()
 }
