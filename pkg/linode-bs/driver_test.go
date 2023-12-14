@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -72,6 +74,32 @@ func TestDriverSuite(t *testing.T) {
 	err = linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, ms, driver, vendorVersion, bsPrefix)
 	if err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
+	}
+
+	// Validate Capabilities are as expected
+	wantControllerCaps := []*csi.ControllerServiceCapability{}
+	for _, cscap := range controllerCapabilities() {
+		wantControllerCaps = append(wantControllerCaps, NewControllerServiceCapability(cscap))
+	}
+
+	if !reflect.DeepEqual(linodeDriver.cscap, wantControllerCaps) {
+		t.Errorf("controller capabilities are not as expected, got:\n%v\nwant:%v", linodeDriver.cscap, wantControllerCaps)
+	}
+
+	wantNodeCaps := []*csi.NodeServiceCapability{}
+	for _, nscap := range nodeCapabilities() {
+		wantNodeCaps = append(wantNodeCaps, NewNodeServiceCapability(nscap))
+	}
+	if !reflect.DeepEqual(linodeDriver.nscap, wantNodeCaps) {
+		t.Errorf("node capabilities are not as expected, got:\n%v\nwant:%v", linodeDriver.nscap, wantNodeCaps)
+	}
+
+	wantVolumeCapAccessMode := []*csi.VolumeCapability_AccessMode{}
+	for _, vcap := range volumeCapabilitiesAccessMode() {
+		wantVolumeCapAccessMode = append(wantVolumeCapAccessMode, NewVolumeCapabilityAccessMode(vcap))
+	}
+	if !reflect.DeepEqual(linodeDriver.vcap, wantVolumeCapAccessMode) {
+		t.Errorf("volume capabilities are not as expected, got:\n%v\nwant:%v", linodeDriver.vcap, volumeCapabilitiesAccessMode())
 	}
 
 	go linodeDriver.Run(endpoint)

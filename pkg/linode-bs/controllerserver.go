@@ -40,6 +40,9 @@ const (
 	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
 	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
 	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
+
+	// Linode Volume Topology Region Label
+	VolumeTopologyRegion string = "topology.linode.com/region"
 )
 
 type LinodeControllerServer struct {
@@ -163,7 +166,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 			AccessibleTopology: []*csi.Topology{
 				{
 					Segments: map[string]string{
-						"topology.linode.com/region": vol.Region,
+						VolumeTopologyRegion: vol.Region,
 					},
 				},
 			},
@@ -393,6 +396,11 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	for _, vol := range volumes {
 		key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
 
+		var publishInfoVolumeName []string = make([]string, 0, 1)
+		if vol.LinodeID != nil {
+			publishInfoVolumeName = append(publishInfoVolumeName, fmt.Sprintf("%d", *vol.LinodeID))
+		}
+
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
@@ -403,6 +411,12 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 							"topology.linode.com/region": vol.Region,
 						},
 					},
+				},
+			},
+			Status: &csi.ListVolumesResponse_VolumeStatus{
+				PublishedNodeIds: publishInfoVolumeName,
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: false,
 				},
 			},
 		})
@@ -424,29 +438,8 @@ func (linodeCS *LinodeControllerServer) ControllerGetVolume(ctx context.Context,
 
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by this Plugin
 func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
-		return &csi.ControllerServiceCapability{
-			Type: &csi.ControllerServiceCapability_Rpc{
-				Rpc: &csi.ControllerServiceCapability_RPC{
-					Type: cap,
-				},
-			},
-		}
-	}
-
-	var caps []*csi.ControllerServiceCapability
-	for _, capability := range []csi.ControllerServiceCapability_RPC_Type{
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
-		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
-		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
-	} {
-		caps = append(caps, newCap(capability))
-	}
-
 	resp := &csi.ControllerGetCapabilitiesResponse{
-		Capabilities: caps,
+		Capabilities: linodeCS.Driver.cscap,
 	}
 
 	klog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
