@@ -44,6 +44,7 @@ csiLinodePlugin:
   image: linode/linode-blockstorage-csi-driver
   tag: # only set if required, defaults to .Chart.AppVersion set during release or "latest" by default
   pullPolicy: IfNotPresent
+  podsMountDir: /var/lib/kubelet
 
 kubectl:
   image: alpine/k8s # This needs to be alpine based and have both kubectl and curl installed.
