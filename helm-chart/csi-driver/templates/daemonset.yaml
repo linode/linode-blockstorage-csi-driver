@@ -72,7 +72,7 @@ spec:
           name: get-linode-id
         - mountPath: /csi
           name: plugin-dir
-        - mountPath: /var/lib/kubelet
+        - mountPath: {{ .Values.csiLinodePlugin.podsMountDir }}
           mountPropagation: Bidirectional
           name: pods-mount-dir
         - mountPath: /dev
@@ -132,7 +132,7 @@ spec:
           type: DirectoryOrCreate
         name: plugin-dir
       - hostPath:
-          path: /var/lib/kubelet
+          path: {{ .Values.csiLinodePlugin.podsMountDir }}
           type: Directory
         name: pods-mount-dir
       - hostPath:
