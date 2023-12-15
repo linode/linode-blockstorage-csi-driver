@@ -10,11 +10,11 @@ test-manifest:
 	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
 
 ${GINKGO_PATH}:
-	go install github.com/onsi/ginkgo/v2/ginkgo@v2.3.1
+	go install github.com/onsi/ginkgo/v2/ginkgo@v2.13.2
 
 test: ${GINKGO_PATH} check-token test-manifest
 	go list -m; \
-	ginkgo -r --v --progress --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
+	ginkgo -r --vv --procs=6 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
 clean: check-token
 	cd test; \
