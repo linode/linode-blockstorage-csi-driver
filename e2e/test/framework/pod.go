@@ -85,7 +85,7 @@ func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error {
 	return wait.PollImmediate(f.RetryInterval, f.Timeout, func() (bool, error) {
 		pod, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
 		if pod == nil || err != nil {
-			return false, nil
+			return false, err
 		}
 		if pod.Status.Phase == core.PodRunning {
 			return true, nil

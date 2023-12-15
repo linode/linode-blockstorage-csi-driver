@@ -82,13 +82,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Detached")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDetached
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDetached {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still attached", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Deleting the PVC")
 				Eventually(func() error {
@@ -96,13 +99,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Deleted")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDeleted, err := f.IsVolumeDeleted(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDeleted
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDeleted {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still present", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 
 			It("Ensures no data is lost between Pod deletions", func() {
@@ -171,9 +177,12 @@ var _ = Describe("Linode CSI Driver", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Checking if Volume expansion occurred")
-				Eventually(func() string {
-					s, _ := f.GetVolumeSize(currentPVC)
-					return strconv.Itoa(s) + "Gi"
+				Eventually(func() (string, error) {
+					s, err := f.GetVolumeSize(currentPVC)
+					if err != nil {
+						return "", err
+					}
+					return strconv.Itoa(s) + "Gi", nil
 				}, f.Timeout, f.RetryInterval).Should(Equal(size))
 			}
 		)
@@ -226,13 +235,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Detached")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDetached
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDetached {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still attached", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Deleting the PVC")
 				Eventually(func() error {
@@ -240,13 +252,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Deleted")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDeleted, err := f.IsVolumeDeleted(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDeleted
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDeleted {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still present", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 
 			// filesystem
