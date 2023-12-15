@@ -2,11 +2,11 @@ package framework
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	core "k8s.io/api/core/v1"
 
-	"github.com/appscode/go/crypto/rand"
 	"github.com/linode/linodego"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -43,7 +43,7 @@ func New(
 		linodeClient: linodeClient,
 
 		name:      "csidriver",
-		namespace: rand.WithUniqSuffix("csi"),
+		namespace: fmt.Sprintf("csi-%x", rand.Int31()),
 	}
 }
 
@@ -52,7 +52,7 @@ func (f *Framework) Invoke() *Invocation {
 		Framework:     f,
 		Timeout:       Timeout,
 		RetryInterval: RetryInterval,
-		app:           rand.WithUniqSuffix("csi-driver-e2e"),
+		app:           fmt.Sprintf("csi-driver-e2e-%x", rand.Int31()),
 	}
 }
 

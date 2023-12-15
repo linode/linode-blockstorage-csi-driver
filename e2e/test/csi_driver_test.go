@@ -43,7 +43,7 @@ var _ = Describe("Linode CSI Driver", func() {
 					if err != nil {
 						return err
 					}
-					return f.WaitForReady(pod.ObjectMeta)
+					return f.IsPodReady(pod.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Checking that there is a PVC created for the StatefulSet")
@@ -82,13 +82,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Detached")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDetached
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDetached {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still attached", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Deleting the PVC")
 				Eventually(func() error {
@@ -96,13 +99,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Deleted")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDeleted, err := f.IsVolumeDeleted(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDeleted
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDeleted {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still present", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 
 			It("Ensures no data is lost between Pod deletions", func() {
@@ -130,7 +136,7 @@ var _ = Describe("Linode CSI Driver", func() {
 					return nil
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 				Eventually(func() error {
-					return f.WaitForReady(pod.ObjectMeta)
+					return f.IsPodReady(pod.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Checking that the file is still present inside the container")
@@ -171,9 +177,12 @@ var _ = Describe("Linode CSI Driver", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Checking if Volume expansion occurred")
-				Eventually(func() string {
-					s, _ := f.GetVolumeSize(currentPVC)
-					return strconv.Itoa(s) + "Gi"
+				Eventually(func() (string, error) {
+					s, err := f.GetVolumeSize(currentPVC)
+					if err != nil {
+						return "", err
+					}
+					return strconv.Itoa(s) + "Gi", nil
 				}, f.Timeout, f.RetryInterval).Should(Equal(size))
 			}
 		)
@@ -196,8 +205,9 @@ var _ = Describe("Linode CSI Driver", func() {
 				pod, err = f.GetPodObject("test-pod"+r, f.Namespace(), pvc.Name, volumeType)
 				Expect(err).NotTo(HaveOccurred())
 
+				Expect(f.CreatePod(pod)).To(Succeed())
 				Eventually(func() error {
-					return f.CreatePod(pod)
+					return f.IsPodReady(pod.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 
@@ -226,13 +236,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Detached")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDetached, err := f.IsVolumeDetached(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDetached
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDetached {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still attached", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Deleting the PVC")
 				Eventually(func() error {
@@ -240,13 +253,16 @@ var _ = Describe("Linode CSI Driver", func() {
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Waiting for the Volume to be Deleted")
-				Eventually(func() bool {
+				Eventually(func() error {
 					isDeleted, err := f.IsVolumeDeleted(volumeID)
 					if err != nil {
-						return false
+						return err
 					}
-					return isDeleted
-				}, f.Timeout, f.RetryInterval).Should(BeTrue())
+					if isDeleted {
+						return nil
+					}
+					return fmt.Errorf("volume %d is still present", volumeID)
+				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 
 			// filesystem
