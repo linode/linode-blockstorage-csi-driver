@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/appscode/go/wait"
 	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,11 +61,8 @@ func (f *Invocation) GetPodObject(name, namespace, pvc string, volumeType core.P
 }
 
 func (f *Invocation) CreatePod(pod *core.Pod) error {
-	pod, err := f.kubeClient.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(pod)
-	if err != nil {
-		return err
-	}
-	return f.WaitForReady(pod.ObjectMeta)
+	_, err := f.kubeClient.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(pod)
+	return err
 }
 
 func (f *Invocation) DeletePod(meta metav1.ObjectMeta) error {
@@ -81,17 +77,15 @@ func (f *Invocation) GetPod(name, namespace string) (*core.Pod, error) {
 	return f.kubeClient.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 }
 
-func (f *Invocation) WaitForReady(meta metav1.ObjectMeta) error {
-	return wait.PollImmediate(f.RetryInterval, f.Timeout, func() (bool, error) {
-		pod, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
-		if pod == nil || err != nil {
-			return false, err
-		}
-		if pod.Status.Phase == core.PodRunning {
-			return true, nil
-		}
-		return false, nil
-	})
+func (f *Invocation) IsPodReady(meta metav1.ObjectMeta) error {
+	pod, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if pod.Status.Phase == core.PodRunning {
+		return nil
+	}
+	return fmt.Errorf("pod %s/%s not ready: %v", meta.Namespace, meta.Name, pod.Status.Phase)
 }
 
 func (f *Invocation) WriteFileIntoPod(filename string, pod *core.Pod) error {

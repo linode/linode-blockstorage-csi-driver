@@ -3,7 +3,6 @@ module e2e_test
 go 1.20
 
 require (
-	github.com/appscode/go v0.0.0-20190112082056-52eaa8008e2e
 	github.com/codeskyblue/go-sh v0.0.0-20171228145154-cf804ac79dff
 	github.com/linode/linodego v1.23.0
 	github.com/onsi/ginkgo/v2 v2.3.1
@@ -18,6 +17,7 @@ require (
 
 require (
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/elazarl/goproxy v0.0.0-20190410145444-c548f45dcf1d // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -36,6 +36,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.2 // indirect
 	golang.org/x/crypto v0.13.0 // indirect
 	golang.org/x/net v0.15.0 // indirect
@@ -48,6 +49,4 @@ require (
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/klog v0.3.1 // indirect
-	sigs.k8s.io/yaml v1.1.0 // indirect
 )

@@ -43,7 +43,7 @@ var _ = Describe("Linode CSI Driver", func() {
 					if err != nil {
 						return err
 					}
-					return f.WaitForReady(pod.ObjectMeta)
+					return f.IsPodReady(pod.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Checking that there is a PVC created for the StatefulSet")
@@ -136,7 +136,7 @@ var _ = Describe("Linode CSI Driver", func() {
 					return nil
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 				Eventually(func() error {
-					return f.WaitForReady(pod.ObjectMeta)
+					return f.IsPodReady(pod.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 
 				By("Checking that the file is still present inside the container")
@@ -205,8 +205,9 @@ var _ = Describe("Linode CSI Driver", func() {
 				pod, err = f.GetPodObject("test-pod"+r, f.Namespace(), pvc.Name, volumeType)
 				Expect(err).NotTo(HaveOccurred())
 
+				Expect(f.CreatePod(pod)).To(Succeed())
 				Eventually(func() error {
-					return f.CreatePod(pod)
+					return f.IsPodReady(pod.ObjectMeta)
 				}, f.Timeout, f.RetryInterval).Should(Succeed())
 			})
 

@@ -2,11 +2,12 @@ package test
 
 import (
 	"flag"
+	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/appscode/go/crypto/rand"
 	"k8s.io/client-go/util/homedir"
 
 	"github.com/linode/linodego"
@@ -69,7 +70,7 @@ var _ = BeforeSuite(func() {
 	if reuse {
 		clusterName = "csi-linode-for-reuse"
 	} else {
-		clusterName = rand.WithUniqSuffix("csi-linode")
+		clusterName = fmt.Sprintf("csi-linode-%x", rand.Int31())
 	}
 
 	dir, err := os.Getwd()
