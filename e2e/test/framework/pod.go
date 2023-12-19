@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,7 +102,7 @@ func (f *Invocation) CheckIfFileIsInPod(filename string, pod *core.Pod) error {
 	if out == filename {
 		return nil
 	}
-	return errors.Wrap(err, fmt.Sprintf("file name %v not found", filename))
+	return fmt.Errorf("file name %v not found: %w", filename, err)
 }
 
 func (f *Invocation) MkfsInPod(pod *core.Pod) error {

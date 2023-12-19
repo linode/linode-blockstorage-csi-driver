@@ -1,12 +1,10 @@
 package framework
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"path"
 
-	"github.com/codeskyblue/go-sh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
@@ -36,11 +34,4 @@ func runCommand(cmd string, args ...string) error {
 func deleteInForeground() *metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
 	return &metav1.DeleteOptions{PropagationPolicy: &policy}
-}
-
-func ApplyManifest(commandName, manifest string) error {
-	args := []string{commandName, "--kubeconfig", KubeConfigFile, "-f", manifest}
-	out, err := sh.Command("kubectl", args).Output()
-	log.Println(string(out))
-	return err
 }
