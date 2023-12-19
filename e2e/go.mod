@@ -1,6 +1,6 @@
 module e2e_test
 
-go 1.20
+go 1.21
 
 require (
 	github.com/codeskyblue/go-sh v0.0.0-20171228145154-cf804ac79dff

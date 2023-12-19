@@ -1,6 +1,6 @@
 module github.com/linode/linode-blockstorage-csi-driver
 
-go 1.20
+go 1.21
 
 require (
 	github.com/container-storage-interface/spec v1.3.0

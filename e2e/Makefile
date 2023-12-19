@@ -4,7 +4,7 @@ IMAGE_VERSION=canary
 K8S_VERSION?=""
 GINKGO_PATH := $(shell go env GOPATH)/bin/ginkgo
 
-.PHONY: test clean check-token install-terraform test-manifest
+.PHONY: test clean check-token test-manifest
 
 test-manifest:
 	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
@@ -25,9 +25,3 @@ check-token:
 	  echo "LINODE_API_TOKEN must be set"; \
 	  exit 1; \
 	fi
-
-install-terraform:
-	sudo apt-get install wget unzip
-	wget https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip
-	unzip terraform_0.11.13_linux_amd64.zip
-	sudo mv terraform /usr/local/bin/

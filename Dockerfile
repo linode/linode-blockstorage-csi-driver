@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine as builder
+FROM golang:1.21-alpine as builder
 # from makefile
 ARG REV
 
@@ -14,7 +14,7 @@ RUN go mod download
 
 RUN go build -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' -o /bin/linode-blockstorage-csi-driver /linode
 
-FROM alpine:3.18.4
+FROM alpine:3.19.0
 LABEL maintainers="Linode"
 LABEL description="Linode CSI Driver"
 
