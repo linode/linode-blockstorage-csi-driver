@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -24,6 +25,7 @@ var (
 )
 
 type Framework struct {
+	ctx        context.Context
 	restConfig *rest.Config
 	kubeClient kubernetes.Interface
 	namespace  string
@@ -38,6 +40,7 @@ func New(
 	linodeClient linodego.Client,
 ) *Framework {
 	return &Framework{
+		ctx:          context.Background(),
 		restConfig:   restConfig,
 		kubeClient:   kubeClient,
 		linodeClient: linodeClient,

@@ -15,10 +15,10 @@ func (f *Framework) CreateNamespace() error {
 			Name: f.namespace,
 		},
 	}
-	_, err := f.kubeClient.CoreV1().Namespaces().Create(obj)
+	_, err := f.kubeClient.CoreV1().Namespaces().Create(f.ctx, obj, metav1.CreateOptions{})
 	return err
 }
 
 func (f *Framework) DeleteNamespace(name string) error {
-	return f.kubeClient.CoreV1().Namespaces().Delete(name, deleteInForeground())
+	return f.kubeClient.CoreV1().Namespaces().Delete(f.ctx, name, deleteInForeground())
 }

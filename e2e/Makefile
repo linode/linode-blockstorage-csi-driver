@@ -14,7 +14,7 @@ ${GINKGO_PATH}:
 
 test: ${GINKGO_PATH} check-token test-manifest
 	go list -m; \
-	ginkgo -r --vv --procs=6 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
+	ginkgo -r --vv --procs=6 --trace --cover $(TEST_ARGS) -- --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
 clean: check-token
 	cd test; \

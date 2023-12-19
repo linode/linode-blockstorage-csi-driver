@@ -31,7 +31,7 @@ func runCommand(cmd string, args ...string) error {
 	return c.Run()
 }
 
-func deleteInForeground() *metav1.DeleteOptions {
+func deleteInForeground() metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
-	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+	return metav1.DeleteOptions{PropagationPolicy: &policy}
 }
