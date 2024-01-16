@@ -307,6 +307,18 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 		"method":    "controller_unpublish_volume",
 	})
 
+	volume, err := linodeCS.CloudProvider.GetVolume(ctx, volumeID)
+	if err != nil {
+		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
+		klog.V(4).Infof("volume is attached to %d, not to %d, skipping", *volume.LinodeID, linodeID)
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	}
+
 	if err := linodeCS.CloudProvider.DetachVolume(ctx, volumeID); err != nil {
 		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
