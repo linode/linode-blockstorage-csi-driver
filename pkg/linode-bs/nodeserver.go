@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	maxVolumesPerNode = 8
+	maxVolumesPerNode = 7
 )
 
 type LinodeNodeServer struct {
