@@ -1,4 +1,5 @@
-# Linode Block Storage CSI Driver [![Test](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/test.yml) [![Docker build](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml/badge.svg?branch=master)](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml)
+# Linode Block Storage CSI Driver
+[![Test](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/test.yml) [![Docker build](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml/badge.svg?branch=master)](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml)
 
 ## Overview
 The Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to manage the life-cycle of persistent storage claims.
@@ -25,38 +26,37 @@ This token will need:
 * A sufficient "Expiry" to allow for continued use of your volumes
 
 ### [Recommended] Using Helm to deploy the CSI Driver
+LINODE_API_TOKEN must be a Linode APIv4 [Personal Access Token](https://cloud.linode.com/profile/tokens) with Volume and Linode permissions.
 
-Use the helm chart located under './helm-chart/csi-driver'. This dir has the manifest for Linode Block Storage CSI Driver.
+REGION must be a Linode [region](https://api.linode.com/v4/regions).
 
-#### To deploy the CSI Driver from the release artifact
+#### Install the csi-linode repo
+```shell
+helm repo add linode-csi https://linode.github.io/linode-blockstorage-csi-driver/   
+helm repo update linode-csi
+```
+
+#### To deploy the CSI Driver
 ```sh
-export VERSION=v0.6.0
 export LINODE_API_TOKEN=<linodeapitoken>
 export REGION=<linoderegion>
 
-helm install linode-csi-driver --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-blockstorage-csi-driver/releases/download/$VERSION/helm-chart-$VERSION.tgz
+helm install linode-csi-driver --set apiToken=$LINODE_API_TOKEN,region=$REGION linode-csi/linode-blockstorage-csi-driver
 ```
 _See [helm install](https://helm.sh/docs/helm/helm_install/) for command documentation._
 
-#### Uninstall
-
-To uninstall linode-csi-driver from kubernetes cluster, run the following command:
-
+#### To uninstall linode-csi-driver from kubernetes cluster. Run the following command:
 ```sh
 helm uninstall linode-csi-driver
 ```
 _See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall/) for command documentation._
 
-#### Upgrade
-
-To upgrade when new changes are made to the helm chart, run the following command:
-
+#### To upgrade when new changes are made to the helm chart. Run the following command:
 ```sh
-export VERSION=v0.6.0
 export LINODE_API_TOKEN=<linodeapitoken>
 export REGION=<linoderegion>
 
-helm upgrade linode-csi-driver --install --set apiToken=$LINODE_API_TOKEN,region=$REGION https://github.com/linode/linode-blockstorage-csi-driver/releases/download/$VERSION/helm-chart-$VERSION.tgz
+helm upgrade linode-csi-driver --install --set apiToken=$LINODE_API_TOKEN,region=$REGION linode-csi/linode-blockstorage-csi-driver
 ```
 _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documentation._
 

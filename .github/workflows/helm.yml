@@ -1,15 +1,11 @@
 name: Helm
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'helm-chart/**'
   pull_request:
     paths:
       - 'helm-chart/**'
   workflow_dispatch: {}
+  release: {}
 
 permissions:
   contents: read
@@ -26,8 +22,8 @@ jobs:
       - name: Set Version
         run: |
           TAG=$(git describe --tags --abbrev=0)
-          sed -ie "s/appVersion: \"latest\"/appVersion: ${TAG#v}/g" ./helm-chart/csi-driver/Chart.yaml
-          sed -ie "s/version: 0.0.0/version: ${TAG#v}/g" ./helm-chart/csi-driver/Chart.yaml
+          sed -ie "s/appVersion: \"latest\"/appVersion: ${TAG#helm-}/g" ./helm-chart/csi-driver/Chart.yaml
+          sed -ie "s/version: 0.0.0/version: ${TAG#helm-}/g" ./helm-chart/csi-driver/Chart.yaml
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
@@ -65,8 +61,8 @@ jobs:
       - name: Set Version
         run: |
           TAG=$(git describe --tags --abbrev=0)
-          sed -ie "s/appVersion: \"latest\"/appVersion: ${TAG#v}/g" ./helm-chart/csi-driver/Chart.yaml
-          sed -ie "s/version: 0.0.0/version: ${TAG#v}/g" ./helm-chart/csi-driver/Chart.yaml
+          sed -ie "s/appVersion: \"latest\"/appVersion: ${TAG#helm-}/g" ./helm-chart/csi-driver/Chart.yaml
+          sed -ie "s/version: 0.0.0/version: ${TAG#helm-}/g" ./helm-chart/csi-driver/Chart.yaml
 
       - name: Configure Git
         run: |
@@ -80,6 +76,7 @@ jobs:
         uses: helm/chart-releaser-action@v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CR_RELEASE_NAME_TEMPLATE: "helm-{{ .Version }}"
         with:
           charts_dir: helm-chart
           skip_existing: true
