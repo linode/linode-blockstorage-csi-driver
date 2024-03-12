@@ -126,20 +126,20 @@ func luksFormat(ctx LuksContext, source string) error {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %s", err)
+		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %w", err)
 	}
 
 	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
-		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %s, closing pipe: %s", err, stdin.Close())
+		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %w, closing pipe: %w", err, stdin.Close())
 	}
 
 	if err := stdin.Close(); err != nil {
-		return fmt.Errorf("failed to close stdin pipe, got err: %s", err)
+		return fmt.Errorf("failed to close stdin pipe, got err: %w", err)
 	}
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksFormat failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("cryptsetup luksFormat failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 
@@ -147,13 +147,12 @@ func luksFormat(ctx LuksContext, source string) error {
 	klog.V(4).Info("luksOpen ", source)
 	err = luksOpen(ctx, source)
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 
 	defer func() {
-		e := luksClose(ctx.VolumeName)
-		if e != nil {
+		if e := luksClose(ctx.VolumeName); e != nil {
 			klog.Errorf("cannot close luks device: %s", e.Error())
 		}
 	}()
@@ -182,7 +181,7 @@ func luksClose(volume string) error {
 
 	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("removing luks mapping failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("removing luks mapping failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 	return nil
@@ -210,20 +209,20 @@ func luksOpen(ctx LuksContext, volume string) error {
 	cmd := exec.Command(cryptsetupCmd, cryptsetupArgs...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %s", err)
+		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %w", err)
 	}
 
 	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
-		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %s, closing pipe: %s", err, stdin.Close())
+		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %w, closing pipe: %w", err, stdin.Close())
 	}
 
 	if err := stdin.Close(); err != nil {
-		return fmt.Errorf("failed to close stdin pipe, got err: %s", err)
+		return fmt.Errorf("failed to close stdin pipe, got err: %w", err)
 	}
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 	return nil
@@ -290,14 +289,14 @@ func blkidValid(source string) (bool, error) {
 	if err != nil {
 		exitError, ok := err.(*exec.ExitError)
 		if !ok {
-			return false, fmt.Errorf("checking blkdid failed: %v cmd: %q, args: %q", err, blkidCmd, blkidArgs)
+			return false, fmt.Errorf("checking blkdid failed: %w cmd: %q, args: %q", err, blkidCmd, blkidArgs)
 		}
 		ws := exitError.Sys().(syscall.WaitStatus)
 		exitCode = ws.ExitStatus()
 		if exitCode == 2 {
 			return false, nil
 		}
-		return false, fmt.Errorf("checking blkdid failed")
+		return false, errors.New("checking blkdid failed")
 	}
 
 	return true, nil
