@@ -64,31 +64,21 @@ func (ctx *LuksContext) validate() error {
 		return nil
 	}
 
-	appendFn := func(x string, xs string) string {
-		if xs != "" {
-			xs += "; "
-		}
-		xs += x
-		return xs
-	}
-
-	errorMsg := ""
+	var err error
 	if ctx.VolumeName == "" {
-		errorMsg = appendFn("no volume name provided", errorMsg)
+		err = errors.Join(err, fmt.Errorf("no volume name provided"))
 	}
 	if ctx.EncryptionKey == "" {
-		errorMsg = appendFn("no encryption key provided", errorMsg)
+		err = errors.Join(err, fmt.Errorf("no encryption key provided"))
 	}
 	if ctx.EncryptionCipher == "" {
-		errorMsg = appendFn("no encryption cipher provided", errorMsg)
+		err = errors.Join(err, fmt.Errorf("no encryption cipher provided"))
 	}
 	if ctx.EncryptionKeySize == "" {
-		errorMsg = appendFn("no encryption key size provided", errorMsg)
+		err = errors.Join(err, fmt.Errorf("no encryption key size provided"))
 	}
-	if errorMsg == "" {
-		return nil
-	}
-	return errors.New(errorMsg)
+
+	return err
 }
 
 func getLuksContext(secrets map[string]string, context map[string]string, lifecycle VolumeLifecycle) LuksContext {
