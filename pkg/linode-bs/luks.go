@@ -66,16 +66,16 @@ func (ctx *LuksContext) validate() error {
 
 	var err error
 	if ctx.VolumeName == "" {
-		err = errors.Join(err, fmt.Errorf("no volume name provided"))
+		err = errors.Join(err, errors.New("no volume name provided"))
 	}
 	if ctx.EncryptionKey == "" {
-		err = errors.Join(err, fmt.Errorf("no encryption key provided"))
+		err = errors.Join(err, errors.New("no encryption key provided"))
 	}
 	if ctx.EncryptionCipher == "" {
-		err = errors.Join(err, fmt.Errorf("no encryption cipher provided"))
+		err = errors.Join(err, errors.New("no encryption cipher provided"))
 	}
 	if ctx.EncryptionKeySize == "" {
-		err = errors.Join(err, fmt.Errorf("no encryption key size provided"))
+		err = errors.Join(err, errors.New("no encryption key size provided"))
 	}
 
 	return err
