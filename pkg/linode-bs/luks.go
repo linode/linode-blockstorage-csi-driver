@@ -114,7 +114,7 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 	}
 }
 
-func luksFormat(source string, ctx LuksContext) error {
+func luksFormat(ctx LuksContext, source string) error {
 	cryptsetupCmd, err := getCryptsetupCmd()
 	if err != nil {
 		return err
@@ -155,7 +155,7 @@ func luksFormat(source string, ctx LuksContext) error {
 
 	// open the luks partition
 	klog.V(4).Info("luksOpen ", source)
-	err = luksOpen(source, ctx)
+	err = luksOpen(ctx, source)
 	if err != nil {
 		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
@@ -174,8 +174,8 @@ func luksFormat(source string, ctx LuksContext) error {
 }
 
 // prepares a luks-encrypted volume for mounting and returns the path of the mapped volume
-func luksPrepareMount(source string, ctx LuksContext) (string, error) {
-	if err := luksOpen(source, ctx); err != nil {
+func luksPrepareMount(ctx LuksContext, source string) (string, error) {
+	if err := luksOpen(ctx, source); err != nil {
 		return "", err
 	}
 	return "/dev/mapper/" + ctx.VolumeName, nil
@@ -198,7 +198,7 @@ func luksClose(volume string) error {
 	return nil
 }
 
-func luksOpen(volume string, ctx LuksContext) error {
+func luksOpen(ctx LuksContext, volume string) error {
 	// check if the luks volume is already open
 	if _, err := os.Stat("/dev/mapper/" + ctx.VolumeName); !os.IsNotExist(err) {
 		klog.V(4).Infof("luks volume is already open %s", volume)
