@@ -140,10 +140,12 @@ func luksFormat(source string, ctx LuksContext) error {
 	}
 
 	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
-		stdin.Close()
-		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %s", err)
+		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %s, closing pipe: %s", err, stdin.Close())
 	}
-	stdin.Close()
+
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close stdin pipe, got err: %s", err)
+	}
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -222,10 +224,12 @@ func luksOpen(volume string, ctx LuksContext) error {
 	}
 
 	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
-		stdin.Close()
-		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %s", err)
+		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %s, closing pipe: %s", err, stdin.Close())
 	}
-	stdin.Close()
+
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close stdin pipe, got err: %s", err)
+	}
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
