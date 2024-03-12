@@ -67,7 +67,7 @@ func GetStatefulSetObject(name, namespace, storageClass string) *appsv1.Stateful
 						AccessModes: []core.PersistentVolumeAccessMode{
 							core.ReadWriteOnce,
 						},
-						Resources: core.ResourceRequirements{
+						Resources: core.VolumeResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceName(core.ResourceStorage): resource.MustParse("1Gi"),
 							},
@@ -80,7 +80,7 @@ func GetStatefulSetObject(name, namespace, storageClass string) *appsv1.Stateful
 }
 
 func (f *Invocation) CreateStatefulSet(sts *appsv1.StatefulSet) error {
-	_, err := f.kubeClient.AppsV1().StatefulSets(sts.ObjectMeta.Namespace).Create(sts)
+	_, err := f.kubeClient.AppsV1().StatefulSets(sts.ObjectMeta.Namespace).Create(f.ctx, sts, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -88,9 +88,9 @@ func (f *Invocation) CreateStatefulSet(sts *appsv1.StatefulSet) error {
 }
 
 func (f *Invocation) DeleteStatefulSet(meta metav1.ObjectMeta) error {
-	return f.kubeClient.AppsV1().StatefulSets(meta.Namespace).Delete(meta.Name, deleteInForeground())
+	return f.kubeClient.AppsV1().StatefulSets(meta.Namespace).Delete(f.ctx, meta.Name, deleteInForeground())
 }
 
 func (f *Invocation) GetStatefulSet(name, namespace string) (*appsv1.StatefulSet, error) {
-	return f.kubeClient.AppsV1().StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	return f.kubeClient.AppsV1().StatefulSets(namespace).Get(f.ctx, name, metav1.GetOptions{})
 }

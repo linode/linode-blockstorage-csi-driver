@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,12 +60,12 @@ func (f *Invocation) GetPodObject(name, namespace, pvc string, volumeType core.P
 }
 
 func (f *Invocation) CreatePod(pod *core.Pod) error {
-	_, err := f.kubeClient.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(pod)
+	_, err := f.kubeClient.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(f.ctx, pod, metav1.CreateOptions{})
 	return err
 }
 
 func (f *Invocation) DeletePod(meta metav1.ObjectMeta) error {
-	err := f.kubeClient.CoreV1().Pods(meta.Namespace).Delete(meta.Name, deleteInForeground())
+	err := f.kubeClient.CoreV1().Pods(meta.Namespace).Delete(f.ctx, meta.Name, deleteInForeground())
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -74,11 +73,11 @@ func (f *Invocation) DeletePod(meta metav1.ObjectMeta) error {
 }
 
 func (f *Invocation) GetPod(name, namespace string) (*core.Pod, error) {
-	return f.kubeClient.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+	return f.kubeClient.CoreV1().Pods(namespace).Get(f.ctx, name, metav1.GetOptions{})
 }
 
 func (f *Invocation) IsPodReady(meta metav1.ObjectMeta) error {
-	pod, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
+	pod, err := f.kubeClient.CoreV1().Pods(meta.Namespace).Get(f.ctx, meta.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -100,10 +99,11 @@ func (f *Invocation) CheckIfFileIsInPod(filename string, pod *core.Pod) error {
 	out, err := exec.ExecIntoPod(f.restConfig, pod, exec.Command([]string{
 		"ls", filename,
 	}...))
-	if out == filename {
+	if out == filename || err == nil {
 		return nil
 	}
-	return errors.Wrap(err, fmt.Sprintf("file name %v not found", filename))
+
+	return fmt.Errorf("file name %v not found: %w", filename, err)
 }
 
 func (f *Invocation) MkfsInPod(pod *core.Pod) error {

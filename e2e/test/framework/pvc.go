@@ -26,7 +26,7 @@ func (f *Invocation) GetPersistentVolumeClaimObject(
 				core.ReadWriteOnce,
 			},
 			StorageClassName: &storageClass,
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: resource.MustParse(size),
 				},
@@ -45,21 +45,21 @@ func (f *Invocation) GetPersistentVolumeClaimObject(
 }
 
 func (f *Invocation) GetPersistentVolumeClaim(meta metav1.ObjectMeta) (*core.PersistentVolumeClaim, error) {
-	return f.kubeClient.CoreV1().PersistentVolumeClaims(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
+	return f.kubeClient.CoreV1().PersistentVolumeClaims(meta.Namespace).Get(f.ctx, meta.Name, metav1.GetOptions{})
 }
 
 func (f *Invocation) UpdatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim) error {
-	_, err := f.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+	_, err := f.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(f.ctx, pvc, metav1.UpdateOptions{})
 	return err
 }
 
 func (f *Invocation) CreatePersistentVolumeClaim(pvc *core.PersistentVolumeClaim) error {
-	_, err := f.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+	_, err := f.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(f.ctx, pvc, metav1.CreateOptions{})
 	return err
 }
 
 func (f *Invocation) DeletePersistentVolumeClaim(meta metav1.ObjectMeta) error {
-	err := f.kubeClient.CoreV1().PersistentVolumeClaims(meta.Namespace).Delete(meta.Name, nil)
+	err := f.kubeClient.CoreV1().PersistentVolumeClaims(meta.Namespace).Delete(f.ctx, meta.Name, metav1.DeleteOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -67,7 +67,7 @@ func (f *Invocation) DeletePersistentVolumeClaim(meta metav1.ObjectMeta) error {
 }
 
 func (f *Invocation) GetVolumeSize(pvc *core.PersistentVolumeClaim) (int, error) {
-	pv, err := f.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := f.kubeClient.CoreV1().PersistentVolumes().Get(f.ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 	if err != nil {
 		return -1, err
 	}
@@ -85,7 +85,7 @@ func (f *Invocation) GetVolumeSize(pvc *core.PersistentVolumeClaim) (int, error)
 }
 
 func (f *Invocation) GetVolumeID(pvc *core.PersistentVolumeClaim) (int, error) {
-	pv, err := f.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := f.kubeClient.CoreV1().PersistentVolumes().Get(f.ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 	if err != nil {
 		return -1, err
 	}
