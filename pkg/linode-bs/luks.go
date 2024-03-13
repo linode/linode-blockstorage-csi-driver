@@ -24,6 +24,7 @@ package linodebs
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -63,31 +64,21 @@ func (ctx *LuksContext) validate() error {
 		return nil
 	}
 
-	var appendFn = func(x string, xs string) string {
-		if xs != "" {
-			xs += "; "
-		}
-		xs += x
-		return xs
-	}
-
-	errorMsg := ""
+	var err error
 	if ctx.VolumeName == "" {
-		errorMsg = appendFn("no volume name provided", errorMsg)
+		err = errors.Join(err, errors.New("no volume name provided"))
 	}
 	if ctx.EncryptionKey == "" {
-		errorMsg = appendFn("no encryption key provided", errorMsg)
+		err = errors.Join(err, errors.New("no encryption key provided"))
 	}
 	if ctx.EncryptionCipher == "" {
-		errorMsg = appendFn("no encryption cipher provided", errorMsg)
+		err = errors.Join(err, errors.New("no encryption cipher provided"))
 	}
 	if ctx.EncryptionKeySize == "" {
-		errorMsg = appendFn("no encryption key size provided", errorMsg)
+		err = errors.Join(err, errors.New("no encryption key size provided"))
 	}
-	if errorMsg == "" {
-		return nil
-	}
-	return errors.New(errorMsg)
+
+	return err
 }
 
 func getLuksContext(secrets map[string]string, context map[string]string, lifecycle VolumeLifecycle) LuksContext {
@@ -113,22 +104,11 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 	}
 }
 
-func luksFormat(source string, ctx LuksContext) error {
+func luksFormat(ctx LuksContext, source string) error {
 	cryptsetupCmd, err := getCryptsetupCmd()
 	if err != nil {
 		return err
 	}
-	filename, err := writeLuksKey(ctx.EncryptionKey)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		e := os.Remove(filename)
-		if e != nil {
-			klog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
-		}
-	}()
 
 	// initialize the luks partition
 	cryptsetupArgs := []string{
@@ -136,29 +116,43 @@ func luksFormat(source string, ctx LuksContext) error {
 		"--batch-mode",
 		"--cipher", ctx.EncryptionCipher,
 		"--key-size", ctx.EncryptionKeySize,
-		"--key-file", filename,
+		"--key-file", "-",
 		"luksFormat", source,
 	}
 
 	klog.V(4).Info("executing cryptsetup luksFormat command ", cryptsetupArgs)
 
-	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
+	cmd := exec.Command(cryptsetupCmd, cryptsetupArgs...)
+
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksFormat failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %w", err)
+	}
+
+	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
+		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %w, closing pipe: %w", err, stdin.Close())
+	}
+
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close stdin pipe, got err: %w", err)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cryptsetup luksFormat failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 
 	// open the luks partition
-	klog.V(4).Info("luksOpen ", source, filename)
-	err = luksOpen(source, filename, ctx)
+	klog.V(4).Info("luksOpen ", source)
+	err = luksOpen(ctx, source)
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 
 	defer func() {
-		e := luksClose(ctx.VolumeName)
-		if e != nil {
+		if e := luksClose(ctx.VolumeName); e != nil {
 			klog.Errorf("cannot close luks device: %s", e.Error())
 		}
 	}()
@@ -169,20 +163,8 @@ func luksFormat(source string, ctx LuksContext) error {
 }
 
 // prepares a luks-encrypted volume for mounting and returns the path of the mapped volume
-func luksPrepareMount(source string, ctx LuksContext) (string, error) {
-	filename, err := writeLuksKey(ctx.EncryptionKey)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		e := os.Remove(filename)
-		if e != nil {
-			klog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
-		}
-	}()
-
-	err = luksOpen(source, filename, ctx)
-	if err != nil {
+func luksPrepareMount(ctx LuksContext, source string) (string, error) {
+	if err := luksOpen(ctx, source); err != nil {
 		return "", err
 	}
 	return "/dev/mapper/" + ctx.VolumeName, nil
@@ -199,49 +181,13 @@ func luksClose(volume string) error {
 
 	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("removing luks mapping failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("removing luks mapping failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 	return nil
 }
 
-// checks if the given volume is formatted by checking if it is a luks volume and
-// if the luks volume, once opened, contains a filesystem
-//func isLuksVolumeFormatted(volume string, ctx LuksContext) (bool, error) {
-//	isLuks, err := isLuks(volume)
-//	if err != nil {
-//		return false, err
-//	}
-//	if !isLuks {
-//		return false, nil
-//	}
-//
-//	filename, err := writeLuksKey(ctx.EncryptionKey)
-//	if err != nil {
-//		return false, err
-//	}
-//	defer func() {
-//		e := os.Remove(filename)
-//		if e != nil {
-//			klog.Errorf("cannot delete temporary file %s: %s", filename, e.Error())
-//		}
-//	}()
-//
-//	err = luksOpen(volume, filename, ctx)
-//	if err != nil {
-//		return false, err
-//	}
-//	defer func() {
-//		e := luksClose(ctx.VolumeName)
-//		if e != nil {
-//			klog.Errorf("cannot close luks device: %s", e.Error())
-//		}
-//	}()
-//
-//	return blkidValid(volume)
-//}
-
-func luksOpen(volume string, keyFile string, ctx LuksContext) error {
+func luksOpen(ctx LuksContext, volume string) error {
 	// check if the luks volume is already open
 	if _, err := os.Stat("/dev/mapper/" + ctx.VolumeName); !os.IsNotExist(err) {
 		klog.V(4).Infof("luks volume is already open %s", volume)
@@ -255,34 +201,32 @@ func luksOpen(volume string, keyFile string, ctx LuksContext) error {
 	cryptsetupArgs := []string{
 		"--batch-mode",
 		"luksOpen",
-		"--key-file", keyFile,
+		"--key-file", "-",
 		volume, ctx.VolumeName,
 	}
 	klog.V(4).Info("executing cryptsetup luksOpen command")
-	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
+
+	cmd := exec.Command(cryptsetupCmd, cryptsetupArgs...)
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %v cmd: '%s %s' output: %q",
+		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %w", err)
+	}
+
+	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
+		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %w, closing pipe: %w", err, stdin.Close())
+	}
+
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close stdin pipe, got err: %w", err)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 	return nil
 }
-
-// runs cryptsetup isLuks for a given volume
-//func isLuks(volume string) (bool, error) {
-//	cryptsetupCmd, err := getCryptsetupCmd()
-//	if err != nil {
-//		return false, err
-//	}
-//	cryptsetupArgs := []string{"--batch-mode", "isLuks", volume}
-//
-//	// cryptsetup isLuks exits with code 0 if the target is a luks volume; otherwise it returns
-//	// a non-zero exit code which exec.Command interprets as an error
-//	_, err = exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-//	if err != nil {
-//		return false, nil
-//	}
-//	return true, nil
-//}
 
 // check is a given mapping under /dev/mapper is a luks volume
 func isLuksMapping(volume string) (bool, string, error) {
@@ -323,36 +267,6 @@ func getCryptsetupCmd() (string, error) {
 	return cryptsetupCmd, nil
 }
 
-// writes the given luks encryption key to a temporary file and returns the name of the temporary
-// file
-func writeLuksKey(key string) (string, error) {
-	if !checkTmpFs("/tmp") {
-		return "", errors.New("temporary directory /tmp is not a tmpfs volume; refusing to write luks key to a volume backed by a disk")
-	}
-	tmpFile, err := os.CreateTemp("/tmp", "luks-")
-	if err != nil {
-		return "", err
-	}
-	_, err = tmpFile.WriteString(key)
-	if err != nil {
-		klog.Error("Unable to write luks key file")
-		return "", err
-	}
-	return tmpFile.Name(), nil
-}
-
-// makes sure that the given directory is a tmpfs to prevent key leakage
-func checkTmpFs(dir string) bool {
-	out, err := exec.Command("sh", "-c", "df -T "+dir+" | tail -n1 | awk '{print $2}'").CombinedOutput()
-	if err != nil {
-		return false
-	}
-	if len(out) == 0 {
-		return false
-	}
-	return strings.TrimSpace(string(out)) == "tmpfs"
-}
-
 func blkidValid(source string) (bool, error) {
 	if source == "" {
 		return false, errors.New("invalid source")
@@ -375,14 +289,14 @@ func blkidValid(source string) (bool, error) {
 	if err != nil {
 		exitError, ok := err.(*exec.ExitError)
 		if !ok {
-			return false, fmt.Errorf("checking blkdid failed: %v cmd: %q, args: %q", err, blkidCmd, blkidArgs)
+			return false, fmt.Errorf("checking blkdid failed: %w cmd: %q, args: %q", err, blkidCmd, blkidArgs)
 		}
 		ws := exitError.Sys().(syscall.WaitStatus)
 		exitCode = ws.ExitStatus()
 		if exitCode == 2 {
 			return false, nil
 		}
-		return false, fmt.Errorf("checking blkdid failed")
+		return false, errors.New("checking blkdid failed")
 	}
 
 	return true, nil

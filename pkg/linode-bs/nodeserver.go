@@ -310,12 +310,12 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 			if err := luksContext.validate(); err != nil {
 				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to luks format validation (%q): %v", devicePath, err))
 			}
-			if err := luksFormat(devicePath, luksContext); err != nil {
+			if err := luksFormat(luksContext, devicePath); err != nil {
 				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to luks format (%q): %v", devicePath, err))
 			}
 		}
 
-		luksSource, err := luksPrepareMount(devicePath, luksContext)
+		luksSource, err := luksPrepareMount(luksContext, devicePath)
 		if err != nil {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to prepare luks mount (%q): %v", devicePath, err))
 		}
