@@ -27,6 +27,10 @@ lint: vet
 test: vet verify
 	go test -v ./... -cover $(TEST_ARGS)
 
+.PHONY: elevated-test
+elevated-test:
+	sudo go test -v ./... -cover -tags=elevated $(TEST_ARGS)
+
 .PHONY: build
 build:
 	go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' ./main.go
