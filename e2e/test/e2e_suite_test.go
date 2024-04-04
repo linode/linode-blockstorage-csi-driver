@@ -28,7 +28,7 @@ var (
 	clusterName string
 	linodeDebug = false
 	linodeURL   = "https://api.linode.com"
-	region      = "us-east"
+	region      = "us-sea"
 )
 
 func init() {

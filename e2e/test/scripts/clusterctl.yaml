@@ -1,0 +1,6 @@
+CLUSTER_TOPOLOGY: "true"
+EXP_CLUSTER_RESOURCE_SET: "true"
+providers:
+   - name: linode
+     url: ${PWD}/e2e/test/scripts/infrastructure-linode/${CAPLI_VERSION}/infrastructure-components.yaml
+     type: InfrastructureProvider

@@ -38,6 +38,4 @@ dist/
 coverage.txt
 *.coverprofile
 
-*.terraform
-e2e/test/terraform*
 *junit.xml

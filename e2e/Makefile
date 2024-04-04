@@ -4,7 +4,7 @@ IMAGE_VERSION=canary
 K8S_VERSION?=""
 GINKGO_PATH := $(shell go env GOPATH)/bin/ginkgo
 
-.PHONY: test clean check-token install-terraform test-manifest
+.PHONY: test clean check-token install-dependencies test-manifest
 
 test-manifest:
 	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
@@ -26,8 +26,10 @@ check-token:
 	  exit 1; \
 	fi
 
-install-terraform:
-	sudo apt-get install wget unzip
-	wget https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip
-	unzip terraform_0.11.13_linux_amd64.zip
-	sudo mv terraform /usr/local/bin/
+install-dependencies:
+	sudo apt-get install curl
+	curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v0.8.28/ctlptl.0.8.28.linux.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
+	chmod +x /usr/local/bin/ctlptl
+	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.6.3/clusterctl-linux-amd64 -o /usr/local/bin/clusterctl
+	chmod +x /usr/local/bin/clusterctl
+

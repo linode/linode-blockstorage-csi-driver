@@ -5,7 +5,8 @@
 Install the following packages (macOS examples)
 
 ```
-brew install terraform
+brew install ctlptl
+brew install clusterctl
 brew install kubectl
 brew install golang
 ```
