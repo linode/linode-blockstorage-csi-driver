@@ -1,12 +1,13 @@
 export GO111MODULE=on
 
-IMAGE_VERSION?=canary
+IMAGE_TAG?=canary
+IMAGE_NAME?="linode/linode-blockstorage-csi-driver"
 K8S_VERSION?="v1.28.7"
 
 .PHONY: test clean check-token test-manifest
 
 test-manifest: kustomize
-	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
+	../hack/generate-yaml.sh $(IMAGE_TAG) $(IMAGE_NAME) > test/manifest/linode-blockstorage-csi-driver.yaml
 
 test-cluster: ctlptl clean-cluster
 	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
