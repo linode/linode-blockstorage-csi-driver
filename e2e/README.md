@@ -2,15 +2,6 @@
 
 ### Building
 
-Install the following packages (macOS examples)
-
-```
-brew install ctlptl
-brew install clusterctl
-brew install kubectl
-brew install golang
-```
-
 Add the following environment variables to your shell rc
 
 ```
