@@ -16,7 +16,7 @@ clean-cluster: ctlptl
 	ctlptl delete cluster kind-management --ignore-not-found
 	rm -rf ./test/kind-management.conf
 
-test: clusterctl ginkgo check-token test-manifest test-cluster
+test: kind clusterctl ginkgo check-token test-manifest test-cluster
 	go list -m; \
 	ginkgo -r --vv --procs=1 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
@@ -72,16 +72,18 @@ $(LOCALBIN):
 GINKGO         ?= $(LOCALBIN)/ginkgo
 CTLPTL         ?= $(LOCALBIN)/ctlptl
 CLUSTERCTL     ?= $(LOCALBIN)/clusterctl
+KIND           ?= $(LOCALBIN)/kind
 KUSTOMIZE      ?= $(LOCALBIN)/kustomize
 
 ## Tool Versions
 GINKGO_VERSION           ?= v2.13.2
 CTLPTL_VERSION           ?= v0.8.28
 CLUSTERCTL_VERSION       ?= v1.6.3
+KIND_VERSION             ?= v0.22.0
 KUSTOMIZE_VERSION        ?= v5.3.0
 
 .PHONY: tools
-tools: ginkgo ctlptl clusterctl kustomize
+tools: ginkgo ctlptl clusterctl kind kustomize
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO)
@@ -98,6 +100,12 @@ clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
 $(CLUSTERCTL): $(LOCALBIN)
 	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(OS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
 	chmod +x $(CLUSTERCTL)
+
+.PHONY: kind
+kind: $(KIND) ## Download kustomize locally if necessary.
+$(KIND): $(LOCALBIN)
+	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/v0.22.0/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
+	chmod +x $(KIND)
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
