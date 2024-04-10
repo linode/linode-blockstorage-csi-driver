@@ -62,16 +62,6 @@ through the `$SUITE_ARGS` environment variable to modify its behavior:
  - Similarly, the Linode API base URL can be changed from
    `https://api.linode.com` with the `--linode-url` flag.
 
-#### Using an existing cluster
-
-If using an existing cluster, ensure that the cluster's kubeconfig is available
-as a file in your filesystem. Then supply the following flags through the
-`$SUITE_ARGS` environment variable to have the e2e use the cluster:
-
-```
-export SUITE_ARGS="--use-existing --kubeconfig=<path to kubeconfig>"
-```
-
 #### Creating a new cluster
 
 By default the tests use $HOME/.ssh/id\_rsa.pub as the public key used to
@@ -96,3 +86,14 @@ make test
 
 To save time on multiple runs by allowing the cluster to remain, export the
 `$SUITE_ARGS` and ensure that the `--reuse` flag is set.
+
+#### Using an existing cluster
+
+If using an existing cluster, ensure that the cluster's kubeconfig is available
+as a file in your filesystem. Then supply the following flags through the
+`$SUITE_ARGS` environment variable to have the e2e use the cluster:
+
+```
+export SUITE_ARGS="--use-existing --kubeconfig=<path to kubeconfig>"
+```
+
