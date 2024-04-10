@@ -308,8 +308,58 @@ var _ = Describe("Linode CSI Driver", func() {
 					volumeType = core.PersistentVolumeBlock
 					size = "10Gi"
 				})
-				It("should write and read", func() {
+				It("should validate expansion", func() {
 					expandVolume("15Gi")
+				})
+			})
+
+			// LUKS
+			Context("LUKS Encrypted Volume", func() {
+				var (
+					originalStorageClass string
+					luksSecretName       string
+				)
+				BeforeEach(func() {
+					volumeType = core.PersistentVolumeFilesystem
+					size = "10Gi"
+
+					// Create Secret
+					luksSecretName = "luks"
+					Eventually(func() error {
+						return f.CreateLuksSecret(luksSecretName)
+					}, f.Timeout, f.RetryInterval).Should(Succeed())
+
+					// Create Storage Class
+					params := f.GetLuksParameters(luksSecretName, "kube-system")
+					sc := f.GetStorageClass("luks", params)
+					Eventually(func() error {
+						return f.CreateStorageClass(sc)
+					}, f.Timeout, f.RetryInterval).Should(Succeed())
+
+					originalStorageClass = storageClass
+					storageClass = sc.Name
+				})
+				It("should validate LUKS volumes", func() {
+					writeFile(file)
+					readFile(file)
+				})
+				// AfterEach is required here because the
+				// storage class and secret names are static.
+				// This means that reuse of clusters causes
+				// problems as Creates will fail due to the
+				// objects already existing.
+				AfterEach(func() {
+					// Delete StorageClass
+					Eventually(func() error {
+						return f.DeleteStorageClass(storageClass)
+					}).Should(Succeed())
+
+					// Delete Secret
+					Eventually(func() error {
+						return f.DeleteLuksSecret(luksSecretName)
+					}).Should(Succeed())
+
+					storageClass = originalStorageClass
 				})
 			})
 		})
