@@ -85,7 +85,9 @@ make test
 ```
 
 To save time on multiple runs by allowing the cluster to remain, export the
-`$SUITE_ARGS` and ensure that the `--reuse` flag is set.
+`$SUITE_ARGS` and ensure that the `--reuse` flag is set. Once a cluster has
+been created using the `--reuse` flag see the section below for how to use an
+existing cluster.
 
 #### Using an existing cluster
 
