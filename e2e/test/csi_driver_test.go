@@ -1,10 +1,11 @@
 package test
 
 import (
-	"e2e_test/test/framework"
 	"fmt"
 	"math/rand"
 	"strconv"
+
+	"e2e_test/test/framework"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
