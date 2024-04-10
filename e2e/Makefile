@@ -18,7 +18,7 @@ clean-cluster: ctlptl
 
 test: kind clusterctl ginkgo check-token test-manifest test-cluster
 	go list -m; \
-	ginkgo -r --vv --procs=1 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
+	ginkgo -r --vv --procs=2 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
 	$(MAKE) clean-cluster
 
