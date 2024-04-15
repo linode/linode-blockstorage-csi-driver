@@ -8,14 +8,14 @@ K8S_VERSION?="v1.28.7"
 test-manifest: kustomize
 	../hack/generate-yaml.sh $(IMAGE_VERSION) > test/manifest/linode-blockstorage-csi-driver.yaml
 
-test-cluster: ctlptl clean-cluster
+test-cluster: ctlptl clean-cluster test-manifest
 	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
 
 clean-cluster: ctlptl
 	ctlptl delete cluster kind-management --ignore-not-found
 	rm -rf ./test/kind-management.conf
 
-test: clusterctl ginkgo check-token test-manifest test-cluster
+test: clusterctl ginkgo check-token test-cluster
 	go list -m; \
 	ginkgo -r --vv --procs=1 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
