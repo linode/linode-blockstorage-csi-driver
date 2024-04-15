@@ -104,7 +104,7 @@ $(CLUSTERCTL): $(LOCALBIN)
 .PHONY: kind
 kind: $(KIND) ## Download kustomize locally if necessary.
 $(KIND): $(LOCALBIN)
-	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/v0.22.0/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
+	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/$(KIND_VERSION)/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
 	chmod +x $(KIND)
 
 .PHONY: kustomize
