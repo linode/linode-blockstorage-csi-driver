@@ -36,6 +36,21 @@ make build
 
 ### Running
 
+Build a docker image passing the `IMAGE_TAG` argument to the make target
+so a custom tag is applied. Then push the image to a public repository.
+
+> You can use any public repository that you have access to. The tags used below are just examples
+
+```
+make docker-build IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+make docker-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+```
+
+Finally run the tests passing the name of the image and the tag so that your custom image is used.
+```
+make test IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_TAG=test-e2e
+```
+
 When running the e2e tests, a couple of options can be passed to the test
 through the `$SUITE_ARGS` environment variable to modify its behavior: 
 
@@ -46,16 +61,6 @@ through the `$SUITE_ARGS` environment variable to modify its behavior:
 
  - Similarly, the Linode API base URL can be changed from
    `https://api.linode.com` with the `--linode-url` flag.
-
-#### Using an existing cluster
-
-If using an existing cluster, ensure that the cluster's kubeconfig is available
-as a file in your filesystem. Then supply the following flags through the
-`$SUITE_ARGS` environment variable to have the e2e use the cluster:
-
-```
-export SUITE_ARGS="--use-existing --kubeconfig=<path to kubeconfig>"
-```
 
 #### Creating a new cluster
 
@@ -80,4 +85,17 @@ make test
 ```
 
 To save time on multiple runs by allowing the cluster to remain, export the
-`$SUITE_ARGS` and ensure that the `--reuse` flag is set.
+`$SUITE_ARGS` and ensure that the `--reuse` flag is set. Once a cluster has
+been created using the `--reuse` flag see the section below for how to use an
+existing cluster.
+
+#### Using an existing cluster
+
+If using an existing cluster, ensure that the cluster's kubeconfig is available
+as a file in your filesystem. Then supply the following flags through the
+`$SUITE_ARGS` environment variable to have the e2e use the cluster:
+
+```
+export SUITE_ARGS="--use-existing --kubeconfig=<path to kubeconfig>"
+```
+
