@@ -9,16 +9,16 @@ K8S_VERSION?="v1.28.7"
 test-manifest: kustomize
 	../hack/generate-yaml.sh $(IMAGE_TAG) $(IMAGE_NAME) > test/manifest/linode-blockstorage-csi-driver.yaml
 
-test-cluster: ctlptl clean-cluster test-manifest
+test-cluster: kind ctlptl clean-cluster test-manifest
 	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
 
 clean-cluster: ctlptl
-	ctlptl delete cluster kind-management --ignore-not-found
+	$(CTLPTL) delete cluster kind-management --ignore-not-found
 	rm -rf ./test/kind-management.conf
 
 test: kind clusterctl ginkgo check-token test-cluster
 	go list -m; \
-	ginkgo -r --vv --procs=2 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
+	$(GINKGO) -r --vv --procs=2 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
 
 	$(MAKE) clean-cluster
 
@@ -65,6 +65,8 @@ ifdef DEVBOX_PACKAGES_DIR
 endif
 
 export PATH := $(CACHE_BIN):$(PATH)
+$(CACHE_BIN):
+	mkdir -p $(CACHE_BIN)
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
@@ -102,7 +104,7 @@ $(CLUSTERCTL): $(LOCALBIN)
 	chmod +x $(CLUSTERCTL)
 
 .PHONY: kind
-kind: $(KIND) ## Download kustomize locally if necessary.
+kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/$(KIND_VERSION)/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
 	chmod +x $(KIND)

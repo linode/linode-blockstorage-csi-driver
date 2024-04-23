@@ -16,13 +16,10 @@ export KUBECONFIG="$(realpath "$(dirname "$0")/../kind-management.conf")"
 
 if [[ -z "$4" ]]
 then
-  export LINODE_REGION="us-sea"
+  export LINODE_REGION="eu-west"
 else
   export LINODE_REGION="$4"
 fi
-
-METADATA_REGIONS="nl-ams in-maa us-ord id-cgk us-lax es-mad us-mia it-mil jp-osa fr-par br-gru us-sea se-sto us-iad"
-[[ "$METADATA_REGIONS" =~ .*"${LINODE_REGION}".* ]] || (echo "Given region doesn't support Metadata service" ; exit 1)
 
 kubectl create ns ${CLUSTER_NAME}
 (cd $(realpath "$(dirname "$0")"); clusterctl generate cluster ${CLUSTER_NAME} \
