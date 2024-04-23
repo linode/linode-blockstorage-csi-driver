@@ -2,5 +2,5 @@ CLUSTER_TOPOLOGY: "true"
 EXP_CLUSTER_RESOURCE_SET: "true"
 providers:
    - name: linode
-     url: ${PWD}/infrastructure-linode/${CAPLI_VERSION}/infrastructure-components.yaml
+     url: ${PWD}/infrastructure-linode/${CAPL_VERSION}/infrastructure-components.yaml
      type: InfrastructureProvider

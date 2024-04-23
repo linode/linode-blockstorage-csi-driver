@@ -8,7 +8,7 @@ set -x
 export LINODE_TOKEN="$1"
 export CLUSTER_NAME="$2"
 export KUBERNETES_VERSION="$3"
-export CAPLI_VERSION="0.1.0"
+export CAPL_VERSION="0.1.0"
 export WORKER_MACHINE_COUNT=1
 export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
 export LINODE_MACHINE_TYPE=g6-standard-2
