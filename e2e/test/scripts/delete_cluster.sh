@@ -5,20 +5,9 @@ set -o pipefail
 set -o nounset
 set -x
 
-cluster_name="$1"
-terraform apply -destroy -auto-approve
+export CLUSTER_NAME="$1"
+export KUBECONFIG="$(realpath "$(dirname "$0")/../kind-management.conf")"
 
-rm cluster.tf
-
-rm -rf test/.terraform
-
-if [[ -d ".terraform" ]]
-then
-    rm -rf .terraform
-fi
-
-if [[ -d "terraform.tfstate.d" ]]
-then
-    rm -rf terraform.tfstate.d
-fi
+kubectl delete linodecluster -n ${CLUSTER_NAME} --timeout=5m --all --wait
+kubectl delete ns ${CLUSTER_NAME} --timeout=5m --force --ignore-not-found
 

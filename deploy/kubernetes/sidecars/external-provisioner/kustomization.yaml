@@ -1,49 +1,48 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - rbac.yaml
+- rbac.yaml
 namespace: kube-system
-patchesStrategicMerge:
-  - |-
+patches:
+- patch: |-
+    - op: replace
+      path: /metadata/name
+      value: external-provisioner-role
+  target:
+    group: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: external-provisioner-runner
+    version: v1
+- patch: |-
+    - op: replace
+      path: /metadata/name
+      value: csi-controller-provisioner-binding
+    - op: replace
+      path: /subjects/0/name
+      value: csi-controller-sa
+    - op: replace
+      path: /subjects/0/namespace
+      value: kube-system
+  target:
+    group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+    name: csi-provisioner-role
+    version: v1
+- patch: |-
     kind: RoleBinding
     apiVersion: rbac.authorization.k8s.io/v1
     metadata:
       name: csi-provisioner-role-cfg
     $patch: delete
-  - |-
+- patch: |-
     kind: Role
     apiVersion: rbac.authorization.k8s.io/v1
     metadata:
       name: external-provisioner-cfg
     $patch: delete
-  - |-
+- patch: |-
     kind: ServiceAccount
     apiVersion: v1
     metadata:
       name: csi-provisioner
     $patch: delete
-patchesJson6902:
-  - target:
-      group: rbac.authorization.k8s.io
-      version: v1
-      kind: ClusterRole
-      name: external-provisioner-runner
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: external-provisioner-role
-  - target:
-      group: rbac.authorization.k8s.io
-      version: v1
-      kind: ClusterRoleBinding
-      name: csi-provisioner-role
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: csi-controller-provisioner-binding
-      - op: replace
-        path: /subjects/0/name
-        value: csi-controller-sa
-      - op: replace
-        path: /subjects/0/namespace
-        value: kube-system
