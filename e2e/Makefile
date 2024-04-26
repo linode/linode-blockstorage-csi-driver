@@ -13,14 +13,15 @@ test-cluster: kind ctlptl clean-cluster test-manifest
 	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
 
 clean-cluster: ctlptl
-	$(CTLPTL) delete cluster kind-management --ignore-not-found
+	$(CTLPTL) delete cluster kind-csi-management --ignore-not-found
 	rm -rf ./test/kind-management.conf
 
-test: kind clusterctl ginkgo check-token test-cluster
+test: kind clusterctl check-token test-cluster _test
+	$(MAKE) clean-cluster
+
+_test: ginkgo
 	go list -m; \
 	$(GINKGO) -r --vv --procs=2 --trace --cover $(TEST_ARGS) -- --v=3 --k8s-version=${K8S_VERSION} $(SUITE_ARGS)
-
-	$(MAKE) clean-cluster
 
 clean: check-token
 	cd test; \

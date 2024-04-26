@@ -21,7 +21,7 @@ else
   export LINODE_REGION="$4"
 fi
 
-kubectl create ns ${CLUSTER_NAME}
+kubectl create ns ${CLUSTER_NAME} ||:
 (cd $(realpath "$(dirname "$0")"); clusterctl generate cluster ${CLUSTER_NAME} \
   --target-namespace ${CLUSTER_NAME} \
   --flavor clusterclass-kubeadm \
@@ -33,9 +33,7 @@ until kubectl get secret -n ${CLUSTER_NAME} ${CLUSTER_NAME}-kubeconfig; do
   sleep $(((c--)))
 done
 
-kubectl get secret -n ${CLUSTER_NAME} ${CLUSTER_NAME}-kubeconfig -o jsonpath="{.data.value}" \
-  | base64 --decode \
-  > "$(pwd)/${CLUSTER_NAME}.conf"
+clusterctl get kubeconfig -n ${CLUSTER_NAME} ${CLUSTER_NAME} > "$(pwd)/${CLUSTER_NAME}.conf"
 
 export KUBECONFIG="$(pwd)/${CLUSTER_NAME}.conf"
 

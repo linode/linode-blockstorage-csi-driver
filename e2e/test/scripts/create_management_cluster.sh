@@ -12,13 +12,13 @@ export HELM_VERSION="v0.2.1"
 export KUBECONFIG="$(realpath "$(dirname "$0")/../kind-management.conf")"
 
 ctlptl create cluster kind \
-  --name kind-management \
+  --name kind-csi-management \
   --kubernetes-version ${KUBERNETES_VERSION}
 
 prepare_images() {
   local images="$(echo "$1" | grep -e "^[[:space:]]*image:[?[:space:]]" | awk '{print $2}')"
 
-  echo "${images//[\'\"]}" | xargs -I {} sh -c 'docker pull '{}' ; kind -n management load docker-image '{}
+  echo "${images//[\'\"]}" | xargs -I {} sh -c 'docker pull '{}' ; kind -n csi-management load docker-image '{}
 }
 
 (set +x; prepare_images "$(cat $(realpath "$(dirname "$0")/../manifest/linode-blockstorage-csi-driver.yaml"))")
