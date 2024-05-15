@@ -12,6 +12,8 @@ import (
 type LinodeClient interface {
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) // Needed for metadata
 	ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error)
+	ListInstanceVolumes(ctx context.Context, instanceID int, options *linodego.ListOptions) ([]linodego.Volume, error)
+	ListInstanceDisks(ctx context.Context, instanceID int, options *linodego.ListOptions) ([]linodego.InstanceDisk, error)
 
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	GetVolume(context.Context, int) (*linodego.Volume, error)

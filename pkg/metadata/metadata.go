@@ -17,6 +17,7 @@ type MetadataService interface {
 	GetProject() string
 	GetName() string
 	GetNodeID() int
+	Memory() uint
 }
 
 type metadataServiceManager struct {
@@ -25,6 +26,7 @@ type metadataServiceManager struct {
 	nodeID  int
 	label   string
 	project string
+	memory  uint // Amount of memory, in bytes
 }
 
 var _ MetadataService = &metadataServiceManager{}
@@ -61,13 +63,26 @@ func NewMetadataService(linodeClient linodeclient.LinodeClient, nodeName string)
 		}
 	}
 
+	// Figure out how much memory this instance has. The API returns the
+	// amount of memory in MB (megabytes, not mebibytes) and even then, it
+	// is a strange number.
+	//
+	// If we cannot determine how much memory the instance has, we are
+	// simply going to assume 1GiB, which is the smallest amount of memory
+	// available across all instance types as of 2024-05-16.
+	var memory uint = 1 << 30
+	if linode.Specs != nil {
+		// Store the amount of memory as number of bytes.
+		memory = uint(linode.Specs.Memory) << 20
+	}
+
 	return &metadataServiceManager{
 		region:  linode.Region,
 		nodeID:  linode.ID,
 		label:   linode.Label,
 		project: linode.Group,
+		memory:  memory,
 	}, nil
-
 }
 
 func getLinodeByID(client linodeclient.LinodeClient, id string) (*linodego.Instance, error) {
@@ -96,18 +111,8 @@ func getLinodeByLabel(client linodeclient.LinodeClient, label string) (*linodego
 	return nil, errors.New("User has no Linode instances with the given label")
 }
 
-func (manager *metadataServiceManager) GetZone() string {
-	return manager.region
-}
-
-func (manager *metadataServiceManager) GetProject() string {
-	return manager.project
-}
-
-func (manager *metadataServiceManager) GetName() string {
-	return manager.label
-}
-
-func (manager *metadataServiceManager) GetNodeID() int {
-	return manager.nodeID
-}
+func (manager *metadataServiceManager) GetZone() string    { return manager.region }
+func (manager *metadataServiceManager) GetProject() string { return manager.project }
+func (manager *metadataServiceManager) GetName() string    { return manager.label }
+func (manager *metadataServiceManager) GetNodeID() int     { return manager.nodeID }
+func (m *metadataServiceManager) Memory() uint             { return m.memory }
