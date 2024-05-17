@@ -8,7 +8,7 @@ require (
 	golang.org/x/net v0.17.0
 	golang.org/x/sys v0.13.0
 	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.33.0
 	k8s.io/apimachinery v0.19.2
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
