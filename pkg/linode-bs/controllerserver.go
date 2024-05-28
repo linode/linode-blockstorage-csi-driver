@@ -258,19 +258,34 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %d already attached to node %d", volumeID, *volume.LinodeID))
 	}
 
-	if _, err := linodeCS.CloudProvider.GetInstance(ctx, linodeID); err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
-			return nil, status.Error(codes.NotFound, fmt.Sprintf("Linode with id %d not found", linodeID))
-		}
+	instance, err := linodeCS.CloudProvider.GetInstance(ctx, linodeID)
+	if err, ok := err.(*linodego.Error); ok && err.Code == 404 {
+		return nil, status.Errorf(codes.NotFound, "Linode with id %d not found", linodeID)
+	} else if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	opts := &linodego.VolumeAttachOptions{
-		LinodeID: linodeID,
-		ConfigID: 0,
+	// Check to see if there is room to attach this volume to the instance.
+	if canAttach, err := linodeCS.canAttach(ctx, instance); err != nil {
+		return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, err.Error())
+	} else if !canAttach {
+		limit := linodeCS.maxVolumeAttachments(instance)
+		return &csi.ControllerPublishVolumeResponse{}, status.Errorf(codes.ResourceExhausted, "max number of volumes (%d) already attached to instance", limit)
 	}
 
-	if _, err := linodeCS.CloudProvider.AttachVolume(ctx, volumeID, opts); err != nil {
+	// Whether or not the volume attachment should be persisted across
+	// boots.
+	//
+	// Setting this to true will limit the maximum number of attached
+	// volumes to 8 (eight), minus any instance disks, since volume
+	// attachments get persisted by adding them to the instance's boot
+	// config.
+	persist := false
+
+	if _, err := linodeCS.CloudProvider.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+		LinodeID:           linodeID,
+		PersistAcrossBoots: &persist,
+	}); err != nil {
 		retCode := codes.Internal
 		if apiErr, ok := err.(*linodego.Error); ok && strings.Contains(apiErr.Message, "is already attached") {
 			retCode = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
@@ -287,6 +302,47 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 
 	pvInfo := map[string]string{devicePathKey: volume.FilesystemPath}
 	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
+}
+
+// canAttach indicates whether or not another volume can be attached to the
+// Linode with the given ID.
+//
+// Whether or not another volume can be attached is based on how many instance
+// disks and block storage volumes are currently attached to the Linode
+// instance.
+func (s *LinodeControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
+	// Total number of attached drives.
+	var attached int
+
+	disks, err := s.CloudProvider.ListInstanceDisks(ctx, instance.ID, nil)
+	if err != nil {
+		return false, fmt.Errorf("list instance disks: %w", err)
+	}
+	attached += len(disks)
+
+	volumes, err := s.CloudProvider.ListInstanceVolumes(ctx, instance.ID, nil)
+	if err != nil {
+		return false, fmt.Errorf("list instance volumes: %w", err)
+	}
+	attached += len(volumes)
+
+	limit := s.maxVolumeAttachments(instance)
+	return attached < limit, nil
+}
+
+// maxVolumeAttachments returns the maximum number of volumes that can be
+// attached to a single Linode instance. If instance == nil, or instance.Specs
+// == nil, [maxPersistentAttachments] will be returned.
+func (s *LinodeControllerServer) maxVolumeAttachments(instance *linodego.Instance) int {
+	if instance == nil || instance.Specs == nil {
+		return maxPersistentAttachments
+	}
+
+	// The reported amount of memory for an instance is in MB.
+	// Convert it to bytes.
+	memBytes := uint(instance.Specs.Memory) << 20
+
+	return maxVolumeAttachments(memBytes)
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
@@ -509,7 +565,6 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 	}
 
 	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -522,12 +577,12 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 	}
 	klog.V(4).Info("volume is resized")
 	return resp, nil
-
 }
 
 // attemptGetContentSourceVolume attempts to get information about the Linode volume to clone from.
 func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(
-	ctx context.Context, contentSource *csi.VolumeContentSource) (*common.LinodeVolumeKey, error) {
+	ctx context.Context, contentSource *csi.VolumeContentSource,
+) (*common.LinodeVolumeKey, error) {
 	// No content source was defined; no clone operation
 	if contentSource == nil {
 		return nil, nil
@@ -598,8 +653,8 @@ func (linodeCS *LinodeControllerServer) attemptCreateLinodeVolume(
 
 // createLinodeVolume creates a Linode volume and returns the result
 func (linodeCS *LinodeControllerServer) createLinodeVolume(
-	ctx context.Context, label string, sizeGB int, tags string) (*linodego.Volume, error) {
-
+	ctx context.Context, label string, sizeGB int, tags string,
+) (*linodego.Volume, error) {
 	volumeReq := linodego.VolumeCreateOptions{
 		Region: linodeCS.MetadataService.GetZone(),
 		Label:  label,
@@ -625,7 +680,8 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 
 // cloneLinodeVolume clones a Linode volume and returns the result
 func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
-	ctx context.Context, label string, sizeGB, sourceID int) (*linodego.Volume, error) {
+	ctx context.Context, label string, sizeGB, sourceID int,
+) (*linodego.Volume, error) {
 	klog.V(4).Infoln("cloning volume", map[string]interface{}{
 		"source_vol_id": sourceID,
 	})

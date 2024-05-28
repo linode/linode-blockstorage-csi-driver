@@ -8,6 +8,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linodego"
 )
 
@@ -179,37 +180,52 @@ func TestListVolumes(t *testing.T) {
 				}
 			}
 		})
-
 	}
-
 }
+
+var _ linodeclient.LinodeClient = &fakeLinodeClient{}
 
 type fakeLinodeClient struct {
 	volumes  []linodego.Volume
+	disks    []linodego.InstanceDisk
 	throwErr bool
 }
 
 func (flc *fakeLinodeClient) ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error) {
 	if flc.throwErr {
 		return nil, errors.New("sad times mate")
 	}
 	return flc.volumes, nil
 }
+
+func (c *fakeLinodeClient) ListInstanceVolumes(_ context.Context, _ int, _ *linodego.ListOptions) ([]linodego.Volume, error) {
+	return c.volumes, nil
+}
+
+func (c *fakeLinodeClient) ListInstanceDisks(_ context.Context, _ int, _ *linodego.ListOptions) ([]linodego.InstanceDisk, error) {
+	return c.disks, nil
+}
+
 func (flc *fakeLinodeClient) GetInstance(context.Context, int) (*linodego.Instance, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) GetVolume(context.Context, int) (*linodego.Volume, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) CreateVolume(context.Context, linodego.VolumeCreateOptions) (*linodego.Volume, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) CloneVolume(context.Context, int, string) (*linodego.Volume, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) AttachVolume(context.Context, int, *linodego.VolumeAttachOptions) (*linodego.Volume, error) {
 	return nil, nil
 }
@@ -217,6 +233,7 @@ func (flc *fakeLinodeClient) DetachVolume(context.Context, int) error { return n
 func (flc *fakeLinodeClient) WaitForVolumeLinodeID(context.Context, int, *int, int) (*linodego.Volume, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus, int) (*linodego.Volume, error) {
 	return nil, nil
 }
@@ -228,4 +245,171 @@ func (flc *fakeLinodeClient) NewEventPoller(context.Context, any, linodego.Entit
 
 func createLinodeID(i int) *int {
 	return &i
+}
+
+func TestControllerCanAttach(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		memory uint // memory in bytes
+		nvols  int  // number of volumes already attached
+		ndisks int  // number of attached disks
+		want   bool // can we attach another?
+		fail   bool // should we expect a non-nil error
+	}{
+		{
+			memory: 1 << 30, // 1GiB
+			nvols:  7,       // maxed out
+			ndisks: 1,
+		},
+		{
+			memory: 16 << 30, // 16GiB
+			nvols:  14,       // should allow one more
+			ndisks: 1,
+			want:   true,
+		},
+		{
+			memory: 16 << 30,
+			nvols:  15,
+			ndisks: 1,
+		},
+		{
+			memory: 256 << 30, // 256GiB
+			nvols:  64,        // maxed out
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for _, tt := range tests {
+		tname := fmt.Sprintf("%dGB-%d", tt.memory>>30, tt.nvols)
+		t.Run(tname, func(t *testing.T) {
+			vols := make([]linodego.Volume, 0, tt.nvols)
+			for i := 0; i < tt.nvols; i++ {
+				vols = append(vols, linodego.Volume{ID: i})
+			}
+
+			disks := make([]linodego.InstanceDisk, 0, tt.ndisks)
+			for i := 0; i < tt.ndisks; i++ {
+				disks = append(disks, linodego.InstanceDisk{ID: i})
+			}
+
+			memMB := 8192
+			if tt.memory != 0 {
+				memMB = int(tt.memory >> 20) // convert bytes -> MB
+			}
+			instance := &linodego.Instance{
+				Specs: &linodego.InstanceSpec{Memory: memMB},
+			}
+
+			srv := LinodeControllerServer{
+				CloudProvider: &fakeLinodeClient{
+					volumes: vols,
+					disks:   disks,
+				},
+			}
+
+			got, err := srv.canAttach(ctx, instance)
+			if err != nil && !tt.fail {
+				t.Fatal(err)
+			} else if err == nil && tt.fail {
+				t.Fatal("should have failed")
+			}
+
+			if got != tt.want {
+				t.Errorf("got=%t want=%t", got, tt.want)
+			}
+		})
+	}
+}
+
+// testMetadata is an implementation of pkg/metadata.MetadataService that can
+// be used by the [LinodeControllerServer] to retrieve metadata about the
+// current Linode instance.
+//
+//nolint:unused
+type testMetadata struct {
+	region  string
+	nodeID  int
+	label   string
+	project string
+	memory  uint // Amount of memory, in bytes
+}
+
+//nolint:unused
+func (m *testMetadata) GetZone() string { return m.region }
+
+//nolint:unused
+func (m *testMetadata) GetProject() string { return m.project }
+
+//nolint:unused
+func (m *testMetadata) GetName() string { return m.label }
+
+//nolint:unused
+func (m *testMetadata) GetNodeID() int { return m.nodeID }
+
+//nolint:unused
+func (m *testMetadata) Memory() uint { return m.memory }
+
+func TestControllerMaxVolumeAttachments(t *testing.T) {
+	tests := []struct {
+		name     string
+		instance *linodego.Instance
+		want     int
+	}{
+		{
+			name: "NilInstance",
+			want: maxPersistentAttachments,
+		},
+		{
+			name:     "NilInstanceSpecs",
+			instance: &linodego.Instance{},
+			want:     maxPersistentAttachments,
+		},
+		{
+			name: "1GB",
+			instance: &linodego.Instance{
+				Specs: &linodego.InstanceSpec{Memory: 1 << 10},
+			},
+			want: maxPersistentAttachments,
+		},
+		{
+			name: "16GB",
+			instance: &linodego.Instance{
+				Specs: &linodego.InstanceSpec{Memory: 16 << 10},
+			},
+			want: 16,
+		},
+		{
+			name: "32GB",
+			instance: &linodego.Instance{
+				Specs: &linodego.InstanceSpec{Memory: 32 << 10},
+			},
+			want: 32,
+		},
+		{
+			name: "64GB",
+			instance: &linodego.Instance{
+				Specs: &linodego.InstanceSpec{Memory: 64 << 10},
+			},
+			want: maxAttachments,
+		},
+		{
+			name: "96GB",
+			instance: &linodego.Instance{
+				Specs: &linodego.InstanceSpec{Memory: 96 << 10},
+			},
+			want: maxAttachments,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &LinodeControllerServer{}
+			got := s.maxVolumeAttachments(tt.instance)
+			if got != tt.want {
+				t.Errorf("got=%d want=%d", got, tt.want)
+			}
+		})
+	}
 }

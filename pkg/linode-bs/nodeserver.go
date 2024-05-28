@@ -35,10 +35,6 @@ import (
 	"k8s.io/utils/mount"
 )
 
-const (
-	maxVolumesPerNode = 7
-)
-
 type LinodeNodeServer struct {
 	Driver          *LinodeDriver
 	Mounter         *mount.SafeFormatAndMount
@@ -246,7 +242,6 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	deviceName := key.GetNormalizedLabel()
 	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
 	devicePath, err := ns.DeviceUtils.VerifyDevicePath(devicePaths)
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err))
 	}
@@ -409,11 +404,10 @@ func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInf
 
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:             strconv.Itoa(nodeID),
-		MaxVolumesPerNode:  maxVolumesPerNode,
+		MaxVolumesPerNode:  int64(maxVolumeAttachments(ns.MetadataService.Memory())),
 		AccessibleTopology: top,
 	}
 	return resp, nil
-
 }
 
 func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
