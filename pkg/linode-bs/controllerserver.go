@@ -11,7 +11,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	"github.com/linode/linodego"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -46,9 +45,9 @@ const (
 )
 
 type LinodeControllerServer struct {
-	Driver          *LinodeDriver
-	CloudProvider   linodeclient.LinodeClient
-	MetadataService metadataservice.MetadataService
+	Driver        *LinodeDriver
+	CloudProvider linodeclient.LinodeClient
+	Metadata      Metadata
 }
 
 var _ csi.ControllerServer = &LinodeControllerServer{}
@@ -580,9 +579,7 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 }
 
 // attemptGetContentSourceVolume attempts to get information about the Linode volume to clone from.
-func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(
-	ctx context.Context, contentSource *csi.VolumeContentSource,
-) (*common.LinodeVolumeKey, error) {
+func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*common.LinodeVolumeKey, error) {
 	// No content source was defined; no clone operation
 	if contentSource == nil {
 		return nil, nil
@@ -607,7 +604,7 @@ func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(
 		return nil, status.Error(codes.Internal, "Error retrieving source volume from Linode API")
 	}
 
-	if volumeData.Region != linodeCS.MetadataService.GetZone() {
+	if volumeData.Region != linodeCS.Metadata.Region {
 		return nil, status.Error(codes.InvalidArgument, "Source volume region cannot differ from destination volume region")
 	}
 
@@ -616,13 +613,7 @@ func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(
 
 // attemptCreateLinodeVolume attempts to create a volume while respecting
 // idempotency.
-func (linodeCS *LinodeControllerServer) attemptCreateLinodeVolume(
-	ctx context.Context,
-	label string,
-	sizeGB int,
-	tags string,
-	sourceVolume *common.LinodeVolumeKey,
-) (*linodego.Volume, error) {
+func (linodeCS *LinodeControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *common.LinodeVolumeKey) (*linodego.Volume, error) {
 	// List existing volumes
 	jsonFilter, err := json.Marshal(map[string]string{"label": label})
 	if err != nil {
@@ -652,11 +643,9 @@ func (linodeCS *LinodeControllerServer) attemptCreateLinodeVolume(
 }
 
 // createLinodeVolume creates a Linode volume and returns the result
-func (linodeCS *LinodeControllerServer) createLinodeVolume(
-	ctx context.Context, label string, sizeGB int, tags string,
-) (*linodego.Volume, error) {
+func (linodeCS *LinodeControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string) (*linodego.Volume, error) {
 	volumeReq := linodego.VolumeCreateOptions{
-		Region: linodeCS.MetadataService.GetZone(),
+		Region: linodeCS.Metadata.Region,
 		Label:  label,
 		Size:   sizeGB,
 	}
@@ -679,9 +668,7 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(
 }
 
 // cloneLinodeVolume clones a Linode volume and returns the result
-func (linodeCS *LinodeControllerServer) cloneLinodeVolume(
-	ctx context.Context, label string, sizeGB, sourceID int,
-) (*linodego.Volume, error) {
+func (linodeCS *LinodeControllerServer) cloneLinodeVolume(ctx context.Context, label string, sizeGB, sourceID int) (*linodego.Volume, error) {
 	klog.V(4).Infoln("cloning volume", map[string]interface{}{
 		"source_vol_id": sourceID,
 	})

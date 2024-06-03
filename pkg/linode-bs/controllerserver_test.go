@@ -323,34 +323,6 @@ func TestControllerCanAttach(t *testing.T) {
 	}
 }
 
-// testMetadata is an implementation of pkg/metadata.MetadataService that can
-// be used by the [LinodeControllerServer] to retrieve metadata about the
-// current Linode instance.
-//
-//nolint:unused
-type testMetadata struct {
-	region  string
-	nodeID  int
-	label   string
-	project string
-	memory  uint // Amount of memory, in bytes
-}
-
-//nolint:unused
-func (m *testMetadata) GetZone() string { return m.region }
-
-//nolint:unused
-func (m *testMetadata) GetProject() string { return m.project }
-
-//nolint:unused
-func (m *testMetadata) GetName() string { return m.label }
-
-//nolint:unused
-func (m *testMetadata) GetNodeID() int { return m.nodeID }
-
-//nolint:unused
-func (m *testMetadata) Memory() uint { return m.memory }
-
 func TestControllerMaxVolumeAttachments(t *testing.T) {
 	tests := []struct {
 		name     string

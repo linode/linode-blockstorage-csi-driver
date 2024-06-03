@@ -26,7 +26,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -36,11 +35,11 @@ import (
 )
 
 type LinodeNodeServer struct {
-	Driver          *LinodeDriver
-	Mounter         *mount.SafeFormatAndMount
-	DeviceUtils     mountmanager.DeviceUtils
-	CloudProvider   linodeclient.LinodeClient
-	MetadataService metadata.MetadataService
+	Driver        *LinodeDriver
+	Mounter       *mount.SafeFormatAndMount
+	DeviceUtils   mountmanager.DeviceUtils
+	CloudProvider linodeclient.LinodeClient
+	Metadata      Metadata
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
 }
@@ -396,15 +395,13 @@ func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInf
 
 	top := &csi.Topology{
 		Segments: map[string]string{
-			"topology.linode.com/region": ns.MetadataService.GetZone(),
+			"topology.linode.com/region": ns.Metadata.Region,
 		},
 	}
 
-	nodeID := ns.MetadataService.GetNodeID()
-
 	resp := &csi.NodeGetInfoResponse{
-		NodeId:             strconv.Itoa(nodeID),
-		MaxVolumesPerNode:  int64(maxVolumeAttachments(ns.MetadataService.Memory())),
+		NodeId:             strconv.Itoa(ns.Metadata.ID),
+		MaxVolumesPerNode:  int64(maxVolumeAttachments(ns.Metadata.Memory)),
 		AccessibleTopology: top,
 	}
 	return resp, nil
