@@ -1,4 +1,4 @@
-package linodebs
+package driver
 
 /*
 Copyright 2018 The Kubernetes Authors.

@@ -1,6 +1,6 @@
 //go:build !windows
 
-package linodebs
+package driver
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package linodebs
+package driver
 
 import (
 	"fmt"

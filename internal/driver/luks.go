@@ -19,7 +19,7 @@ limitations under the License.
 
 // luks utilities from https://github.com/cloudscale-ch/csi-cloudscale/blob/master/driver/luks_util.go with some modifications for this driver
 
-package linodebs
+package driver
 
 import (
 	"errors"
