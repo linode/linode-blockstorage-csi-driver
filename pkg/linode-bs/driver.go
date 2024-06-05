@@ -22,7 +22,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
@@ -54,8 +53,15 @@ func GetLinodeDriver() *LinodeDriver {
 	return &LinodeDriver{}
 }
 
-func (linodeDriver *LinodeDriver) SetupLinodeDriver(linodeClient linodeclient.LinodeClient, mounter *mount.SafeFormatAndMount,
-	deviceUtils mountmanager.DeviceUtils, metadata metadata.MetadataService, name, vendorVersion, bsPrefix string) error {
+func (linodeDriver *LinodeDriver) SetupLinodeDriver(
+	linodeClient linodeclient.LinodeClient,
+	mounter *mount.SafeFormatAndMount,
+	deviceUtils mountmanager.DeviceUtils,
+	metadata Metadata,
+	name,
+	vendorVersion,
+	bsPrefix string,
+) error {
 	if name == "" {
 		return fmt.Errorf("Driver name missing")
 	}
@@ -144,21 +150,21 @@ func NewIdentityServer(linodeDriver *LinodeDriver) *LinodeIdentityServer {
 	}
 }
 
-func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, cloudProvider linodeclient.LinodeClient, meta metadata.MetadataService) *LinodeNodeServer {
+func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, cloudProvider linodeclient.LinodeClient, metadata Metadata) *LinodeNodeServer {
 	return &LinodeNodeServer{
-		Driver:          linodeDriver,
-		Mounter:         mounter,
-		DeviceUtils:     deviceUtils,
-		CloudProvider:   cloudProvider,
-		MetadataService: meta,
+		Driver:        linodeDriver,
+		Mounter:       mounter,
+		DeviceUtils:   deviceUtils,
+		CloudProvider: cloudProvider,
+		Metadata:      metadata,
 	}
 }
 
-func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.LinodeClient, meta metadata.MetadataService) *LinodeControllerServer {
+func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.LinodeClient, metadata Metadata) *LinodeControllerServer {
 	return &LinodeControllerServer{
-		Driver:          linodeDriver,
-		CloudProvider:   cloudProvider,
-		MetadataService: meta,
+		Driver:        linodeDriver,
+		CloudProvider: cloudProvider,
+		Metadata:      metadata,
 	}
 }
 
@@ -172,7 +178,7 @@ func (linodeDriver *LinodeDriver) Run(endpoint string) {
 	linodeDriver.ready = true
 	linodeDriver.readyMu.Unlock()
 
-	//Start the nonblocking GRPC
+	// Start the nonblocking GRPC
 	s := NewNonBlockingGRPCServer()
 	// TODO(#34): Only start specific servers based on a flag.
 	// In the future have this only run specific combinations of servers depending on which version this is.

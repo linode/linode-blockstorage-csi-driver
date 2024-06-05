@@ -40,7 +40,6 @@ spec:
         - --endpoint=$(CSI_ENDPOINT)
         - --token=$(LINODE_TOKEN)
         - --url=$(LINODE_API_URL)
-        - --node=$(NODE_NAME)
         - --v=2
         env:
         - name: CSI_ENDPOINT

@@ -14,6 +14,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,7 +22,6 @@ import (
 
 	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/klog/v2"
 )
@@ -35,7 +35,6 @@ var (
 	endpoint      = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
 	token         = flag.String("token", "", "Linode API Token")
 	url           = flag.String("url", "", "Linode API URL")
-	node          = flag.String("node", "", "Node name")
 	bsPrefix      = flag.String("bs-prefix", "", "Linode BlockStorage Volume label prefix")
 )
 
@@ -63,7 +62,7 @@ func handle() error {
 
 	linodeDriver := driver.GetLinodeDriver()
 
-	//Initialize Linode Driver (Move setup to main?)
+	// Initialize Linode Driver (Move setup to main?)
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
 	cloudProvider, err := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
 	if err != nil {
@@ -73,9 +72,11 @@ func handle() error {
 	mounter := mountmanager.NewSafeMounter()
 	deviceUtils := mountmanager.NewDeviceUtils()
 
-	ms, err := metadataservice.NewMetadataService(cloudProvider, *node)
+	metadata, err := driver.GetMetadata(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to set up metadata service: %v", err)
+		if metadata, err = driver.GetMetadataFromAPI(context.Background(), cloudProvider); err != nil {
+			return fmt.Errorf("get metadata from api: %w", err)
+		}
 	}
 
 	prefix := ""
@@ -84,7 +85,14 @@ func handle() error {
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(
-		cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion, prefix); err != nil {
+		cloudProvider,
+		mounter,
+		deviceUtils,
+		metadata,
+		driverName,
+		vendorVersion,
+		prefix,
+	); err != nil {
 		return fmt.Errorf("failed to initialize Linode CSI Driver: %v", err)
 	}
 

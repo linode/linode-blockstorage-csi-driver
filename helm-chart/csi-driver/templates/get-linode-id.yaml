@@ -32,7 +32,7 @@ data:
     if [ -z "$ID" ]; then
         echo "Getting Linode ID using dmidecode"
         apk add --update dmidecode
-        ID=$(dmidecode -t 1 | awk -F': ' '/Serial Number/{print $2}' | tr -d '\n')
+        ID=$(dmidecode --string system-serial-number | tr -d '\n')
         echo "Dmidecode linode ID was $ID"
     fi
 

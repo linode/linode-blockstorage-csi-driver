@@ -2,24 +2,21 @@ package linodebs
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-
-	"strconv"
-
-	"fmt"
-	"strings"
 
 	"github.com/linode/linodego"
 )
@@ -66,13 +63,14 @@ func TestDriverSuite(t *testing.T) {
 	}
 
 	// TODO fake metadata
-	ms, err := metadata.NewMetadataService(fakeCloudProvider, fake.instance.Label)
-	if err != nil {
-		t.Fatalf("Failed to setup Linode metadata: %v", err)
+	md := Metadata{
+		ID:     123,
+		Label:  fake.instance.Label,
+		Region: fake.instance.Region,
+		Memory: 4 << 30, // 4GiB
 	}
 	linodeDriver := GetLinodeDriver()
-	err = linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, ms, driver, vendorVersion, bsPrefix)
-	if err != nil {
+	if err := linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix); err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 
@@ -105,9 +103,9 @@ func TestDriverSuite(t *testing.T) {
 	go linodeDriver.Run(endpoint)
 
 	// TODO: fix sanity checks for e2e, disable for ci
-	//cfg := sanity.NewTestConfig()
-	//cfg.Address = endpoint
-	//sanity.Test(t, cfg)
+	// cfg := sanity.NewTestConfig()
+	// cfg.Address = endpoint
+	// sanity.Test(t, cfg)
 }
 
 // fakeAPI implements a fake, cached Linode API
