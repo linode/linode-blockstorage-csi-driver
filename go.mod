@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/container-storage-interface/spec v1.3.0
+	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
 	github.com/linode/go-metadata v0.2.0
 	github.com/linode/linodego v1.23.0
 	golang.org/x/net v0.17.0

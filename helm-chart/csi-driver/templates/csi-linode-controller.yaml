@@ -58,17 +58,14 @@ spec:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
       - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --token=$(LINODE_TOKEN)
-        - --url=$(LINODE_API_URL)
-        - --bs-prefix=$(LINODE_BS_PREFIX)
         - --v=2
         env:
         - name: CSI_ENDPOINT
           value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
-        - name: LINODE_API_URL
+        - name: LINODE_URL
           value: https://api.linode.com/v4
-        - name: LINODE_BS_PREFIX
+        - name: LINODE_VOLUME_LABEL_PREFIX
+          value: {{ .Values.volumeLabelPrefix | default "" | quote }}
         - name: NODE_NAME
           valueFrom:
             fieldRef:

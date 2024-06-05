@@ -5,6 +5,10 @@ apiToken: ""
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
 
+# (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this
+# driver.
+volumeLabelPrefix: ""
+
 # Default namespace is "kube-system" but it can be set to another namespace
 namespace: kube-system
 
