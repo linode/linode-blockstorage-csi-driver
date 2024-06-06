@@ -715,7 +715,7 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 		}
 		maxSize = reqSize
 	} else if maxSize < minProviderVolumeBytes {
-		return 0, fmt.Errorf("Limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
+		return 0, fmt.Errorf("limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
 	}
 
 	// fulfill the upper bound of the request

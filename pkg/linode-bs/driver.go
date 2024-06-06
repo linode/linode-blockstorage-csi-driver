@@ -63,7 +63,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	bsPrefix string,
 ) error {
 	if name == "" {
-		return fmt.Errorf("Driver name missing")
+		return fmt.Errorf("driver name missing")
 	}
 
 	linodeDriver.name = name
