@@ -47,8 +47,7 @@ type DeviceUtils interface {
 	VerifyDevicePath(devicePaths []string) (string, error)
 }
 
-type deviceUtils struct {
-}
+type deviceUtils struct{}
 
 var _ DeviceUtils = &deviceUtils{}
 
@@ -88,7 +87,7 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 
 	for _, path := range devicePaths {
 		if pathExists, err := pathExists(path); err != nil {
-			return "", fmt.Errorf("Error checking if path exists: %v", err)
+			return "", fmt.Errorf("error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
 		}
@@ -104,7 +103,7 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 	sdAfter, err := filepath.Glob(diskSDPattern)
 	if err != nil {
-		return fmt.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
+		return fmt.Errorf("error filepath.Glob(\"%s\"): %w", diskSDPattern, err)
 	}
 
 	for _, sd := range sdAfter {
@@ -125,13 +124,13 @@ func udevadmChangeToDrive(drivePath string) error {
 	// Evaluate symlink, if any
 	drive, err := filepath.EvalSymlinks(drivePath)
 	if err != nil {
-		return fmt.Errorf("udevadmChangeToDrive: filepath.EvalSymlinks(%q) failed with %v.", drivePath, err)
+		return fmt.Errorf("eval symlinks %q: %w", drivePath, err)
 	}
 	klog.V(5).Infof("udevadmChangeToDrive: symlink path is %q", drive)
 
 	// Check to make sure input is "/dev/sd*"
 	if !strings.Contains(drive, diskSDPath) {
-		return fmt.Errorf("udevadmChangeToDrive: expected input in the form \"%s\" but drive is %q.", diskSDPattern, drive)
+		return fmt.Errorf("invalid disk %q: path must start with %q", drive, diskSDPattern)
 	}
 
 	// Call "udevadm trigger --action=change --property-match=DEVNAME=/dev/sd..."
@@ -141,7 +140,7 @@ func udevadmChangeToDrive(drivePath string) error {
 		"--action=change",
 		fmt.Sprintf("--property-match=DEVNAME=%s", drive)).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v.", drive, err)
+		return fmt.Errorf("udevadm trigger failed for %q: %w", drive, err)
 	}
 	return nil
 }
