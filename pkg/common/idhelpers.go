@@ -80,12 +80,12 @@ func CreateLinodeVolumeKey(id int, label string) LinodeVolumeKey {
 func ParseLinodeVolumeKey(key string) (*LinodeVolumeKey, error) {
 	keys := strings.SplitN(key, "-", 2)
 	if len(keys) != 2 {
-		return nil, fmt.Errorf("Invalid Linode Volume key: %q", key)
+		return nil, fmt.Errorf("invalid linode volume key: %q", key)
 	}
 
 	volumeID, err := strconv.Atoi(keys[0])
 	if err != nil {
-		return nil, fmt.Errorf("Invalid Linode Volume ID: %q", keys[0])
+		return nil, fmt.Errorf("invalid linode volume id: %q", keys[0])
 	}
 
 	lvk := LinodeVolumeKey{volumeID, keys[1]}

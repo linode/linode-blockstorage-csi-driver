@@ -1,0 +1,155 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+
+output:
+  formats: colored-line-number
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  gci:
+    sections:
+      - standard
+      - default
+      - blank
+      - dot
+      - prefix(github.com/linode)
+
+  govet:
+    check-shadowing: false
+
+  golint:
+    min-confidence: 0.8
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/linode/
+
+  maligned:
+    suggest-new: true
+
+  dupl:
+    threshold: 100
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+
+    settings:
+      captLocal:
+        paramsOnly: true
+      rangeValCopy:
+        sizeThreshold: 32
+
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+
+  varnamelen:
+    min-name-length: 2
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidicheck
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - errcheck
+    - exportloopref
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - gocheckcompilerdirectives
+    - gocognit
+    - goconst
+    - gocritic
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - ineffassign
+    - loggercheck
+    - maintidx
+    - makezero
+    - misspell
+    - mnd
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - parlalleltest
+    - prealloc
+    - predeclared
+    - reassign
+    - tenv
+    - thelper
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - varnamelen
+    - whitespace
+
+  presets:
+    - bugs
+    - unused
+
+  fast: false
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - maintidx
+        - dupl
+        - exportloopref
+
+    - text: "G101:"
+      linters:
+        - gosec
+        - gas
+
+    - text: "G104:"
+      linters:
+        - gosec
+        - gas
+
+  exclude-use-default: false
+  new: false
+  max-per-linter: 0
+  max-same-issues: 0
+  exclude-files:
+    - "zz_generated\\..+\\.go$"

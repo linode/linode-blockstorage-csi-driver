@@ -16,16 +16,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Vet
-        run: make vet
-      - name: Lint
-        run: make lint
-      - name: Test
-        run: make test
-      - name: Test (elevated)
-        run: make elevated-test
-      - name: Build
-        run: make build
+      - run: make build
+      - run: go vet ./...
+      - uses: dominikh/staticcheck-action@v1
+        with:
+          version: latest
+          install-go: false
+      - run: go test -cover ./...
+      - run: make elevated-test
   docker-build:
     runs-on: ubuntu-latest
     steps:
