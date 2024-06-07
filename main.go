@@ -20,30 +20,56 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ianschenck/envflag"
+	"github.com/linode/linodego"
+	"k8s.io/klog/v2"
+
 	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-	"k8s.io/klog/v2"
 )
 
-const (
-	driverName = "linodebs.csi.linode.com"
-)
+const driverName = "linodebs.csi.linode.com"
 
-var (
-	vendorVersion string
-	endpoint      = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
-	token         = flag.String("token", "", "Linode API Token")
-	url           = flag.String("url", "", "Linode API URL")
-	bsPrefix      = flag.String("bs-prefix", "", "Linode BlockStorage Volume label prefix")
-)
+var vendorVersion string // set by the linker
 
-func init() {
-	_ = flag.Set("logtostderr", "true")
+type configuration struct {
+	// The UNIX socket to listen on for RPC requests.
+	csiEndpoint string
+
+	// Linode personal access token, used to make requests to the Linode
+	// API.
+	linodeToken string
+
+	// Linode API URL.
+	linodeURL string
+
+	// Optional label prefix to use when creating new Linode Block Storage
+	// Volumes.
+	volumeLabelPrefix string
+
+	// Name of the current node, when running as the node plugin.
+	//
+	// deprecated: This is not needed as the CSI driver now uses the Linode
+	// Metadata Service to source information about the current
+	// node/instance. It will be removed in a future change.
+	nodeName string
+}
+
+func loadConfig() configuration {
+	var cfg configuration
+	envflag.StringVar(&cfg.csiEndpoint, "CSI_ENDPOINT", "unix:/tmp/csi.sock", "Path to the CSI endpoint socket")
+	envflag.StringVar(&cfg.linodeToken, "LINODE_TOKEN", "", "Linode API token")
+	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", linodego.APIHost, "Linode API URL")
+	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
+	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
+	envflag.Parse()
+	return cfg
 }
 
 func main() {
 	klog.InitFlags(nil)
+	_ = flag.Set("logtostderr", "true")
 	flag.Parse()
 	if err := handle(); err != nil {
 		klog.Fatal(err)
@@ -55,16 +81,18 @@ func handle() error {
 	if vendorVersion == "" {
 		return errors.New("vendorVersion must be set at compile time")
 	}
-	if *token == "" {
+	klog.V(4).Infof("Driver vendor version %v", vendorVersion)
+
+	cfg := loadConfig()
+	if cfg.linodeToken == "" {
 		return errors.New("linode token required")
 	}
-	klog.V(4).Infof("Driver vendor version %v", vendorVersion)
 
 	linodeDriver := driver.GetLinodeDriver()
 
 	// Initialize Linode Driver (Move setup to main?)
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
-	cloudProvider, err := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
+	cloudProvider, err := linodeclient.NewLinodeClient(cfg.linodeToken, uaPrefix, cfg.linodeURL)
 	if err != nil {
 		return fmt.Errorf("failed to set up linode client: %s", err)
 	}
@@ -74,14 +102,10 @@ func handle() error {
 
 	metadata, err := driver.GetMetadata(context.Background())
 	if err != nil {
+		klog.ErrorS(err, "Metadata service not available, falling back to API")
 		if metadata, err = driver.GetMetadataFromAPI(context.Background(), cloudProvider); err != nil {
 			return fmt.Errorf("get metadata from api: %w", err)
 		}
-	}
-
-	prefix := ""
-	if bsPrefix != nil {
-		prefix = *bsPrefix
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(
@@ -91,11 +115,11 @@ func handle() error {
 		metadata,
 		driverName,
 		vendorVersion,
-		prefix,
+		cfg.volumeLabelPrefix,
 	); err != nil {
-		return fmt.Errorf("failed to initialize Linode CSI Driver: %v", err)
+		return fmt.Errorf("setup driver: %v", err)
 	}
 
-	linodeDriver.Run(*endpoint)
+	linodeDriver.Run(cfg.csiEndpoint)
 	return nil
 }
