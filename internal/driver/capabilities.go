@@ -1,4 +1,4 @@
-package linodebs
+package driver
 
 import "github.com/container-storage-interface/spec/lib/go/csi"
 

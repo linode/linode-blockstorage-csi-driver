@@ -1,7 +1,7 @@
 //go:build linux && elevated
 // +build linux,elevated
 
-package linodebs_test
+package driver
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	linodebs "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/mount"
@@ -27,7 +26,7 @@ func newSafeMounter() *mount.SafeFormatAndMount {
 }
 
 var (
-	defaultNodeServer = &linodebs.LinodeNodeServer{Mounter: mountmanager.NewSafeMounter()}
+	defaultNodeServer = LinodeNodeServer{Mounter: mountmanager.NewSafeMounter()}
 
 	defaultTeardownFunc = func(t *testing.T, mount string) {
 		_, err := os.Stat(mount)

@@ -24,7 +24,7 @@ import (
 	"github.com/linode/linodego"
 	"k8s.io/klog/v2"
 
-	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
+	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )

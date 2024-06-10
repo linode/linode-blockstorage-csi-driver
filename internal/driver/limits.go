@@ -1,4 +1,4 @@
-package linodebs
+package driver
 
 // maxVolumeAttachments returns the maximum number of block storage volumes
 // that can be attached to a Linode instance, given the amount of memory the
