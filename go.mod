@@ -1,14 +1,14 @@
 module github.com/linode/linode-blockstorage-csi-driver
 
-go 1.20
+go 1.22.4
 
 require (
 	github.com/container-storage-interface/spec v1.3.0
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
 	github.com/linode/go-metadata v0.2.0
-	github.com/linode/linodego v1.23.0
-	golang.org/x/net v0.17.0
-	golang.org/x/sys v0.13.0
+	github.com/linode/linodego v1.35.0
+	golang.org/x/net v0.25.0
+	golang.org/x/sys v0.20.0
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 	k8s.io/apimachinery v0.19.2
@@ -18,9 +18,9 @@ require (
 
 require (
 	github.com/go-logr/logr v1.3.0 // indirect
-	github.com/go-resty/resty/v2 v2.9.1 // indirect
+	github.com/go-resty/resty/v2 v2.13.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
