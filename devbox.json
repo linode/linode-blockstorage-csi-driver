@@ -1,6 +1,6 @@
 {
   "packages": [
-    "go_1_20@latest",
+    "go_1_22@latest",
     "ginkgo@2.13.2",
     "ctlptl@0.8.28",
     "clusterctl@1.6.3",
