@@ -14,16 +14,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Create Release Artifacts
-        run: make release
-        env:
-          IMAGE_VERSION: ${{ github.ref_name }}
-      - name: Upload Release Artifacts
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ./release/helm-chart-${{ github.ref_name }}.tgz
-            ./release/linode-blockstorage-csi-driver-${{ github.ref_name }}.yaml
+      # - name: Create Release Artifacts
+      #   run: make release
+      #   env:
+      #     IMAGE_VERSION: ${{ github.ref_name }}
+      # - name: Upload Release Artifacts
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     files: |
+      #       ./release/helm-chart-${{ github.ref_name }}.tgz
+      #       ./release/linode-blockstorage-csi-driver-${{ github.ref_name }}.yaml
       - name: Docker Meta
         id: meta
         uses: docker/metadata-action@v5
