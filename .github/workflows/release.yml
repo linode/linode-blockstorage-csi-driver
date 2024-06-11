@@ -3,6 +3,9 @@ on:
   push:
     tags:
       - "v*.*.*"
+  pull_request:
+    branches:
+      - "*"
 
 jobs:
   release:
@@ -48,8 +51,8 @@ jobs:
           push: true
           file: "./Dockerfile"
           tags: |
-            ${{ steps.meta.outputs.tags }}
-            ghcr.io/${{steps.meta.outputs.tags}}
+            linode/linode-blockstorage-csi-driver:test
+            ghcr.io/linode/linode-blockstorage-csi-driver:test
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             REV=${{ github.ref_name }}
