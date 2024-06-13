@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"k8s.io/client-go/util/homedir"
 
 	"github.com/linode/linodego"
-
-	"path/filepath"
 
 	"e2e_test/test/framework"
 
@@ -44,9 +43,7 @@ func init() {
 	flag.StringVar(&region, "region", region, "Region to create cluster in")
 }
 
-var (
-	root *framework.Framework
-)
+var root *framework.Framework
 
 func TestE2e(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -116,7 +113,7 @@ var _ = AfterSuite(func() {
 	By("Deleting Namespace " + root.Namespace())
 	err := root.DeleteNamespace(root.Namespace())
 	Expect(err).NotTo(HaveOccurred())
-	if !(useExisting || reuse) {
+	if !useExisting && !reuse {
 		By("Deleting cluster")
 		err := framework.DeleteCluster(clusterName)
 		Expect(err).NotTo(HaveOccurred())

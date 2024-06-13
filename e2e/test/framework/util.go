@@ -44,3 +44,7 @@ func ApplyManifest(commandName, manifest string) error {
 	log.Println(string(out))
 	return err
 }
+
+func ptrT[T any](v T) *T {
+	return &v
+}
