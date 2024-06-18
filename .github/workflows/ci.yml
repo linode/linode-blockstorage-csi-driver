@@ -41,13 +41,29 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
             type=semver,pattern={{raw}},value=${{ github.ref_name }}
-      - name: Build and Push to Docker Hub
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+      - name: Build and Push GHCR
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
+          push: true
           file: "./Dockerfile"
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ghcr.io/${{steps.meta.outputs.tags}}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             REV=${{ github.ref_name }}
+      - name: Delete Image from GHCR
+        uses: bots-house/ghcr-delete-image-action@v1.1.0
+        with:
+          # NOTE: at now only orgs is supported
+          owner: linode
+          name: linode-blockstorage-csi-driver
+          # NOTE: using Personal Access Token
+          token: ${{secrets.GITHUB_TOKEN}}
+          tag: ${{ github.ref_name }}
