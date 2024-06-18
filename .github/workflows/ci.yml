@@ -54,7 +54,7 @@ jobs:
           push: true
           file: "./Dockerfile"
           tags: |
-            ghcr.io/${{steps.meta.outputs.tags}}
+            ${{steps.meta.outputs.tags}}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             REV=${{ github.ref_name }}
