@@ -40,7 +40,7 @@ jobs:
             linode/linode-blockstorage-csi-driver
           tags: |
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=raw,value=${{ github.ref_name }},enable=${{ github.ref != format('refs/heads/{0}', 'main') }}
+            type=raw,value=${{ github.head_ref || github.ref_name }} ,enable=${{ github.ref != format('refs/heads/{0}', 'main') }}
             type=semver,pattern={{raw}},value=${{ github.ref_name }}
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -67,4 +67,4 @@ jobs:
           name: linode-blockstorage-csi-driver
           # NOTE: using Personal Access Token
           token: ${{secrets.GITHUB_TOKEN}}
-          tag: ${{ github.ref_name }}
+          tag: ${{ github.head_ref || github.ref_name }} 

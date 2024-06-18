@@ -1,8 +1,10 @@
 export GO111MODULE=on
 
-IMAGE_TAG?=canary
+IMAGE_TAG?=$(shell git rev-parse --abbrev-ref HEAD)
 IMAGE_NAME?="linode/linode-blockstorage-csi-driver"
 K8S_VERSION?="v1.28.7"
+CAPI_VERSION?="v1.6.3"
+HELM_VERSION?="v0.2.1"
 
 .PHONY: test clean check-token test-manifest
 
@@ -10,7 +12,13 @@ test-manifest: kustomize
 	../hack/generate-yaml.sh $(IMAGE_TAG) $(IMAGE_NAME) > test/manifest/linode-blockstorage-csi-driver.yaml
 
 test-cluster: kind ctlptl clean-cluster test-manifest
-	./test/scripts/create_management_cluster.sh $(K8S_VERSION)
+	$(CTLPTL) apply -f test/scripts/ctlptl-config.yaml
+	$(CLUSTERCTL) init \
+		--wait-providers \
+		--core cluster-api:${CAPI_VERSION} \
+		--addon helm:${HELM_VERSION} \
+		--infrastructure akamai-linode \
+		--config test/scripts/clusterctl.yaml
 
 clean-cluster: ctlptl
 	$(CTLPTL) delete cluster kind-csi-management --ignore-not-found
