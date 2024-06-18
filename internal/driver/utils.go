@@ -17,35 +17,10 @@ limitations under the License.
 package driver
 
 import (
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
-
-func NewVolumeCapabilityAccessMode(mode csi.VolumeCapability_AccessMode_Mode) *csi.VolumeCapability_AccessMode {
-	return &csi.VolumeCapability_AccessMode{Mode: mode}
-}
-
-func NewControllerServiceCapability(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
-	return &csi.ControllerServiceCapability{
-		Type: &csi.ControllerServiceCapability_Rpc{
-			Rpc: &csi.ControllerServiceCapability_RPC{
-				Type: cap,
-			},
-		},
-	}
-}
-
-func NewNodeServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
-	return &csi.NodeServiceCapability{
-		Type: &csi.NodeServiceCapability_Rpc{
-			Rpc: &csi.NodeServiceCapability_RPC{
-				Type: cap,
-			},
-		},
-	}
-}
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	klog.V(3).Infof("GRPC call: %s", info.FullMethod)

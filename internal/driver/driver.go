@@ -50,7 +50,11 @@ type LinodeDriver struct {
 const linodeBSPrefixLength = 12
 
 func GetLinodeDriver() *LinodeDriver {
-	return &LinodeDriver{}
+	return &LinodeDriver{
+		vcap:  VolumeCapabilityAccessModes(),
+		cscap: ControllerServiceCapabilities(),
+		nscap: NodeServiceCapabilities(),
+	}
 }
 
 func (linodeDriver *LinodeDriver) SetupLinodeDriver(
@@ -78,55 +82,11 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	}
 	linodeDriver.bsPrefix = bsPrefix
 
-	// Adding Capabilities
-	vcam := volumeCapabilitiesAccessMode()
-	if err := linodeDriver.AddVolumeCapabilityAccessModes(vcam); err != nil {
-		return err
-	}
-	csc := controllerCapabilities()
-	if err := linodeDriver.AddControllerServiceCapabilities(csc); err != nil {
-		return err
-	}
-	ns := nodeCapabilities()
-	if err := linodeDriver.AddNodeServiceCapabilities(ns); err != nil {
-		return err
-	}
-
 	// Set up RPC Servers
 	linodeDriver.ids = NewIdentityServer(linodeDriver)
 	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata)
 	linodeDriver.cs = NewControllerServer(linodeDriver, linodeClient, metadata)
 
-	return nil
-}
-
-func (linodeDriver *LinodeDriver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_AccessMode_Mode) error {
-	var vca []*csi.VolumeCapability_AccessMode
-	for _, c := range vc {
-		klog.V(4).Infof("Enabling volume access mode: %v", c.String())
-		vca = append(vca, NewVolumeCapabilityAccessMode(c))
-	}
-	linodeDriver.vcap = vca
-	return nil
-}
-
-func (linodeDriver *LinodeDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) error {
-	var csc []*csi.ControllerServiceCapability
-	for _, c := range cl {
-		klog.V(4).Infof("Enabling controller service capability: %v", c.String())
-		csc = append(csc, NewControllerServiceCapability(c))
-	}
-	linodeDriver.cscap = csc
-	return nil
-}
-
-func (linodeDriver *LinodeDriver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_Type) error {
-	var nsc []*csi.NodeServiceCapability
-	for _, n := range nl {
-		klog.V(4).Infof("Enabling node service capability: %v", n.String())
-		nsc = append(nsc, NewNodeServiceCapability(n))
-	}
-	linodeDriver.nscap = nsc
 	return nil
 }
 
