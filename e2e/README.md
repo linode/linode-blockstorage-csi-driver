@@ -1,101 +1,72 @@
 ## How to use these End-to-end (e2e) tests
 
-### Building
+In order to run these e2e tests, you'll need the following:
+- CAPL Management Cluster
+- CAPL Child Test Cluster
+- Test Image 
 
-Add the following environment variables to your shell rc
+### 0. Pre-requisites: Install devbox
 
+Install devbox as described in the [devbox docs](https://www.jetify.com/devbox/docs/installing_devbox/) before running any of the commands below.
+
+### 1. Setup a CAPL Management Cluster
+
+We will be using a kind cluster and install CAPL plus various other providers.
+
+Setup the env vars and run the following command to create a kind mgmt cluster:
+
+```sh
+# Make sure to set the following env vars
+export LINODE_TOKEN="your linode api token"
+export LINODE_REGION="your preferred region"
+export KUBERNETES_VERSION=v1.29.1
+export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
+export LINODE_MACHINE_TYPE=g6-standard-2
+
+devbox run local-deploy
 ```
-export LINODE_API_TOKEN=<your linode API token>
+This will download all the necessary binaries to local bin and create a local mgmt cluster.
 
-export GOPATH=$HOME/go
-export PATH=$HOME/go/bin:$PATH
-export GO111MODULE=on 
+### 2. Build and Push Test Image
+
+If you have a PR open, GHA will build & push to docker hub and tag it with the current branch name.
+
+If you do not have PR open, follow the steps below:
+- Build a docker image passing the `IMAGE_TAG` argument to the make target
+  so a custom tag is applied. Then push the image to a public repository.
+
+  > You can use any public repository that you have access to. The tags used below are just examples
+
+  ```
+  make docker-build IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+  make docker-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+  ```
+
+### 2. Setup a CAPL Child Test Cluster
+
+In order create a test cluster, run the following command:
+
+```sh
+devbox run remote-cluster-deploy TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e
 ```
+> You don't need to pass TEST_IMAGE_TAG and TEST_IMAGE_NAME if you have a PR open
 
-If you need a Linode API token visit this page:
-https://cloud.linode.com/profile/tokens
+The above command will create a test cluster, install CSI driver using the test image, and export kubeconfig of test-cluster to the root directory
 
-Then, `go get` this repo
-`go get github.com/linode/linode-blockstorage-csi-driver`
+### 3. Run E2E Tests
 
-That may fail, if it does, navigate to the directory that was created and run
-`go mod tidy`:
+Run the following command to run e2e tests:
 
+```sh
+devbox run e2e-test
 ```
-cd ~/go/src/github.com/linode/linode-blockstorage-csi-driver
-go mod tidy
+This will run the chainsaw e2e tests under the `e2e/test` directory
+
+### 4. Cleanup
+
+Run the following command to cleanup the test cluster:
+
+```sh
+devbox run cleanup-cluster
 ```
-
-Then, use the makefile in the directory above this directory to build the CSI
-(this is to download goimports)
-
-```
-cd $GOPATH/src/github.com/linode/linode-blockstorage-csi-driver
-make build
-```
-
-### Running
-
-Build a docker image passing the `IMAGE_TAG` argument to the make target
-so a custom tag is applied. Then push the image to a public repository.
-
-> You can use any public repository that you have access to. The tags used below are just examples
-
-```
-make docker-build IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
-make docker-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
-```
-
-Finally run the tests passing the name of the image and the tag so that your custom image is used.
-```
-make test IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_TAG=test-e2e
-```
-
-When running the e2e tests, a couple of options can be passed to the test
-through the `$SUITE_ARGS` environment variable to modify its behavior: 
-
- - If the Linode API extra debugging logs are desired, simply use the
-   `--linode-debug` in the list of suite arguments. NOTE: This will also
-   print out the Linode API token in the logs, since they will be part of the
-   requests being logged.
-
- - Similarly, the Linode API base URL can be changed from
-   `https://api.linode.com` with the `--linode-url` flag.
-
-#### Creating a new cluster
-
-By default the tests use $HOME/.ssh/id\_rsa.pub as the public key used to
-provision the cluster, so it needs to be added to your agent.
-
-```
-ssh-add $HOME/.ssh/id_rsa
-```
-
-The cluster created will need an expected Kubernetes version, which is defined
-by exporting the following environment variable:
-
-```
-export K8S_VERSION=<the version in vMM.mm.pp format>
-```
-
-Finally, run the tests in the e2e directory:
-```
-cd e2e
-make test
-```
-
-To save time on multiple runs by allowing the cluster to remain, export the
-`$SUITE_ARGS` and ensure that the `--reuse` flag is set. Once a cluster has
-been created using the `--reuse` flag see the section below for how to use an
-existing cluster.
-
-#### Using an existing cluster
-
-If using an existing cluster, ensure that the cluster's kubeconfig is available
-as a file in your filesystem. Then supply the following flags through the
-`$SUITE_ARGS` environment variable to have the e2e use the cluster:
-
-```
-export SUITE_ARGS="--use-existing --kubeconfig=<path to kubeconfig>"
-```
-
+*Its will destroy the CAPL test cluster and kind mgmt cluster*
