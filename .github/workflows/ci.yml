@@ -59,12 +59,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             REV=${{ github.ref_name }}
-      - name: Delete Image from GHCR
-        uses: bots-house/ghcr-delete-image-action@v1.1.0
-        with:
-          # NOTE: at now only orgs is supported
-          owner: linode
-          name: linode-blockstorage-csi-driver
-          # NOTE: using Personal Access Token
-          token: ${{secrets.GITHUB_TOKEN}}
-          tag: ${{ github.head_ref || github.ref_name }} 
+      # - name: Delete Image from GHCR
+      #   uses: bots-house/ghcr-delete-image-action@v1.1.0
+      #   with:
+      #     # NOTE: at now only orgs is supported
+      #     owner: linode
+      #     name: linode-blockstorage-csi-driver
+      #     # NOTE: using Personal Access Token
+      #     token: ${{secrets.GITHUB_TOKEN}}
+      #     tag: ${{ github.head_ref || github.ref_name }}
+
+  # TODO: Create mgmt cluster and test-cluster to install CSI driver on test cluster
+  #       and verify that it works by running chainsaw e2e tests
