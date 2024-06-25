@@ -23,7 +23,7 @@ data:
       # Try to get ID using Metadata API with a 5-second timeout
       TOKEN=$(curl -sS -m 5 -X PUT -H "Metadata-Token-Expiry-Seconds: 3600" $META_API/token || true)
       if [ ! -z "$TOKEN" ]; then
-        ID=$(curl -sS -m 5 -H "Metadata-Token: $TOKEN" $META_API/instance | grep -v "uuid" | awk -F': ' '/id:/{print $2}'  | tr -d '\n' || true)
+        ID=$(curl -sS -m 5 -H "Metadata-Token: $TOKEN" $META_API/instance -H "Accept: application/json" | jq -r .id |  tr -d '\n' || true)
         echo "Metadata linode ID was $ID"
       fi
     fi
