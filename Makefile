@@ -58,5 +58,7 @@ clean:
 .PHONY: release
 release:
 	mkdir -p $(RELEASE_DIR)
+	./hack/release-yaml.sh $(IMAGE_VERSION)
+	cp ./internal/driver/deploy/releases/linode-blockstorage-csi-driver-$(IMAGE_VERSION).yaml ./$(RELEASE_DIR)
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
