@@ -47,7 +47,7 @@ make remote-cluster-deploy TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-c
 ```
 > You don't need to pass TEST_IMAGE_TAG and TEST_IMAGE_NAME if you have a PR open
 
-The above command will create a test cluster and export kubeconfig of test-cluster in the root directory
+The above command will create a test cluster, install CSI driver using the test image, and export kubeconfig of test-cluster to the root directory
 
 ### 3. Run E2E Tests
 
