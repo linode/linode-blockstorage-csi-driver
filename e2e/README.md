@@ -43,7 +43,7 @@ export KUBERNETES_VERSION=v1.29.1
 export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
 export LINODE_MACHINE_TYPE=g6-standard-2
 
-make remote-cluster-deploy TEST_IMAGE_NAME=linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e
+make remote-cluster-deploy TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e
 ```
 > You don't need to pass TEST_IMAGE_TAG and TEST_IMAGE_NAME if you have a PR open
 
