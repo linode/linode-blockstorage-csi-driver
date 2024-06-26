@@ -98,6 +98,7 @@ remote-cluster-deploy: kubectl yq envsubst clusterctl
 	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) describe pod csi-linode-controller-0 -n kube-system
 	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) describe configmap get-linode-id -n kube-system
 	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) describe pods -n kube-system -l app=csi-linode-node
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) get pods -n kube-system -l role=csi-linode -o yaml
 	# END OF DEBUGGING
 	
 	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
