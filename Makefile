@@ -94,6 +94,9 @@ remote-cluster-deploy: kubectl yq envsubst clusterctl
 	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
 	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
+	# For Debugging
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) get all -A
+
 .PHONY: local-deploy
 local-deploy: kind ctlptl clusterctl
 	$(CTLPTL) apply -f e2e/setup/ctlptl-config.yaml
