@@ -103,8 +103,8 @@ remote-cluster-deploy: kubectl yq envsubst clusterctl
 	# Install CSI driver and wait for it to be ready
 	cat e2e/setup/linode-secret.yaml | $(ENVSUBST) | KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
 	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node --timeout=2m
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller --timeout=2m
 
 .PHONY: cleanup-cluster
 cleanup-cluster: kubectl kind
