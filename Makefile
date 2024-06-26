@@ -63,14 +63,63 @@ release:
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
 
-local-deploy: kind ctlptl tilt kustomize clusterctl
-	$(CTLPTL) apply -f .tilt/ctlptl-config.yaml
-	
+
+## --------------------------------------
+## Testing
+## --------------------------------------
+
+##@ Testing:
+
+# TODO: switch image tag to current branch name
+TEST_IMAGE_TAG?=$(shell git rev-parse --abbrev-ref HEAD)
+TEST_IMAGE_NAME?="linode/linode-blockstorage-csi-driver"
+K8S_VERSION?="v1.29.1"
+CAPI_VERSION?="v1.6.3"
+HELM_VERSION?="v0.2.1"
+CAPL_VERSION?="v0.3.1"
+
+
+.PHONY: local-deploy
+local-deploy: kind ctlptl clusterctl
+	$(CTLPTL) apply -f e2e/setup/ctlptl-config.yaml
+	$(CLUSTERCTL) init \
+		--wait-providers \
+		--core cluster-api:${CAPI_VERSION} \
+		--addon helm:${HELM_VERSION} \
+		--infrastructure akamai-linode:${CAPL_VERSION} \
+		--config e2e/setup/clusterctl.yaml
+
+.PHONY: remote-cluster-deploy
+remote-cluster-deploy: kubectl yq envsubst clusterctl
+	# Create a CAPL test cluster without CSI driver and wait for it to be ready
+	$(CLUSTERCTL) generate cluster test-cluster \
+		--config e2e/setup/clusterctl.yaml \
+		--kubernetes-version $(K8S_VERSION) \
+		--infrastructure akamai-linode:$(CAPL_VERSION) \
+		--flavor kubeadm-vpcless | $(YQ) 'select(.metadata.name != "test-cluster-csi-driver-linode")' | $(KUBECTL) apply -f -
+	$(KUBECTL) wait --for=condition=ControlPlaneReady  cluster/test-cluster --timeout=600s
+	$(CLUSTERCTL) get kubeconfig test-cluster > test-cluster-kubeconfig.yaml
+
+	# Install CSI driver and wait for it to be ready
+	cat e2e/setup/linode-secret.yaml | $(ENVSUBST) | KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
+	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller
+
+.PHONY: cleanup-cluster
+cleanup-cluster: kubectl kind
+	-$(KUBECTL) delete cluster test-cluster
+	-$(KIND) delete cluster -n capl
+
+.PHONY: e2e-test
+e2e-test: chainsaw
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(CHAINSAW) test ./e2e/test
 
 #####################################################################
 # OS / ARCH
 #####################################################################
 OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
+OS_UPPER=$(shell uname -s)
 ARCH=$(shell uname -m)
 ARCH_SHORT=$(ARCH)
 ifeq ($(ARCH_SHORT),x86_64)
@@ -108,15 +157,20 @@ CTLPTL         ?= $(LOCALBIN)/ctlptl
 CLUSTERCTL     ?= $(LOCALBIN)/clusterctl
 KIND           ?= $(LOCALBIN)/kind
 KUSTOMIZE      ?= $(LOCALBIN)/kustomize
+CHAINSAW      ?= $(LOCALBIN)/chainsaw
+KUBECTL        ?= $(LOCALBIN)/kubectl
+YQ            ?= $(LOCALBIN)/yq
+ENVSUBST      ?= $(LOCALBIN)/envsubst
 
 ## Tool Versions
 CTLPTL_VERSION           ?= v0.8.28
 CLUSTERCTL_VERSION       ?= v1.6.3
 KIND_VERSION             ?= v0.22.0
 KUSTOMIZE_VERSION        ?= v5.3.0
+CHAINSAW_VERSION         ?= v0.2.2
 
 .PHONY: tools
-tools: ctlptl clusterctl kind kustomize
+tools: ctlptl clusterctl kind kustomize chainsaw kubectl yq envsubst
 
 .PHONY: ctlptl
 ctlptl: $(CTLPTL) ## Download ctlptl locally if necessary.
@@ -135,19 +189,28 @@ $(KIND): $(LOCALBIN)
 	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/$(KIND_VERSION)/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
 	chmod +x $(KIND)
 
+.PHONY: kubectl
+kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
+$(KUBECTL): $(LOCALBIN)
+	curl -L https://dl.k8s.io/release/$(shell curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(OS)/$(ARCH_SHORT)/kubectl -o $(KUBECTL)
+	chmod +x $(KUBECTL)
+
+.PHONY: yq
+yq: $(YQ) ## Download yq locally if necessary.
+$(YQ): $(LOCALBIN)
+	curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_$(OS)_$(ARCH_SHORT) -o $(YQ)
+	chmod +x $(YQ)
+
+.PHONY: envsubst
+envsubst: $(ENVSUBST) ## Download envsubst locally if necessary.
+$(ENVSUBST): $(LOCALBIN)
+	curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-$(OS_UPPER)-$(ARCH) -o $(ENVSUBST)
+	chmod +x $(ENVSUBST)
+
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
-
-.PHONY: tilt
-tilt: $(TILT) ## Download tilt locally if necessary.
-$(TILT): $(LOCALBIN)
-	TILT_OS=$(OS); \
-	if [ $$TILT_OS = "darwin" ]; then \
-		TILT_OS=mac; \
-	fi; \
-	curl -fsSL https://github.com/tilt-dev/tilt/releases/download/v$(TILT_VERSION)/tilt.$(TILT_VERSION).$$TILT_OS.$(ARCH).tar.gz | tar -xzvm -C $(LOCALBIN) tilt
 
 .PHONY: chainsaw
 chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
