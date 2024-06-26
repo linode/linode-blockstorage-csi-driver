@@ -56,6 +56,7 @@ Run the following command to run e2e tests:
 ```sh
 make e2e-test
 ```
+This will run the chainsaw e2e tests under the `e2e/test` directory
 
 ### 4. Cleanup
 
