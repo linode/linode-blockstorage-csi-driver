@@ -70,24 +70,12 @@ release:
 
 ##@ Testing:
 
-# TODO: switch image tag to current branch name
 TEST_IMAGE_TAG?=$(shell git rev-parse --abbrev-ref HEAD)
 TEST_IMAGE_NAME?="linode/linode-blockstorage-csi-driver"
 K8S_VERSION?="v1.29.1"
 CAPI_VERSION?="v1.6.3"
 HELM_VERSION?="v0.2.1"
 CAPL_VERSION?="v0.3.1"
-
-
-.PHONY: local-deploy
-local-deploy: kind ctlptl clusterctl
-	$(CTLPTL) apply -f e2e/setup/ctlptl-config.yaml
-	$(CLUSTERCTL) init \
-		--wait-providers \
-		--core cluster-api:${CAPI_VERSION} \
-		--addon helm:${HELM_VERSION} \
-		--infrastructure akamai-linode:${CAPL_VERSION} \
-		--config e2e/setup/clusterctl.yaml
 
 .PHONY: remote-cluster-deploy
 remote-cluster-deploy: kubectl yq envsubst clusterctl
@@ -103,8 +91,18 @@ remote-cluster-deploy: kubectl yq envsubst clusterctl
 	# Install CSI driver and wait for it to be ready
 	cat e2e/setup/linode-secret.yaml | $(ENVSUBST) | KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
 	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node --timeout=2m
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller --timeout=2m
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
+	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
+
+.PHONY: local-deploy
+local-deploy: kind ctlptl clusterctl
+	$(CTLPTL) apply -f e2e/setup/ctlptl-config.yaml
+	$(CLUSTERCTL) init \
+		--wait-providers \
+		--core cluster-api:${CAPI_VERSION} \
+		--addon helm:${HELM_VERSION} \
+		--infrastructure akamai-linode:${CAPL_VERSION} \
+		--config e2e/setup/clusterctl.yaml
 
 .PHONY: cleanup-cluster
 cleanup-cluster: kubectl kind

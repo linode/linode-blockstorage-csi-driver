@@ -82,12 +82,11 @@ jobs:
         run: make local-deploy
 
       - name: Setup CAPL Child Cluster For Testing
-        continue-on-error: true
         run: make remote-cluster-deploy
 
       - name: Run E2E Tests
-        continue-on-error: true
         run: make e2e-test
 
       - name: Cleanup Resources
+        if: always()
         run: make cleanup-cluster
