@@ -16,6 +16,10 @@
     "init_hook": [
       "export GOROOT=$(go env GOROOT)"
     ],
-    "scripts": {}
+    "scripts": {
+      "local-deploy": "make local-deploy",
+      "remote-cluster-deploy": "make remote-cluster-deploy",
+      "e2e-test": "make e2e-test"
+    }
   }
 }

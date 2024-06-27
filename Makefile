@@ -117,10 +117,10 @@ local-deploy:
 		--infrastructure linode-linode:${CAPL_VERSION}
 
 .PHONY: cleanup-cluster
-cleanup-cluster: kubectl kind
+cleanup-cluster:
 	-kubectl delete cluster test-cluster
 	-kind delete cluster -n capl
 
 .PHONY: e2e-test
-e2e-test: chainsaw
+e2e-test:
 	KUBECONFIG=test-cluster-kubeconfig.yaml chainsaw test ./e2e/test
