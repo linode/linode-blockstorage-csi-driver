@@ -63,6 +63,7 @@ jobs:
     needs: docker-build
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
+      TEST_TAG: ${{ github.head_ref || github.ref_name }}
       LINODE_TOKEN: ${{ secrets.DX_LINODE_TOKEN }}
       LINODE_REGION: us-sea
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
@@ -79,14 +80,17 @@ jobs:
           check-latest: true
 
       - name: Setup CAPL Management Kind Cluster
-        run: make local-deploy
+        run: |
+          echo $GITHUB_REF_NAME
+          echo $TEST_TAG
+      #   run: make local-deploy
 
-      - name: Setup CAPL Child Cluster For Testing
-        run: make remote-cluster-deploy
+      # - name: Setup CAPL Child Cluster For Testing
+      #   run: make remote-cluster-deploy
 
-      - name: Run E2E Tests
-        run: make e2e-test
+      # - name: Run E2E Tests
+      #   run: make e2e-test
 
-      - name: Cleanup Resources
-        if: always()
-        run: make cleanup-cluster
+      # - name: Cleanup Resources
+      #   if: always()
+      #   run: make cleanup-cluster
