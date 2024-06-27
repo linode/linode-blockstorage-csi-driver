@@ -9,7 +9,7 @@
     "kind@latest",
     "kustomize@latest",
     "kyverno-chainsaw@latest",
-    "yq@latest",
+    "yq-go@latest",
     "envsubst@latest"
   ],
   "shell": {
@@ -22,5 +22,8 @@
       "e2e-test": "make e2e-test",
       "cleanup-cluster": "make cleanup-cluster"
     }
+  },
+  "env": {
+    "EXP_CLUSTER_RESOURCE_SET": "true"
   }
 }

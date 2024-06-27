@@ -78,7 +78,11 @@ HELM_VERSION ?= "v0.2.1"
 CAPL_VERSION ?= "v0.3.1"
 
 # Setting unique cluster name
-TEST_CLUSTER_NAME ?= "test-cluster"-"$(shell git rev-parse --short HEAD)"
+TEST_CLUSTER_NAME ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
+
+.PHONY: test-image-tags
+test-image-tags:
+	@echo $(TEST_IMAGE_TAG)
 
 .PHONY: remote-cluster-deploy
 remote-cluster-deploy:
@@ -86,23 +90,13 @@ remote-cluster-deploy:
 	clusterctl generate cluster $(TEST_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION) \
-		--flavor kubeadm-vpcless | yq 'select(.metadata.name != "test-cluster-csi-driver-linode")' | kubectl apply -f -
+		--flavor kubeadm-vpcless | yq 'select(.metadata.name != "$(TEST_CLUSTER_NAME)-csi-driver-linode")' | kubectl apply -f -
 	kubectl wait --for=condition=ControlPlaneReady  cluster/$(TEST_CLUSTER_NAME) --timeout=600s
 	clusterctl get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 
 	# Install CSI driver and wait for it to be ready
 	cat e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
-	
-	# START OF DEBUGGING
-	sleep 60
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl get all -A
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl describe pod csi-linode-controller-0 -n kube-system
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl describe configmap get-linode-id -n kube-system
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl describe pods -n kube-system -l app=csi-linode-node
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl get pods -n kube-system -l role=csi-linode -o yaml
-	# END OF DEBUGGING
-	
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
@@ -118,7 +112,7 @@ local-deploy:
 
 .PHONY: cleanup-cluster
 cleanup-cluster:
-	-kubectl delete cluster test-cluster
+	-kubectl delete cluster $(TEST_CLUSTER_NAME)
 	-kind delete cluster -n capl
 
 .PHONY: e2e-test
