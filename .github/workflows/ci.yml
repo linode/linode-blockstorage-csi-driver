@@ -93,4 +93,4 @@ jobs:
 
       - name: Cleanup Resources
         if: always()
-        run: make cleanup-cluster
+        run: devbox run cleanup-cluster
