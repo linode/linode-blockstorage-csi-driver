@@ -77,16 +77,19 @@ CAPI_VERSION?="v1.6.3"
 HELM_VERSION?="v0.2.1"
 CAPL_VERSION?="v0.3.1"
 
+# Setting unique cluster name
+TEST_CLUSTER_NAME?= "test-cluster"-"$(shell git rev-parse --short HEAD)"
+
 .PHONY: remote-cluster-deploy
 remote-cluster-deploy: kubectl yq envsubst clusterctl
 	# Create a CAPL test cluster without CSI driver and wait for it to be ready
-	$(CLUSTERCTL) generate cluster test-cluster \
+	$(CLUSTERCTL) generate cluster $(TEST_CLUSTER_NAME) \
 		--config e2e/setup/clusterctl.yaml \
 		--kubernetes-version $(K8S_VERSION) \
 		--infrastructure akamai-linode:$(CAPL_VERSION) \
 		--flavor kubeadm-vpcless | $(YQ) 'select(.metadata.name != "test-cluster-csi-driver-linode")' | $(KUBECTL) apply -f -
 	$(KUBECTL) wait --for=condition=ControlPlaneReady  cluster/test-cluster --timeout=600s
-	$(CLUSTERCTL) get kubeconfig test-cluster > test-cluster-kubeconfig.yaml
+	$(CLUSTERCTL) get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 
 	# Install CSI driver and wait for it to be ready
 	cat e2e/setup/linode-secret.yaml | $(ENVSUBST) | KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
