@@ -131,4 +131,3 @@ spec:
             check:
               ($error): ~
               (contains($stdout, 'Volume deleted in Linode')): true
-            

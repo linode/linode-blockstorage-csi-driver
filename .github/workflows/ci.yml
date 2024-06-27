@@ -84,14 +84,12 @@ jobs:
       - name: Start devbox
         run: devbox shell
 
-      - name: Setup CAPL Management Kind Cluster
-        run: make local-deploy
-
-      - name: Setup CAPL Child Cluster For Testing
-        run: make remote-cluster-deploy TEST_IMAGE_TAG=${{ github.head_ref || github.ref_name }}
-
-      - name: Run E2E Tests
-        run: make e2e-test
+      - name: Setup CAPL Management Kind Cluster, Deploy Test Cluster, and Run E2E Tests
+        run: |
+          devbox shell
+          make local-deploy
+          make remote-cluster-deploy TEST_IMAGE_TAG=${{ github.head_ref || github.ref_name }}
+          make e2e-test
 
       - name: Cleanup Resources
         if: always()
