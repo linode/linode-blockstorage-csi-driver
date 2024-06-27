@@ -70,161 +70,57 @@ release:
 
 ##@ Testing:
 
-TEST_IMAGE_TAG?=$(shell git rev-parse --abbrev-ref HEAD)
-TEST_IMAGE_NAME?="linode/linode-blockstorage-csi-driver"
-K8S_VERSION?="v1.29.1"
-CAPI_VERSION?="v1.6.3"
-HELM_VERSION?="v0.2.1"
-CAPL_VERSION?="v0.3.1"
+TEST_IMAGE_TAG ?= $(shell git rev-parse --abbrev-ref HEAD)
+TEST_IMAGE_NAME ?= "linode/linode-blockstorage-csi-driver"
+K8S_VERSION ?= "v1.29.1"
+CAPI_VERSION ?= "v1.6.3"
+HELM_VERSION ?= "v0.2.1"
+CAPL_VERSION ?= "v0.3.1"
 
 # Setting unique cluster name
-TEST_CLUSTER_NAME?= "test-cluster"-"$(shell git rev-parse --short HEAD)"
+TEST_CLUSTER_NAME ?= "test-cluster"-"$(shell git rev-parse --short HEAD)"
 
 .PHONY: remote-cluster-deploy
-remote-cluster-deploy: kubectl yq envsubst clusterctl
+remote-cluster-deploy:
 	# Create a CAPL test cluster without CSI driver and wait for it to be ready
-	$(CLUSTERCTL) generate cluster $(TEST_CLUSTER_NAME) \
-		--config e2e/setup/clusterctl.yaml \
+	clusterctl generate cluster $(TEST_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
-		--infrastructure akamai-linode:$(CAPL_VERSION) \
-		--flavor kubeadm-vpcless | $(YQ) 'select(.metadata.name != "test-cluster-csi-driver-linode")' | $(KUBECTL) apply -f -
-	$(KUBECTL) wait --for=condition=ControlPlaneReady  cluster/test-cluster --timeout=600s
-	$(CLUSTERCTL) get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
+		--infrastructure linode-linode:$(CAPL_VERSION) \
+		--flavor kubeadm-vpcless | yq 'select(.metadata.name != "test-cluster-csi-driver-linode")' | kubectl apply -f -
+	kubectl wait --for=condition=ControlPlaneReady  cluster/$(TEST_CLUSTER_NAME) --timeout=600s
+	clusterctl get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 
 	# Install CSI driver and wait for it to be ready
-	cat e2e/setup/linode-secret.yaml | $(ENVSUBST) | KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
-	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) apply -f -
+	cat e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
+	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 	
 	# START OF DEBUGGING
 	sleep 60
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) get all -A
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) describe pod csi-linode-controller-0 -n kube-system
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) describe configmap get-linode-id -n kube-system
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) describe pods -n kube-system -l app=csi-linode-node
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) get pods -n kube-system -l role=csi-linode -o yaml
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl get all -A
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl describe pod csi-linode-controller-0 -n kube-system
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl describe configmap get-linode-id -n kube-system
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl describe pods -n kube-system -l app=csi-linode-node
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl get pods -n kube-system -l role=csi-linode -o yaml
 	# END OF DEBUGGING
 	
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(KUBECTL) rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
 
 .PHONY: local-deploy
-local-deploy: kind ctlptl clusterctl
-	$(CTLPTL) apply -f e2e/setup/ctlptl-config.yaml
-	$(CLUSTERCTL) init \
+local-deploy:
+	ctlptl apply -f e2e/setup/ctlptl-config.yaml
+	clusterctl init \
 		--wait-providers \
 		--core cluster-api:${CAPI_VERSION} \
 		--addon helm:${HELM_VERSION} \
-		--infrastructure akamai-linode:${CAPL_VERSION} \
-		--config e2e/setup/clusterctl.yaml
+		--infrastructure linode-linode:${CAPL_VERSION}
 
 .PHONY: cleanup-cluster
 cleanup-cluster: kubectl kind
-	-$(KUBECTL) delete cluster test-cluster
-	-$(KIND) delete cluster -n capl
+	-kubectl delete cluster test-cluster
+	-kind delete cluster -n capl
 
 .PHONY: e2e-test
 e2e-test: chainsaw
-	KUBECONFIG=test-cluster-kubeconfig.yaml $(CHAINSAW) test ./e2e/test
-
-#####################################################################
-# OS / ARCH
-#####################################################################
-OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
-OS_UPPER=$(shell uname -s)
-ARCH=$(shell uname -m)
-ARCH_SHORT=$(ARCH)
-ifeq ($(ARCH_SHORT),x86_64)
-ARCH_SHORT := amd64
-else ifeq ($(ARCH_SHORT),aarch64)
-ARCH_SHORT := arm64
-endif
-
-## --------------------------------------
-## Build Dependencies
-## --------------------------------------
-
-##@ Build Dependencies:
-
-## Location to install dependencies to
-
-# Use CACHE_BIN for tools that cannot use devbox and LOCALBIN for tools that can use either method
-CACHE_BIN ?= $(CURDIR)/bin
-LOCALBIN ?= $(CACHE_BIN)
-
-DEVBOX_BIN ?= $(DEVBOX_PACKAGES_DIR)/bin
-
-# if the $DEVBOX_PACKAGES_DIR env variable exists that means we are within a devbox shell and can safely
-# use devbox's bin for our tools
-ifdef DEVBOX_PACKAGES_DIR
-	LOCALBIN = $(DEVBOX_BIN)
-endif
-
-export PATH := $(CACHE_BIN):$(PATH)
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
-
-##@ Tooling Binaries:
-CTLPTL         ?= $(LOCALBIN)/ctlptl
-CLUSTERCTL     ?= $(LOCALBIN)/clusterctl
-KIND           ?= $(LOCALBIN)/kind
-KUSTOMIZE      ?= $(LOCALBIN)/kustomize
-CHAINSAW      ?= $(LOCALBIN)/chainsaw
-KUBECTL        ?= $(LOCALBIN)/kubectl
-YQ            ?= $(LOCALBIN)/yq
-ENVSUBST      ?= $(LOCALBIN)/envsubst
-
-## Tool Versions
-CTLPTL_VERSION           ?= v0.8.28
-CLUSTERCTL_VERSION       ?= v1.6.3
-KIND_VERSION             ?= v0.22.0
-KUSTOMIZE_VERSION        ?= v5.3.0
-CHAINSAW_VERSION         ?= v0.2.2
-
-.PHONY: tools
-tools: ctlptl clusterctl kind kustomize chainsaw kubectl yq envsubst
-
-.PHONY: ctlptl
-ctlptl: $(CTLPTL) ## Download ctlptl locally if necessary.
-$(CTLPTL): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install github.com/tilt-dev/ctlptl/cmd/ctlptl@$(CTLPTL_VERSION)
-
-.PHONY: clusterctl
-clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
-$(CLUSTERCTL): $(LOCALBIN)
-	curl -fsSL https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(OS)-$(ARCH_SHORT) -o $(CLUSTERCTL)
-	chmod +x $(CLUSTERCTL)
-
-.PHONY: kind
-kind: $(KIND) ## Download kind locally if necessary.
-$(KIND): $(LOCALBIN)
-	curl -fsSL https://github.com/kubernetes-sigs/kind/releases/download/$(KIND_VERSION)/kind-$(OS)-$(ARCH_SHORT) -o $(KIND)
-	chmod +x $(KIND)
-
-.PHONY: kubectl
-kubectl: $(KUBECTL) ## Download kubectl locally if necessary.
-$(KUBECTL): $(LOCALBIN)
-	curl -L https://dl.k8s.io/release/$(shell curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(OS)/$(ARCH_SHORT)/kubectl -o $(KUBECTL)
-	chmod +x $(KUBECTL)
-
-.PHONY: yq
-yq: $(YQ) ## Download yq locally if necessary.
-$(YQ): $(LOCALBIN)
-	curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_$(OS)_$(ARCH_SHORT) -o $(YQ)
-	chmod +x $(YQ)
-
-.PHONY: envsubst
-envsubst: $(ENVSUBST) ## Download envsubst locally if necessary.
-$(ENVSUBST): $(LOCALBIN)
-	curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-$(OS_UPPER)-$(ARCH) -o $(ENVSUBST)
-	chmod +x $(ENVSUBST)
-
-.PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
-
-.PHONY: chainsaw
-chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
-$(CHAINSAW): $(CACHE_BIN)
-	GOBIN=$(CACHE_BIN) go install github.com/kyverno/chainsaw@$(CHAINSAW_VERSION)
+	KUBECONFIG=test-cluster-kubeconfig.yaml chainsaw test ./e2e/test

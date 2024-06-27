@@ -136,66 +136,35 @@ spec:
             ref:
               apiVersion: v1
               kind: Pod
-    - name: Wait to allow volume to detach (20 sec)
+    - name: Check if the volume is detached on Node resource and in Linode (using API)
       try:
-        - sleep:
-            duration: 20s
-    - name: Check if the volume is detached
-      try: 
         - script:
             env:
-              - name: TARGET_API
-                value: api.linode.com
-              - name: TARGET_API_VERSION
-                value: v4
-              - name: URI
-                value: volumes
+              - name: NAMESPACE
+                value: ($namespace)
               - name: FILTER
                 value: (to_string({"tags":($namespace)}))
             content: |
-              set -e
-              curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "X-Filter: $FILTER" \
-                -H "Content-Type: application/json" \
-                "https://$TARGET_API/$TARGET_API_VERSION/$URI"
+              ../check-volume-detached.sh $NAMESPACE pvc-filesystem $FILTER
             check:
               ($error): ~
-              (json_parse($stdout)):
-                results: 1
-                data:
-                  - linode_id: null
+              (contains($stdout, 'Volume was successfully detached')): true
+              (contains($stdout, 'Volume detached in Linode')): true
     - name: Delete PVC
       try:
         - delete:
             ref:
               apiVersion: v1
               kind: PersistentVolumeClaim
-    - name: Wait 5 seconds for volume deletion
-      try:
-        - sleep:
-            duration: 5s
     - name: Check if the Volume was deleted
       try:
         - script:
             env:
-              - name: TARGET_API
-                value: api.linode.com
-              - name: TARGET_API_VERSION
-                value: v4
-              - name: URI
-                value: volumes
               - name: FILTER
                 value: (to_string({"tags":($namespace)}))
             content: |
-              set -e
-              curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "X-Filter: $FILTER" \
-                -H "Content-Type: application/json" \
-                "https://$TARGET_API/$TARGET_API_VERSION/$URI"
+              ../check-volume-deleted.sh $FILTER
             check:
               ($error): ~
-              (json_parse($stdout)):
-                results: 0
+              (contains($stdout, 'Volume deleted in Linode')): true
             
