@@ -87,6 +87,19 @@ spec:
         - describe:
             apiVersion: v1
             kind: PersistentVolume
+    - name: Check if volume size was changed on Linode
+      try:
+        - script:
+            env:
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+              - name: VOLUME_SIZE
+                value: "20"
+            content: |
+              ../check-volume-size.sh $FILTER $VOLUME_SIZE
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume size was changed successfully')): true
     - name: Check if PV reflect storage expansion
       try:
         - assert:
@@ -96,29 +109,6 @@ spec:
               spec:
                 capacity:
                   storage: 20Gi
-        - script:
-            env:
-              - name: TARGET_API
-                value: api.linode.com
-              - name: TARGET_API_VERSION
-                value: v4
-              - name: URI
-                value: volumes
-              - name: FILTER
-                value: (to_string({"tags":($namespace)}))
-            content: |
-              set -e
-              curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "X-Filter: $FILTER" \
-                -H "Content-Type: application/json" \
-                "https://$TARGET_API/$TARGET_API_VERSION/$URI"
-            check:
-              ($error): ~
-              (json_parse($stdout)):
-                results: 1
-                data: 
-                  - size: 20
     - name: Check if the file still exists
       try:
         - script:

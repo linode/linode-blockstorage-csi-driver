@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Check if namespace is provided
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <filter>"
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <filter> <size>"
   exit 1
 fi
 
@@ -11,6 +11,7 @@ TARGET_API=${TARGET_API:-api.linode.com}
 TARGET_API_VERSION=${TARGET_API_VERSION:-v4}
 URI=${URI:-volumes}
 FILTER=$1
+SIZE=$2
 MAX_RETRIES=5
 RETRY_DELAY=5
 
@@ -31,14 +32,13 @@ for ((i=1; i<=$MAX_RETRIES; i++)); do
         # Check if the response is valid JSON
         if jq -e . >/dev/null 2>&1 <<< "$response"; then
             # Extract results and check if it's null
-            results=$(echo "$response" | jq -r '.results')
-            
-            if [ "$results" = "0" ]; then
-                echo "Volume deleted in Linode"
+            volume_size=$(echo "$response" | jq -r '.data[0].size')
+
+            if [ "$volume_size" = $SIZE ]; then
+                echo "Volume size was changed successfully. Current size: $volume_size"
                 exit 0
             else
-                echo "Volume still available in Linode. Response:"
-                echo "$response"
+                echo "Volume size has not been changed. Current size: $volume_size"
                 if [ $i -lt $MAX_RETRIES ]; then
                     echo "Retrying in $RETRY_DELAY seconds..."
                     sleep $RETRY_DELAY
@@ -61,4 +61,3 @@ for ((i=1; i<=$MAX_RETRIES; i++)); do
         exit 1
     fi
 done
-
