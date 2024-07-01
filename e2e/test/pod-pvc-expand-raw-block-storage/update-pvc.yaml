@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-block
+spec:
+  resources:
+    requests:
+      storage: 20Gi
