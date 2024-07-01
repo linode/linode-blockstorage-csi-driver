@@ -12,7 +12,7 @@ We will be using a kind cluster and install CAPL plus various other providers.
 Run the following command to create a kind mgmt cluster:
 
 ```sh
-make local-deploy
+devbox run local-deploy
 ```
 This will download all the necessary binaries to local bin and create a local mgmt cluster.
 
@@ -43,7 +43,7 @@ export KUBERNETES_VERSION=v1.29.1
 export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
 export LINODE_MACHINE_TYPE=g6-standard-2
 
-make remote-cluster-deploy TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e
+devbox run remote-cluster-deploy TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e
 ```
 > You don't need to pass TEST_IMAGE_TAG and TEST_IMAGE_NAME if you have a PR open
 
@@ -54,7 +54,7 @@ The above command will create a test cluster, install CSI driver using the test 
 Run the following command to run e2e tests:
 
 ```sh
-make e2e-test
+devbox run e2e-test
 ```
 This will run the chainsaw e2e tests under the `e2e/test` directory
 
@@ -63,6 +63,6 @@ This will run the chainsaw e2e tests under the `e2e/test` directory
 Run the following command to cleanup the test cluster:
 
 ```sh
-make cleanup-cluster
+devbox run cleanup-cluster
 ```
 *Its will destroy the CAPL test cluster and kind mgmt cluster*
