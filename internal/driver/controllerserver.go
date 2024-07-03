@@ -265,10 +265,19 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 	}
 
 	// Check to see if there is room to attach this volume to the instance.
-	if canAttach, err := linodeCS.canAttach(ctx, instance); err != nil {
+	if canAttach, err := linodeCS.canAttach(ctx, instance); errors.Is(err, errNilInstance) {
+		return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, "cannot determine volume attachments for a nil instance")
+	} else if err != nil {
 		return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, err.Error())
 	} else if !canAttach {
-		limit := linodeCS.maxVolumeAttachments(instance)
+		// If we can, try and add a little more information to the error message
+		// for the caller.
+		limit, err := linodeCS.maxVolumeAttachments(ctx, instance)
+		if errors.Is(err, errNilInstance) {
+			return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, "cannot calculate max volume attachments for a nil instance")
+		} else if err != nil {
+			return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.ResourceExhausted, "max number of volumes already attached to instance")
+		}
 		return &csi.ControllerPublishVolumeResponse{}, status.Errorf(codes.ResourceExhausted, "max number of volumes (%d) already attached to instance", limit)
 	}
 
@@ -307,41 +316,46 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 // Linode with the given ID.
 //
 // Whether or not another volume can be attached is based on how many instance
-// disks and block storage volumes are currently attached to the Linode
-// instance.
+// disks and block storage volumes are currently attached to the instance.
 func (s *LinodeControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
-	// Total number of attached drives.
-	var attached int
-
-	disks, err := s.CloudProvider.ListInstanceDisks(ctx, instance.ID, nil)
+	limit, err := s.maxVolumeAttachments(ctx, instance)
 	if err != nil {
-		return false, fmt.Errorf("list instance disks: %w", err)
+		return false, fmt.Errorf("max volume attachments: %w", err)
 	}
-	attached += len(disks)
 
 	volumes, err := s.CloudProvider.ListInstanceVolumes(ctx, instance.ID, nil)
 	if err != nil {
 		return false, fmt.Errorf("list instance volumes: %w", err)
 	}
-	attached += len(volumes)
 
-	limit := s.maxVolumeAttachments(instance)
-	return attached < limit, nil
+	return len(volumes) < limit, nil
 }
 
+var (
+	// errNilInstance is a general-purpose error used to indicate a nil
+	// [github.com/linode/linodego.Instance] was passed as an argument to a
+	// function.
+	errNilInstance = errors.New("nil instance")
+)
+
 // maxVolumeAttachments returns the maximum number of volumes that can be
-// attached to a single Linode instance. If instance == nil, or instance.Specs
-// == nil, [maxPersistentAttachments] will be returned.
-func (s *LinodeControllerServer) maxVolumeAttachments(instance *linodego.Instance) int {
+// attached to a single Linode instance, minus any currently-attached instance
+// disks.
+func (s *LinodeControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
 	if instance == nil || instance.Specs == nil {
-		return maxPersistentAttachments
+		return 0, errNilInstance
+	}
+
+	disks, err := s.CloudProvider.ListInstanceDisks(ctx, instance.ID, nil)
+	if err != nil {
+		return 0, fmt.Errorf("list instance disks: %w", err)
 	}
 
 	// The reported amount of memory for an instance is in MB.
 	// Convert it to bytes.
 	memBytes := uint(instance.Specs.Memory) << 20
 
-	return maxVolumeAttachments(memBytes)
+	return maxVolumeAttachments(memBytes) - len(disks), nil
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
