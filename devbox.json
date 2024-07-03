@@ -1,19 +1,29 @@
 {
   "packages": [
     "go_1_22@latest",
-    "ginkgo@2.13.2",
-    "ctlptl@0.8.28",
-    "clusterctl@1.6.3",
-    "kustomize@5.3.0",
-    "kubectl@1.28.4",
-    "kind@0.22.0"
+    "ginkgo@latest",
+    "ctlptl@latest",
+    "clusterctl@latest",
+    "kustomize@latest",
+    "kubectl@latest",
+    "kind@latest",
+    "kustomize@latest",
+    "kyverno-chainsaw@latest",
+    "yq-go@latest",
+    "envsubst@latest"
   ],
   "shell": {
     "init_hook": [
-      "export GOROOT=$(go env GOROOT)",
-      "export KUBECONFIG=${PWD}/e2e/test/kind-management.conf",
-      "export K8S_VERSION=v1.28.7"
+      "export GOROOT=$(go env GOROOT)"
     ],
-    "scripts": {}
+    "scripts": {
+      "local-deploy": "make local-deploy",
+      "remote-cluster-deploy": "make remote-cluster-deploy",
+      "e2e-test": "make e2e-test",
+      "cleanup-cluster": "make cleanup-cluster"
+    }
+  },
+  "env": {
+    "EXP_CLUSTER_RESOURCE_SET": "true"
   }
 }
