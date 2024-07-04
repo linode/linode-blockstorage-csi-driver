@@ -328,57 +328,84 @@ func TestControllerMaxVolumeAttachments(t *testing.T) {
 		name     string
 		instance *linodego.Instance
 		want     int
+		fail     bool
 	}{
 		{
 			name: "NilInstance",
-			want: maxPersistentAttachments,
+			fail: true,
 		},
 		{
 			name:     "NilInstanceSpecs",
 			instance: &linodego.Instance{},
-			want:     maxPersistentAttachments,
+			fail:     true,
 		},
+
+		// The test cases that follow should return the maximum number of
+		// volumes (not block devices) that can be attached to the instance.
+		// [maxPersistentAttachments] is the ideal maximum number of block
+		// devices that can be attached to an instance.
+		// Since this test uses a (fake) Linode client that reports instances
+		// with a single instance disk, we need to subtract 1 (one) from
+		// the expected result to count as "the number of volumes that can be
+		// attached".
 		{
 			name: "1GB",
 			instance: &linodego.Instance{
 				Specs: &linodego.InstanceSpec{Memory: 1 << 10},
 			},
-			want: maxPersistentAttachments,
+			want: maxPersistentAttachments - 1,
 		},
 		{
 			name: "16GB",
 			instance: &linodego.Instance{
 				Specs: &linodego.InstanceSpec{Memory: 16 << 10},
 			},
-			want: 16,
+			want: 15,
 		},
 		{
 			name: "32GB",
 			instance: &linodego.Instance{
 				Specs: &linodego.InstanceSpec{Memory: 32 << 10},
 			},
-			want: 32,
+			want: 31,
 		},
 		{
 			name: "64GB",
 			instance: &linodego.Instance{
 				Specs: &linodego.InstanceSpec{Memory: 64 << 10},
 			},
-			want: maxAttachments,
+			want: maxAttachments - 1,
 		},
 		{
 			name: "96GB",
 			instance: &linodego.Instance{
 				Specs: &linodego.InstanceSpec{Memory: 96 << 10},
 			},
-			want: maxAttachments,
+			want: maxAttachments - 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &LinodeControllerServer{}
-			got := s.maxVolumeAttachments(tt.instance)
+			s := &LinodeControllerServer{
+				CloudProvider: &fakeLinodeClient{
+					disks: []linodego.InstanceDisk{
+						{
+							ID:         1,
+							Label:      "boot",
+							Status:     linodego.DiskReady,
+							Size:       25 << 20, // 25GB in MB
+							Filesystem: linodego.FilesystemExt4,
+						},
+					},
+				},
+			}
+			got, err := s.maxVolumeAttachments(context.Background(), tt.instance)
+			if err != nil && !tt.fail {
+				t.Fatal(err)
+			} else if err == nil && tt.fail {
+				t.Fatal("should have failed")
+			}
 			if got != tt.want {
 				t.Errorf("got=%d want=%d", got, tt.want)
 			}

@@ -391,20 +391,29 @@ func (ns *LinodeNodeServer) NodeGetCapabilities(ctx context.Context, req *csi.No
 }
 
 func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(4).Infof("NodeGetInfo called with req: %#v", req)
+	// Get the number of currently attached instance disks, and subtract it
+	// from the limit of block devices that can be attached to the instance,
+	// which will effectively give us the number of block storage volumes
+	// that can be attached to this node/instance.
+	//
+	// This is what the spec wants us to report: the actual number of volumes
+	// that can be attached, and not the theoretical maximum number of
+	// devices that can be attached.
+	disks, err := ns.CloudProvider.ListInstanceDisks(ctx, ns.Metadata.ID, nil)
+	if err != nil {
+		return &csi.NodeGetInfoResponse{}, status.Errorf(codes.Internal, "list instance disks: %v", err)
+	}
+	maxVolumes := maxVolumeAttachments(ns.Metadata.Memory) - len(disks)
 
-	top := &csi.Topology{
-		Segments: map[string]string{
-			"topology.linode.com/region": ns.Metadata.Region,
+	return &csi.NodeGetInfoResponse{
+		NodeId:            strconv.Itoa(ns.Metadata.ID),
+		MaxVolumesPerNode: int64(maxVolumes),
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{
+				"topology.linode.com/region": ns.Metadata.Region,
+			},
 		},
-	}
-
-	resp := &csi.NodeGetInfoResponse{
-		NodeId:             strconv.Itoa(ns.Metadata.ID),
-		MaxVolumesPerNode:  int64(maxVolumeAttachments(ns.Metadata.Memory)),
-		AccessibleTopology: top,
-	}
-	return resp, nil
+	}, nil
 }
 
 func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
