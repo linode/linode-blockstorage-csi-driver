@@ -30,6 +30,11 @@ import (
 	"k8s.io/utils/mount"
 )
 
+// Name is the name of the driver provided by this package.
+// It is also used as the name of the socket file used for container
+// orchestrator and driver communications.
+const Name = "linodebs.csi.linode.com"
+
 type LinodeDriver struct {
 	name          string
 	vendorVersion string

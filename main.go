@@ -29,8 +29,6 @@ import (
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
-const driverName = "linodebs.csi.linode.com"
-
 var vendorVersion string // set by the linker
 
 type configuration struct {
@@ -113,7 +111,7 @@ func handle() error {
 		mounter,
 		deviceUtils,
 		metadata,
-		driverName,
+		driver.Name,
 		vendorVersion,
 		cfg.volumeLabelPrefix,
 	); err != nil {
