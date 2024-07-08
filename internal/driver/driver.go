@@ -42,7 +42,7 @@ type LinodeDriver struct {
 
 	ids *LinodeIdentityServer
 	ns  *LinodeNodeServer
-	cs  *LinodeControllerServer
+	cs  *ControllerServer
 
 	vcap  []*csi.VolumeCapability_AccessMode
 	cscap []*csi.ControllerServiceCapability
@@ -90,7 +90,12 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	// Set up RPC Servers
 	linodeDriver.ids = NewIdentityServer(linodeDriver)
 	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata)
-	linodeDriver.cs = NewControllerServer(linodeDriver, linodeClient, metadata)
+
+	cs, err := NewControllerServer(linodeDriver, linodeClient, metadata)
+	if err != nil {
+		return fmt.Errorf("new controller server: %w", err)
+	}
+	linodeDriver.cs = cs
 
 	return nil
 }
@@ -120,14 +125,6 @@ func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount
 		Driver:        linodeDriver,
 		Mounter:       mounter,
 		DeviceUtils:   deviceUtils,
-		CloudProvider: cloudProvider,
-		Metadata:      metadata,
-	}
-}
-
-func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.LinodeClient, metadata Metadata) *LinodeControllerServer {
-	return &LinodeControllerServer{
-		Driver:        linodeDriver,
 		CloudProvider: cloudProvider,
 		Metadata:      metadata,
 	}

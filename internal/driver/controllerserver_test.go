@@ -103,8 +103,8 @@ func TestListVolumes(t *testing.T) {
 
 	for c, tt := range cases {
 		t.Run(c, func(t *testing.T) {
-			cs := &LinodeControllerServer{
-				CloudProvider: &fakeLinodeClient{
+			cs := &ControllerServer{
+				client: &fakeLinodeClient{
 					volumes:  tt.volumes,
 					throwErr: tt.throwErr,
 				},
@@ -302,8 +302,8 @@ func TestControllerCanAttach(t *testing.T) {
 				Specs: &linodego.InstanceSpec{Memory: memMB},
 			}
 
-			srv := LinodeControllerServer{
-				CloudProvider: &fakeLinodeClient{
+			srv := ControllerServer{
+				client: &fakeLinodeClient{
 					volumes: vols,
 					disks:   disks,
 				},
@@ -387,8 +387,8 @@ func TestControllerMaxVolumeAttachments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &LinodeControllerServer{
-				CloudProvider: &fakeLinodeClient{
+			s := &ControllerServer{
+				client: &fakeLinodeClient{
 					disks: []linodego.InstanceDisk{
 						{
 							ID:         1,
