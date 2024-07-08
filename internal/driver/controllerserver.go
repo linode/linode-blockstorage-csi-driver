@@ -17,8 +17,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type VolumeLifecycle string
-
 const (
 	gigabyte               = 1024 * 1024 * 1024
 	devicePathKey          = "devicePath"
@@ -33,11 +31,6 @@ const (
 	// PublishInfoVolumeName is used to pass the volume name from
 	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
 	PublishInfoVolumeName = Name + "/volume-name"
-
-	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
-	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
-	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
-	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
 
 	// Linode Volume Topology Region Label
 	VolumeTopologyRegion string = "topology.linode.com/region"
