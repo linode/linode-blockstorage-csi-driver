@@ -47,9 +47,9 @@ type LinodeControllerServer struct {
 	Driver        *LinodeDriver
 	CloudProvider linodeclient.LinodeClient
 	Metadata      Metadata
-}
 
-var _ csi.ControllerServer = &LinodeControllerServer{}
+	csi.UnimplementedControllerServer
+}
 
 // CreateVolume will be called by the CO to provision a new volume on behalf of a user (to be consumed
 // as either a block device or a mounted filesystem).  This operation is idempotent.
@@ -511,11 +511,6 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	return resp, nil
 }
 
-// ControllerGetVolume allows probing for health status
-func (linodeCS *LinodeControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by this Plugin
 func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	resp := &csi.ControllerGetCapabilitiesResponse{
@@ -527,22 +522,6 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 		"method":   "controller_get_capabilities",
 	})
 	return resp, nil
-}
-
-func (linodeCS *LinodeControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
