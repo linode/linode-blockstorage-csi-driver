@@ -45,15 +45,15 @@ type LuksContext struct {
 const (
 	// LuksEncryptedAttribute is used to pass the information if the volume should be
 	// encrypted with luks to `NodeStageVolume`
-	LuksEncryptedAttribute = driverName + "/luks-encrypted"
+	LuksEncryptedAttribute = Name + "/luks-encrypted"
 
 	// LuksCipherAttribute is used to pass the information about the luks encryption
 	// cipher to `NodeStageVolume`
-	LuksCipherAttribute = driverName + "/luks-cipher"
+	LuksCipherAttribute = Name + "/luks-cipher"
 
 	// LuksKeySizeAttribute is used to pass the information about the luks key size
 	// to `NodeStageVolume`
-	LuksKeySizeAttribute = driverName + "/luks-key-size"
+	LuksKeySizeAttribute = Name + "/luks-key-size"
 
 	// LuksKeyAttribute is the key of the luks key used in the map of secrets passed from the CO
 	LuksKeyAttribute = "luksKey"

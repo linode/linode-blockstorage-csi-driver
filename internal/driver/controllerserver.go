@@ -21,7 +21,6 @@ type VolumeLifecycle string
 
 const (
 	gigabyte               = 1024 * 1024 * 1024
-	driverName             = "linodebs.csi.linode.com"
 	devicePathKey          = "devicePath"
 	waitTimeout            = 300
 	cloneReadinessTimeout  = 900
@@ -29,11 +28,11 @@ const (
 
 	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
 	// created volumes
-	VolumeTags = driverName + "/volumeTags"
+	VolumeTags = Name + "/volumeTags"
 
 	// PublishInfoVolumeName is used to pass the volume name from
 	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
-	PublishInfoVolumeName = driverName + "/volume-name"
+	PublishInfoVolumeName = Name + "/volume-name"
 
 	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
 	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
