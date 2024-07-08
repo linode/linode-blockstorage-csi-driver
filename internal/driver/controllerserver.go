@@ -23,16 +23,20 @@ const (
 	waitTimeout            = 300
 	cloneReadinessTimeout  = 900
 	minProviderVolumeBytes = 10 * gigabyte
+)
 
-	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
-	// created volumes
+const (
+	// VolumeTags is the parameter key used for passing a comma-separated list
+	// of tags to the Linode API.
 	VolumeTags = Name + "/volumeTags"
 
-	// PublishInfoVolumeName is used to pass the volume name from
-	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
+	// PublishInfoVolumeName is used to pass the name of the volume as it exists
+	// in the Linode API (the "label") to [NodeStageVolume] and
+	// [NodePublishVolume].
 	PublishInfoVolumeName = Name + "/volume-name"
 
-	// Linode Volume Topology Region Label
+	// VolumeTopologyRegion is the parameter key used to indicate the region
+	// the volume exists in.
 	VolumeTopologyRegion string = "topology.linode.com/region"
 )
 
