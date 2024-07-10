@@ -19,6 +19,27 @@ import (
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 )
 
+// MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
+// Volume, in bytes.
+//
+// The CSI RPC scheme deal with bytes, whereas the Linode API's block storage
+// volume endpoints deal with "GB".
+// Internally, the driver will deal with sizes and capacities in bytes, but
+// convert to and from "GB" when interacting with the Linode API.
+const MinVolumeSizeBytes = 10 << 30 // 10GiB
+
+// bytesToGB is a convenience function that converts the given number of bytes
+// to gigabytes.
+// This function should be used when converting a CSI RPC type's capacity range
+// to a value that the Linode API will understand.
+func bytesToGB(numBytes int64) int { return int(numBytes >> 30) }
+
+// gbToBytes is a convenience function that converts gigabytes to bytes.
+// This function is typically going to be used when converting
+// [github.com/linode/linodego.Volume.Size] to a value that works with the CSI
+// RPC types.
+func gbToBytes(gb int) int64 { return int64(gb << 30) }
+
 const (
 	// WaitTimeout is the default timeout duration used for polling the Linode
 	// API, when waiting for a volume to enter an "active" state.
@@ -127,7 +148,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	klog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
-		"storage_size_giga_bytes": size / gigabyte,
+		"storage_size_giga_bytes": bytesToGB(size), // bytes -> GB
 		"volume_name":             volumeName,
 	})
 
@@ -140,7 +161,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
-	targetSizeGB := int(size / gigabyte)
+	targetSizeGB := bytesToGB(size) // bytes -> GB
 
 	// Attempt to get info about the source volume.
 	// sourceVolumeInfo will be null if no content source is defined.
@@ -520,11 +541,11 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
-				CapacityBytes: int64(vol.Size * gigabyte),
+				CapacityBytes: gbToBytes(vol.Size),
 				AccessibleTopology: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							"topology.linode.com/region": vol.Region,
+							VolumeTopologyRegion: vol.Region,
 						},
 					},
 				},
@@ -583,11 +604,11 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	if vol.Size > int(size/gigabyte) {
+	if vol.Size > bytesToGB(size) {
 		return nil, status.Error(codes.Internal, "Volumes can only be resized up")
 	}
 
-	if err := cs.client.ResizeVolume(ctx, volumeID, int(size/gigabyte)); err != nil {
+	if err := cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -715,7 +736,7 @@ func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string,
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size
 func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	if capRange == nil {
-		return minProviderVolumeBytes, nil
+		return MinVolumeSizeBytes, nil
 	}
 
 	// Volume MUST be at least this big. This field is OPTIONAL.
@@ -736,14 +757,14 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 
 	if maxSize == 0 {
 		// Only received a required size
-		if reqSize < minProviderVolumeBytes {
+		if reqSize < MinVolumeSizeBytes {
 			// the Linode API would reject the request, opt to fulfill it by provisioning above
 			// the requested size, but no more than the limit size
-			reqSize = minProviderVolumeBytes
+			reqSize = MinVolumeSizeBytes
 		}
 		maxSize = reqSize
-	} else if maxSize < minProviderVolumeBytes {
-		return 0, fmt.Errorf("limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
+	} else if maxSize < MinVolumeSizeBytes {
+		return 0, fmt.Errorf("limit bytes %v is less than minimum bytes %v", maxSize, MinVolumeSizeBytes)
 	}
 
 	// fulfill the upper bound of the request
