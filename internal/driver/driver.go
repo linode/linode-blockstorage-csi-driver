@@ -52,7 +52,9 @@ type LinodeDriver struct {
 	ready   bool
 }
 
-const linodeBSPrefixLength = 12
+// MaxVolumeLabelPrefixLength is the maximum allowed length of a volume label
+// prefix.
+const MaxVolumeLabelPrefixLength = 12
 
 func GetLinodeDriver() *LinodeDriver {
 	return &LinodeDriver{
@@ -78,7 +80,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.name = name
 	linodeDriver.vendorVersion = vendorVersion
 
-	matched, err := regexp.MatchString(`^[0-9A-Za-z_-]{0,`+strconv.Itoa(linodeBSPrefixLength)+`}$`, bsPrefix)
+	matched, err := regexp.MatchString(`^[0-9A-Za-z_-]{0,`+strconv.Itoa(MaxVolumeLabelPrefixLength)+`}$`, bsPrefix)
 	if err != nil {
 		return err
 	}
