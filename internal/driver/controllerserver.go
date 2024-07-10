@@ -105,7 +105,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	preKey := common.CreateLinodeVolumeKey(0, condensedName)
 
-	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.bsPrefix)
+	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 
 	klog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
