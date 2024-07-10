@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linodego"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 )
 
 const (
