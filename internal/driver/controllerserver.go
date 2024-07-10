@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
@@ -18,12 +19,28 @@ import (
 )
 
 const (
-	gigabyte               = 1024 * 1024 * 1024
-	devicePathKey          = "devicePath"
-	waitTimeout            = 300
-	cloneReadinessTimeout  = 900
-	minProviderVolumeBytes = 10 * gigabyte
+	// WaitTimeout is the default timeout duration used for polling the Linode
+	// API, when waiting for a volume to enter an "active" state.
+	WaitTimeout = 5 * time.Minute
+
+	// CloneTimeout is the duration to wait when cloning a volume through the
+	// Linode API.
+	CloneTimeout = 15 * time.Minute
 )
+
+// waitTimeout is a convenience function to get the number of seconds in
+// [WaitTimeout].
+func waitTimeout() int {
+	return int(WaitTimeout.Truncate(time.Second).Seconds())
+}
+
+// cloneTimeout is a convenience function to get the number of seconds in
+// [CloneTimeout].
+func cloneTimeout() int {
+	return int(CloneTimeout.Truncate(time.Second).Seconds())
+}
+
+const devicePathKey = "devicePath"
 
 const (
 	// VolumeTags is the parameter key used for passing a comma-separated list
@@ -160,11 +177,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	statusPollTimeout := waitTimeout
+	statusPollTimeout := waitTimeout()
 
 	// If we're cloning the volume we should extend the timeout
 	if sourceVolumeInfo != nil {
-		statusPollTimeout = cloneReadinessTimeout
+		statusPollTimeout = cloneTimeout()
 	}
 
 	if _, err := cs.client.WaitForVolumeStatus(
@@ -319,7 +336,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 
 	klog.V(4).Infoln("waiting for volume to attach")
-	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout)
+	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +430,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	}
 
 	klog.V(4).Infoln("waiting for detaching volume")
-	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
+	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -573,7 +590,7 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
+	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
