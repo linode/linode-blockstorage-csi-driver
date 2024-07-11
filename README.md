@@ -1,5 +1,7 @@
 # Linode Block Storage CSI Driver
-[![Test](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/test.yml) [![Docker build](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml/badge.svg?branch=master)](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/docker-hub.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/linode/linode-blockstorage-csi-driver)](https://goreportcard.com/report/github.com/linode/linode-blockstorage-csi-driver)
+[![codecov](https://codecov.io/gh/linode/linode-blockstorage-csi-driver/graph/badge.svg?token=b5HeEgMdAd)](https://codecov.io/gh/linode/linode-blockstorage-csi-driver)
+[![Docker Pulls](https://img.shields.io/docker/pulls/linode/linode-blockstorage-csi-driver.svg)](https://hub.docker.com/r/linode/linode-blockstorage-csi-driver/)
 
 ## Overview
 The Container Storage Interface
