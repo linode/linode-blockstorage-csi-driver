@@ -24,8 +24,16 @@ jobs:
         with:
           version: latest
           install-go: false
-      - run: go test -cover ./...
+      - run: go test -cover ./... -coverprofile ./coverage.out
       - run: make elevated-test
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: linode/linode-blockstorage-csi-driver
   docker-build:
     runs-on: ubuntu-latest
     steps:
