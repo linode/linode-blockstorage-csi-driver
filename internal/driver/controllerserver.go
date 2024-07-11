@@ -7,75 +7,123 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linodego"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 )
 
-type VolumeLifecycle string
+// MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
+// Volume, in bytes.
+//
+// The CSI RPC scheme deal with bytes, whereas the Linode API's block storage
+// volume endpoints deal with "GB".
+// Internally, the driver will deal with sizes and capacities in bytes, but
+// convert to and from "GB" when interacting with the Linode API.
+const MinVolumeSizeBytes = 10 << 30 // 10GiB
+
+// bytesToGB is a convenience function that converts the given number of bytes
+// to gigabytes.
+// This function should be used when converting a CSI RPC type's capacity range
+// to a value that the Linode API will understand.
+func bytesToGB(numBytes int64) int { return int(numBytes >> 30) }
+
+// gbToBytes is a convenience function that converts gigabytes to bytes.
+// This function is typically going to be used when converting
+// [github.com/linode/linodego.Volume.Size] to a value that works with the CSI
+// RPC types.
+func gbToBytes(gb int) int64 { return int64(gb << 30) }
 
 const (
-	gigabyte               = 1024 * 1024 * 1024
-	devicePathKey          = "devicePath"
-	waitTimeout            = 300
-	cloneReadinessTimeout  = 900
-	minProviderVolumeBytes = 10 * gigabyte
+	// WaitTimeout is the default timeout duration used for polling the Linode
+	// API, when waiting for a volume to enter an "active" state.
+	WaitTimeout = 5 * time.Minute
 
-	// VolumeTags is a comma seperated string used to pass information to the linode APIs to tag the
-	// created volumes
+	// CloneTimeout is the duration to wait when cloning a volume through the
+	// Linode API.
+	CloneTimeout = 15 * time.Minute
+)
+
+// waitTimeout is a convenience function to get the number of seconds in
+// [WaitTimeout].
+func waitTimeout() int {
+	return int(WaitTimeout.Truncate(time.Second).Seconds())
+}
+
+// cloneTimeout is a convenience function to get the number of seconds in
+// [CloneTimeout].
+func cloneTimeout() int {
+	return int(CloneTimeout.Truncate(time.Second).Seconds())
+}
+
+const (
+	// VolumeTags is the parameter key used for passing a comma-separated list
+	// of tags to the Linode API.
 	VolumeTags = Name + "/volumeTags"
 
-	// PublishInfoVolumeName is used to pass the volume name from
-	// `ControllerPublishVolume` to `NodeStageVolume or `NodePublishVolume`
+	// PublishInfoVolumeName is used to pass the name of the volume as it exists
+	// in the Linode API (the "label") to [NodeStageVolume] and
+	// [NodePublishVolume].
 	PublishInfoVolumeName = Name + "/volume-name"
 
-	VolumeLifecycleNodeStageVolume     VolumeLifecycle = "NodeStageVolume"
-	VolumeLifecycleNodePublishVolume   VolumeLifecycle = "NodePublishVolume"
-	VolumeLifecycleNodeUnstageVolume   VolumeLifecycle = "NodeUnstageVolume"
-	VolumeLifecycleNodeUnpublishVolume VolumeLifecycle = "NodeUnpublishVolume"
-
-	// Linode Volume Topology Region Label
+	// VolumeTopologyRegion is the parameter key used to indicate the region
+	// the volume exists in.
 	VolumeTopologyRegion string = "topology.linode.com/region"
 )
 
-type LinodeControllerServer struct {
-	Driver        *LinodeDriver
-	CloudProvider linodeclient.LinodeClient
-	Metadata      Metadata
+type ControllerServer struct {
+	driver   *LinodeDriver
+	client   linodeclient.LinodeClient
+	metadata Metadata
+
+	csi.UnimplementedControllerServer
 }
 
-var _ csi.ControllerServer = &LinodeControllerServer{}
+// NewControllerServer instantiates a new RPC service that implements the
+// CSI [Controller Service RPC] endpoints.
+//
+// If driver or client are nil, NewControllerServer returns a non-nil error.
+//
+// [Controller Service RPC]: https://github.com/container-storage-interface/spec/blob/master/spec.md#controller-service-rpc
+func NewControllerServer(driver *LinodeDriver, client linodeclient.LinodeClient, metadata Metadata) (*ControllerServer, error) {
+	if driver == nil {
+		return nil, errNilDriver
+	}
+	if client == nil {
+		return nil, errors.New("nil client")
+	}
+
+	return &ControllerServer{
+		driver:   driver,
+		client:   client,
+		metadata: metadata,
+	}, nil
+}
 
 // CreateVolume will be called by the CO to provision a new volume on behalf of a user (to be consumed
 // as either a block device or a mounted filesystem).  This operation is idempotent.
-func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	name := req.GetName()
 
 	if len(name) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "CreateVolume name is required")
+		return &csi.CreateVolumeResponse{}, errNoVolumeName
 	}
 
 	volCapabilities := req.GetVolumeCapabilities()
 	if len(volCapabilities) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "CreateVolume capabilities are required")
+		return &csi.CreateVolumeResponse{}, errNoVolumeCapabilities
 	}
-
-	/*
-		// early validation: If ANY of the specified volume capabilities are not supported
-		if validVolumeCapabilities(req) {
-			return nil, status.Error(codes.InvalidArgument, "CreateVolume capabilities are limitted to SINGLE_NODE_WRITER")
-		}
-	*/
 
 	capRange := req.GetCapacityRange()
 	size, err := getRequestCapacitySize(capRange)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// to avoid mangled requests for existing volumes with hyphen,
@@ -87,11 +135,11 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 
 	preKey := common.CreateLinodeVolumeKey(0, condensedName)
 
-	volumeName := preKey.GetNormalizedLabelWithPrefix(linodeCS.Driver.bsPrefix)
+	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 
 	klog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
-		"storage_size_giga_bytes": size / gigabyte,
+		"storage_size_giga_bytes": bytesToGB(size), // bytes -> GB
 		"volume_name":             volumeName,
 	})
 
@@ -104,21 +152,18 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
-	targetSizeGB := int(size / gigabyte)
+	targetSizeGB := bytesToGB(size)
 
 	// Attempt to get info about the source volume.
 	// sourceVolumeInfo will be null if no content source is defined.
 	contentSource := req.GetVolumeContentSource()
-	sourceVolumeInfo, err := linodeCS.attemptGetContentSourceVolume(
-		ctx,
-		contentSource,
-	)
+	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
 	if err != nil {
-		return nil, err
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Attempt to create the volume while respecting idempotency
-	vol, err := linodeCS.attemptCreateLinodeVolume(
+	vol, err := cs.attemptCreateLinodeVolume(
 		ctx,
 		volumeName,
 		targetSizeGB,
@@ -126,7 +171,7 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 		sourceVolumeInfo,
 	)
 	if err != nil {
-		return nil, err
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Attempt to resize the volume if necessary
@@ -137,21 +182,21 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 			"new_size":  targetSizeGB,
 		})
 
-		if err := linodeCS.CloudProvider.ResizeVolume(ctx, vol.ID, targetSizeGB); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to resize cloned volume (%d): %s", targetSizeGB, err)
+		if err := cs.client.ResizeVolume(ctx, vol.ID, targetSizeGB); err != nil {
+			return &csi.CreateVolumeResponse{}, errInternal("resize cloned volume (%d): %v", targetSizeGB, err)
 		}
 	}
 
-	statusPollTimeout := waitTimeout
+	statusPollTimeout := waitTimeout()
 
 	// If we're cloning the volume we should extend the timeout
 	if sourceVolumeInfo != nil {
-		statusPollTimeout = cloneReadinessTimeout
+		statusPollTimeout = cloneTimeout()
 	}
 
-	if _, err := linodeCS.CloudProvider.WaitForVolumeStatus(
+	if _, err := cs.client.WaitForVolumeStatus(
 		ctx, vol.ID, linodego.VolumeActive, statusPollTimeout); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to wait for volume (%d) active: %s", vol.ID, err)
+		return &csi.CreateVolumeResponse{}, errInternal("wait for volume %d to be active: %v", vol.ID, err)
 	}
 
 	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
@@ -188,10 +233,10 @@ func (linodeCS *LinodeControllerServer) CreateVolume(ctx context.Context, req *c
 }
 
 // DeleteVolume deletes the given volume. The function is idempotent.
-func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	volID, statusErr := common.VolumeIdAsInt("DeleteVolume", req)
 	if statusErr != nil {
-		return nil, statusErr
+		return &csi.DeleteVolumeResponse{}, statusErr
 	}
 
 	klog.V(4).Infoln("delete volume called", map[string]interface{}{
@@ -199,17 +244,18 @@ func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *c
 		"method":    "delete_volume",
 	})
 
-	if vol, err := linodeCS.CloudProvider.GetVolume(ctx, volID); err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
-			return &csi.DeleteVolumeResponse{}, nil
-		}
-		return nil, status.Error(codes.Internal, err.Error())
-	} else if vol.LinodeID != nil {
-		return nil, status.Error(codes.FailedPrecondition, "DeleteVolume Volume in use")
+	vol, err := cs.client.GetVolume(ctx, volID)
+	if linodego.IsNotFound(err) {
+		return &csi.DeleteVolumeResponse{}, nil
+	} else if err != nil {
+		return &csi.DeleteVolumeResponse{}, errInternal("get volume %d: %v", volID, err)
+	}
+	if vol.LinodeID != nil {
+		return &csi.DeleteVolumeResponse{}, errVolumeInUse
 	}
 
-	if err := linodeCS.CloudProvider.DeleteVolume(ctx, volID); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
+		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
 	}
 
 	klog.V(4).Info("volume is deleted")
@@ -217,24 +263,24 @@ func (linodeCS *LinodeControllerServer) DeleteVolume(ctx context.Context, req *c
 }
 
 // ControllerPublishVolume attaches the given volume to the node
-func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	linodeID, statusErr := common.NodeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
-		return nil, statusErr
+		return &csi.ControllerPublishVolumeResponse{}, statusErr
 	}
 
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
-		return nil, statusErr
+		return &csi.ControllerPublishVolumeResponse{}, statusErr
 	}
 
 	cap := req.GetVolumeCapability()
 	if cap == nil {
-		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume capability must be provided")
+		return &csi.ControllerPublishVolumeResponse{}, errNoVolumeCapability
 	}
 
-	if !validVolumeCapabilities([]*csi.VolumeCapability{req.GetVolumeCapability()}) {
-		return nil, status.Errorf(codes.InvalidArgument, "ControllerPublishVolume Volume capability is not compatible: %v", req)
+	if vc := req.GetVolumeCapability(); !validVolumeCapabilities([]*csi.VolumeCapability{vc}) {
+		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability(vc)
 	}
 
 	klog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
@@ -244,40 +290,39 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 		"method":    "controller_publish_volume",
 	})
 
-	if volume, err := linodeCS.CloudProvider.GetVolume(ctx, volumeID); err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
-			return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %d not found", volumeID))
-		}
-		return nil, status.Error(codes.Internal, err.Error())
-	} else if volume.LinodeID != nil {
+	volume, err := cs.client.GetVolume(ctx, volumeID)
+	if linodego.IsNotFound(err) {
+		return &csi.ControllerPublishVolumeResponse{}, errVolumeNotFound(volumeID)
+	} else if err != nil {
+		return &csi.ControllerPublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
+	}
+	if volume.LinodeID != nil {
 		if *volume.LinodeID == linodeID {
 			return &csi.ControllerPublishVolumeResponse{}, nil
 		}
-		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("Volume with id %d already attached to node %d", volumeID, *volume.LinodeID))
+		return &csi.ControllerPublishVolumeResponse{}, errVolumeAttached(volumeID, linodeID)
 	}
 
-	instance, err := linodeCS.CloudProvider.GetInstance(ctx, linodeID)
-	if err, ok := err.(*linodego.Error); ok && err.Code == 404 {
-		return nil, status.Errorf(codes.NotFound, "Linode with id %d not found", linodeID)
+	instance, err := cs.client.GetInstance(ctx, linodeID)
+	if linodego.IsNotFound(err) {
+		return &csi.ControllerPublishVolumeResponse{}, errInstanceNotFound(linodeID)
 	} else if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return &csi.ControllerPublishVolumeResponse{}, errInternal("get linode instance %d: %v", linodeID, err)
 	}
 
 	// Check to see if there is room to attach this volume to the instance.
-	if canAttach, err := linodeCS.canAttach(ctx, instance); errors.Is(err, errNilInstance) {
-		return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, "cannot determine volume attachments for a nil instance")
-	} else if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, err.Error())
+	if canAttach, err := cs.canAttach(ctx, instance); err != nil {
+		return &csi.ControllerPublishVolumeResponse{}, err
 	} else if !canAttach {
 		// If we can, try and add a little more information to the error message
 		// for the caller.
-		limit, err := linodeCS.maxVolumeAttachments(ctx, instance)
+		limit, err := cs.maxVolumeAttachments(ctx, instance)
 		if errors.Is(err, errNilInstance) {
 			return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, "cannot calculate max volume attachments for a nil instance")
 		} else if err != nil {
-			return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.ResourceExhausted, "max number of volumes already attached to instance")
+			return &csi.ControllerPublishVolumeResponse{}, errMaxAttachments
 		}
-		return &csi.ControllerPublishVolumeResponse{}, status.Errorf(codes.ResourceExhausted, "max number of volumes (%d) already attached to instance", limit)
+		return &csi.ControllerPublishVolumeResponse{}, errMaxVolumeAttachments(limit)
 	}
 
 	// Whether or not the volume attachment should be persisted across
@@ -289,84 +334,88 @@ func (linodeCS *LinodeControllerServer) ControllerPublishVolume(ctx context.Cont
 	// config.
 	persist := false
 
-	if _, err := linodeCS.CloudProvider.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+	if _, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID:           linodeID,
 		PersistAcrossBoots: &persist,
 	}); err != nil {
-		retCode := codes.Internal
+		code := codes.Internal
 		if apiErr, ok := err.(*linodego.Error); ok && strings.Contains(apiErr.Message, "is already attached") {
-			retCode = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
+			code = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
 		}
-		return nil, status.Errorf(retCode, "error attaching volume: %s", err)
+		return &csi.ControllerPublishVolumeResponse{}, status.Errorf(code, "attach volume: %v", err)
 	}
 
 	klog.V(4).Infoln("waiting for volume to attach")
-	volume, err := linodeCS.CloudProvider.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout)
+	volume, err = cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, errInternal("wait for volume to attach: %v", err)
 	}
-	klog.V(4).Infof("volume %d is attached to instance %d with path '%s'", volume.ID, *volume.LinodeID, volume.FilesystemPath)
+	klog.V(4).Infof("volume %d is attached to instance %d with path '%s'",
+		volume.ID,
+		*volume.LinodeID,
+		volume.FilesystemPath,
+	)
 
-	pvInfo := map[string]string{devicePathKey: volume.FilesystemPath}
-	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
+	pvInfo := map[string]string{
+		devicePathKey: volume.FilesystemPath,
+	}
+	return &csi.ControllerPublishVolumeResponse{
+		PublishContext: pvInfo,
+	}, nil
 }
+
+// devicePathKey is the key used in the publish context map when a volume is
+// published/attached to an instance.
+const devicePathKey = "devicePath"
 
 // canAttach indicates whether or not another volume can be attached to the
 // Linode with the given ID.
 //
 // Whether or not another volume can be attached is based on how many instance
 // disks and block storage volumes are currently attached to the instance.
-func (s *LinodeControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
+func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
 	limit, err := s.maxVolumeAttachments(ctx, instance)
 	if err != nil {
-		return false, fmt.Errorf("max volume attachments: %w", err)
+		return false, err
 	}
 
-	volumes, err := s.CloudProvider.ListInstanceVolumes(ctx, instance.ID, nil)
+	volumes, err := s.client.ListInstanceVolumes(ctx, instance.ID, nil)
 	if err != nil {
-		return false, fmt.Errorf("list instance volumes: %w", err)
+		return false, status.Errorf(codes.Internal, "list instance volumes: %v", err)
 	}
 
 	return len(volumes) < limit, nil
 }
 
-var (
-	// errNilInstance is a general-purpose error used to indicate a nil
-	// [github.com/linode/linodego.Instance] was passed as an argument to a
-	// function.
-	errNilInstance = errors.New("nil instance")
-)
-
 // maxVolumeAttachments returns the maximum number of volumes that can be
 // attached to a single Linode instance, minus any currently-attached instance
 // disks.
-func (s *LinodeControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
+func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
 	if instance == nil || instance.Specs == nil {
 		return 0, errNilInstance
 	}
 
-	disks, err := s.CloudProvider.ListInstanceDisks(ctx, instance.ID, nil)
+	disks, err := s.client.ListInstanceDisks(ctx, instance.ID, nil)
 	if err != nil {
-		return 0, fmt.Errorf("list instance disks: %w", err)
+		return 0, errInternal("list instance disks: %v", err)
 	}
 
 	// The reported amount of memory for an instance is in MB.
 	// Convert it to bytes.
 	memBytes := uint(instance.Specs.Memory) << 20
-
 	return maxVolumeAttachments(memBytes) - len(disks), nil
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
-func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
-		return nil, statusErr
+		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
 	linodeID, statusErr := common.NodeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
-		return nil, statusErr
+		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
 	klog.V(4).Infoln("controller unpublish volume called", map[string]interface{}{
@@ -375,28 +424,26 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 		"method":    "controller_unpublish_volume",
 	})
 
-	volume, err := linodeCS.CloudProvider.GetVolume(ctx, volumeID)
-	if err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
-			return &csi.ControllerUnpublishVolumeResponse{}, nil
-		}
-		return nil, status.Error(codes.Internal, err.Error())
+	volume, err := cs.client.GetVolume(ctx, volumeID)
+	if linodego.IsNotFound(err) {
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	} else if err != nil {
+		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
 	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
 		klog.V(4).Infof("volume is attached to %d, not to %d, skipping", *volume.LinodeID, linodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
-	if err := linodeCS.CloudProvider.DetachVolume(ctx, volumeID); err != nil {
-		if apiErr, ok := err.(*linodego.Error); ok && apiErr.Code == 404 {
-			return &csi.ControllerUnpublishVolumeResponse{}, nil
-		}
-		return nil, status.Errorf(codes.Internal, "Error detaching volume: %s", err)
+	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
+	} else if err != nil {
+		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
 	}
 
 	klog.V(4).Infoln("waiting for detaching volume")
-	if _, err := linodeCS.CloudProvider.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
+		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
 	}
 
 	klog.V(4).Info("volume is detached")
@@ -404,23 +451,21 @@ func (linodeCS *LinodeControllerServer) ControllerUnpublishVolume(ctx context.Co
 }
 
 // ValidateVolumeCapabilities checks whether the volume capabilities requested are supported.
-func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
 	if statusErr != nil {
-		return nil, statusErr
+		return &csi.ValidateVolumeCapabilitiesResponse{}, statusErr
 	}
 
 	volumeCapabilities := req.GetVolumeCapabilities()
 	if len(volumeCapabilities) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
+		return &csi.ValidateVolumeCapabilitiesResponse{}, errNoVolumeCapabilities
 	}
 
-	volume, err := linodeCS.CloudProvider.GetVolume(ctx, volumeID)
-	if volume == nil {
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("Volume with id %v not found", volumeID))
-	}
-	if err != nil {
-		return nil, err
+	if _, err := cs.client.GetVolume(ctx, volumeID); linodego.IsNotFound(err) {
+		return &csi.ValidateVolumeCapabilitiesResponse{}, errVolumeNotFound(volumeID)
+	} else if err != nil {
+		return &csi.ValidateVolumeCapabilitiesResponse{}, errInternal("get volume: %v", err)
 	}
 
 	klog.V(4).Infoln("validate volume capabilities called", map[string]interface{}{
@@ -439,7 +484,7 @@ func (linodeCS *LinodeControllerServer) ValidateVolumeCapabilities(ctx context.C
 }
 
 // ListVolumes shall return information about all the volumes the provider knows about
-func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	var err error
 
 	startingToken := req.GetStartingToken()
@@ -453,7 +498,7 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	if startingToken != "" {
 		startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
 		if errParse != nil {
-			return nil, status.Error(codes.Aborted, fmt.Sprintf("Invalid starting token %v", startingToken))
+			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted, "invalid starting token: %q", startingToken)
 		}
 
 		listOpts.Page = int(startingPage)
@@ -466,35 +511,43 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 		"method":             "list_volumes",
 	})
 
-	var volumes []linodego.Volume
-
-	volumes, err = linodeCS.CloudProvider.ListVolumes(ctx, listOpts)
+	volumes, err := cs.client.ListVolumes(ctx, listOpts)
 	if err != nil {
-		return nil, err
+		return &csi.ListVolumesResponse{}, errInternal("list volumes: %v", err)
 	}
-	var entries []*csi.ListVolumesResponse_Entry
+
+	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
 	for _, vol := range volumes {
 		key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
 
-		var publishInfoVolumeName []string = make([]string, 0, 1)
+		// If the volume is attached to a Linode instance, add it to the list.
+		//
+		// Note that in the Linode API, volumes can only be attached to a single
+		// Linode at a time.
+		// We are storing it in a []string here, since that is what the
+		// response struct returns.
+		// We do not need to pre-allocate the slice with make(), since the CSI
+		// specification says this response field is optional, and thus it
+		// should tolerate a nil slice.
+		var publishedNodeIDs []string
 		if vol.LinodeID != nil {
-			publishInfoVolumeName = append(publishInfoVolumeName, fmt.Sprintf("%d", *vol.LinodeID))
+			publishedNodeIDs = append(publishedNodeIDs, strconv.Itoa(*vol.LinodeID))
 		}
 
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
-				CapacityBytes: int64(vol.Size * gigabyte),
+				CapacityBytes: gbToBytes(vol.Size),
 				AccessibleTopology: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							"topology.linode.com/region": vol.Region,
+							VolumeTopologyRegion: vol.Region,
 						},
 					},
 				},
 			},
 			Status: &csi.ListVolumesResponse_VolumeStatus{
-				PublishedNodeIds: publishInfoVolumeName,
+				PublishedNodeIds: publishedNodeIDs,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: false,
 				},
@@ -511,15 +564,10 @@ func (linodeCS *LinodeControllerServer) ListVolumes(ctx context.Context, req *cs
 	return resp, nil
 }
 
-// ControllerGetVolume allows probing for health status
-func (linodeCS *LinodeControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
 // ControllerGetCapabilities returns the supported capabilities of controller service provided by this Plugin
-func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	resp := &csi.ControllerGetCapabilitiesResponse{
-		Capabilities: linodeCS.Driver.cscap,
+		Capabilities: cs.driver.cscap,
 	}
 
 	klog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
@@ -529,32 +577,15 @@ func (linodeCS *LinodeControllerServer) ControllerGetCapabilities(ctx context.Co
 	return resp, nil
 }
 
-func (linodeCS *LinodeControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	volumeID, statusErr := common.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
 
-	capRange := req.GetCapacityRange()
-	size, err := getRequestCapacitySize(capRange)
+	size, err := getRequestCapacitySize(req.GetCapacityRange())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return &csi.ControllerExpandVolumeResponse{}, errInternal("get requested size from capacity range: %v", err)
 	}
 
 	klog.V(4).Infoln("expand volume called", map[string]interface{}{
@@ -562,63 +593,62 @@ func (linodeCS *LinodeControllerServer) ControllerExpandVolume(ctx context.Conte
 		"method":    "controller_expand_volume",
 	})
 
-	var vol *linodego.Volume
-
-	if vol, err = linodeCS.CloudProvider.GetVolume(ctx, volumeID); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if vol.Size > int(size/gigabyte) {
-		return nil, status.Error(codes.Internal, "Volumes can only be resized up")
-	}
-
-	if err := linodeCS.CloudProvider.ResizeVolume(ctx, volumeID, int(size/gigabyte)); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	vol, err = linodeCS.CloudProvider.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout)
+	vol, err := cs.client.GetVolume(ctx, volumeID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return &csi.ControllerExpandVolumeResponse{}, errInternal("get volume: %v", err)
+	}
+
+	// Is the caller trying to resize the volume to be smaller than it currently is?
+	if vol.Size > bytesToGB(size) {
+		return &csi.ControllerExpandVolumeResponse{}, errResizeDown
+	}
+
+	if err := cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
+		return &csi.ControllerExpandVolumeResponse{}, errInternal("resize volume %d: %v", volumeID, err)
+	}
+
+	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
+	if err != nil {
+		return &csi.ControllerExpandVolumeResponse{}, errInternal("wait for volume %d to become active: %v", volumeID, err)
 	}
 
 	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
-	resp := &csi.ControllerExpandVolumeResponse{
+	klog.V(4).Info("volume is resized")
+	return &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         size,
 		NodeExpansionRequired: false,
-	}
-	klog.V(4).Info("volume is resized")
-	return resp, nil
+	}, nil
 }
 
 // attemptGetContentSourceVolume attempts to get information about the Linode volume to clone from.
-func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*common.LinodeVolumeKey, error) {
+func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*common.LinodeVolumeKey, error) {
 	// No content source was defined; no clone operation
 	if contentSource == nil {
 		return nil, nil
 	}
 
 	if _, ok := contentSource.GetType().(*csi.VolumeContentSource_Volume); !ok {
-		return nil, status.Error(codes.InvalidArgument, "Unsupported volume content source type")
+		return nil, errUnsupportedVolumeContentSource
 	}
 
 	sourceVolume := contentSource.GetVolume()
 	if sourceVolume == nil {
-		return nil, status.Error(codes.InvalidArgument, "Error retrieving volume from the volume content source")
+		return nil, errNoSourceVolume
 	}
 
 	volumeInfo, err := common.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Error parsing Linode volume info from volume content source")
+		return nil, errInternal("parse volume info from content source: %v", err)
 	}
 
-	volumeData, err := linodeCS.CloudProvider.GetVolume(ctx, volumeInfo.VolumeID)
+	volumeData, err := cs.client.GetVolume(ctx, volumeInfo.VolumeID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "Error retrieving source volume from Linode API")
+		return nil, errInternal("get volume %d: %v", volumeInfo.VolumeID, err)
 	}
 
-	if volumeData.Region != linodeCS.Metadata.Region {
-		return nil, status.Error(codes.InvalidArgument, "Source volume region cannot differ from destination volume region")
+	if volumeData.Region != cs.metadata.Region {
+		return nil, errRegionMismatch(volumeData.Region, cs.metadata.Region)
 	}
 
 	return volumeInfo, nil
@@ -626,21 +656,21 @@ func (linodeCS *LinodeControllerServer) attemptGetContentSourceVolume(ctx contex
 
 // attemptCreateLinodeVolume attempts to create a volume while respecting
 // idempotency.
-func (linodeCS *LinodeControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *common.LinodeVolumeKey) (*linodego.Volume, error) {
+func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *common.LinodeVolumeKey) (*linodego.Volume, error) {
 	// List existing volumes
 	jsonFilter, err := json.Marshal(map[string]string{"label": label})
 	if err != nil {
-		return nil, err
+		return nil, errInternal("marshal json filter: %v", err)
 	}
 
-	volumes, err := linodeCS.CloudProvider.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
+	volumes, err := cs.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, errInternal("list volumes: %v", err)
 	}
 
 	// This shouldn't happen, but raise an error just in case
 	if len(volumes) > 1 {
-		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("duplicate volume %q exists", label))
+		return nil, status.Errorf(codes.AlreadyExists, "volume %q already exists", label)
 	}
 
 	// Volume already exists
@@ -649,16 +679,16 @@ func (linodeCS *LinodeControllerServer) attemptCreateLinodeVolume(ctx context.Co
 	}
 
 	if sourceVolume != nil {
-		return linodeCS.cloneLinodeVolume(ctx, label, sizeGB, sourceVolume.VolumeID)
+		return cs.cloneLinodeVolume(ctx, label, sourceVolume.VolumeID)
 	}
 
-	return linodeCS.createLinodeVolume(ctx, label, sizeGB, tags)
+	return cs.createLinodeVolume(ctx, label, sizeGB, tags)
 }
 
 // createLinodeVolume creates a Linode volume and returns the result
-func (linodeCS *LinodeControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string) (*linodego.Volume, error) {
+func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string) (*linodego.Volume, error) {
 	volumeReq := linodego.VolumeCreateOptions{
-		Region: linodeCS.Metadata.Region,
+		Region: cs.metadata.Region,
 		Label:  label,
 		Size:   sizeGB,
 	}
@@ -669,29 +699,23 @@ func (linodeCS *LinodeControllerServer) createLinodeVolume(ctx context.Context, 
 
 	klog.V(4).Infoln("creating volume", map[string]interface{}{"volume_req": volumeReq})
 
-	result, err := linodeCS.CloudProvider.CreateVolume(ctx, volumeReq)
+	result, err := cs.client.CreateVolume(ctx, volumeReq)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to create linode volume: %s", err,
-		)
+		return nil, errInternal("create volume: %v", err)
 	}
 
 	return result, nil
 }
 
 // cloneLinodeVolume clones a Linode volume and returns the result
-func (linodeCS *LinodeControllerServer) cloneLinodeVolume(ctx context.Context, label string, sizeGB, sourceID int) (*linodego.Volume, error) {
+func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string, sourceID int) (*linodego.Volume, error) {
 	klog.V(4).Infoln("cloning volume", map[string]interface{}{
 		"source_vol_id": sourceID,
 	})
 
-	result, err := linodeCS.CloudProvider.CloneVolume(ctx, sourceID, label)
+	result, err := cs.client.CloneVolume(ctx, sourceID, label)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to clone linode volume %d into new volume: %s", sourceID, err,
-		)
+		return nil, errInternal("clone volume %d: %v", sourceID, err)
 	}
 
 	return result, nil
@@ -700,7 +724,7 @@ func (linodeCS *LinodeControllerServer) cloneLinodeVolume(ctx context.Context, l
 // getRequestCapacity evaluates the CapacityRange parameters to validate and resolve the best volume size
 func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	if capRange == nil {
-		return minProviderVolumeBytes, nil
+		return MinVolumeSizeBytes, nil
 	}
 
 	// Volume MUST be at least this big. This field is OPTIONAL.
@@ -721,14 +745,14 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 
 	if maxSize == 0 {
 		// Only received a required size
-		if reqSize < minProviderVolumeBytes {
+		if reqSize < MinVolumeSizeBytes {
 			// the Linode API would reject the request, opt to fulfill it by provisioning above
 			// the requested size, but no more than the limit size
-			reqSize = minProviderVolumeBytes
+			reqSize = MinVolumeSizeBytes
 		}
 		maxSize = reqSize
-	} else if maxSize < minProviderVolumeBytes {
-		return 0, fmt.Errorf("limit bytes %v is less than minimum bytes %v", maxSize, minProviderVolumeBytes)
+	} else if maxSize < MinVolumeSizeBytes {
+		return 0, fmt.Errorf("limit bytes %v is less than minimum bytes %v", maxSize, MinVolumeSizeBytes)
 	}
 
 	// fulfill the upper bound of the request

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -36,13 +37,13 @@ import (
 const Name = "linodebs.csi.linode.com"
 
 type LinodeDriver struct {
-	name          string
-	vendorVersion string
-	bsPrefix      string
+	name              string
+	vendorVersion     string
+	volumeLabelPrefix string
 
 	ids *LinodeIdentityServer
 	ns  *LinodeNodeServer
-	cs  *LinodeControllerServer
+	cs  *ControllerServer
 
 	vcap  []*csi.VolumeCapability_AccessMode
 	cscap []*csi.ControllerServiceCapability
@@ -52,7 +53,9 @@ type LinodeDriver struct {
 	ready   bool
 }
 
-const linodeBSPrefixLength = 12
+// MaxVolumeLabelPrefixLength is the maximum allowed length of a volume label
+// prefix.
+const MaxVolumeLabelPrefixLength = 12
 
 func GetLinodeDriver() *LinodeDriver {
 	return &LinodeDriver{
@@ -69,7 +72,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	metadata Metadata,
 	name,
 	vendorVersion,
-	bsPrefix string,
+	volumeLabelPrefix string,
 ) error {
 	if name == "" {
 		return fmt.Errorf("driver name missing")
@@ -78,19 +81,34 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.name = name
 	linodeDriver.vendorVersion = vendorVersion
 
-	matched, err := regexp.MatchString(`^[0-9A-Za-z_-]{0,`+strconv.Itoa(linodeBSPrefixLength)+`}$`, bsPrefix)
+	// Validate the volume label prefix, if it is set.
+	//
+	// First, we want to make sure it is the right length, then we will make
+	// sure it only contains the acceptable characters.
+	//
+	// When checking the length, we will convert it to a []rune first, to count
+	// the number of unicode characters.
+	if r := []rune(volumeLabelPrefix); len(r) > MaxVolumeLabelPrefixLength {
+		return fmt.Errorf("volume label prefix is too long: length=%d max=%d", len(r), MaxVolumeLabelPrefixLength)
+	}
+	matched, err := regexp.MatchString(`^[0-9A-Za-z_-]{0,`+strconv.Itoa(MaxVolumeLabelPrefixLength)+`}$`, volumeLabelPrefix)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid regexp pattern: %w", err)
 	}
 	if !matched {
-		return fmt.Errorf("bs-prefix must be up to 12 alphanumeric characters, including hyphen and underscore")
+		return errors.New("volume label prefix may only contain: [A-Za-z0-9_-]")
 	}
-	linodeDriver.bsPrefix = bsPrefix
+	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
 
 	// Set up RPC Servers
 	linodeDriver.ids = NewIdentityServer(linodeDriver)
 	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata)
-	linodeDriver.cs = NewControllerServer(linodeDriver, linodeClient, metadata)
+
+	cs, err := NewControllerServer(linodeDriver, linodeClient, metadata)
+	if err != nil {
+		return fmt.Errorf("new controller server: %w", err)
+	}
+	linodeDriver.cs = cs
 
 	return nil
 }
@@ -125,18 +143,10 @@ func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount
 	}
 }
 
-func NewControllerServer(linodeDriver *LinodeDriver, cloudProvider linodeclient.LinodeClient, metadata Metadata) *LinodeControllerServer {
-	return &LinodeControllerServer{
-		Driver:        linodeDriver,
-		CloudProvider: cloudProvider,
-		Metadata:      metadata,
-	}
-}
-
 func (linodeDriver *LinodeDriver) Run(endpoint string) {
 	klog.V(4).Infof("Driver: %v", linodeDriver.name)
-	if len(linodeDriver.bsPrefix) > 0 {
-		klog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.bsPrefix)
+	if len(linodeDriver.volumeLabelPrefix) > 0 {
+		klog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.volumeLabelPrefix)
 	}
 
 	linodeDriver.readyMu.Lock()

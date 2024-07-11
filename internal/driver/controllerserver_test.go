@@ -20,163 +20,132 @@ func TestListVolumes(t *testing.T) {
 		"volume attached to node": {
 			volumes: []linodego.Volume{
 				{
-					ID:             1,
-					Label:          "foo",
-					Status:         "",
-					Region:         "danmaaag",
-					Size:           30,
-					LinodeID:       createLinodeID(10),
-					FilesystemPath: "",
-					Tags:           []string{},
+					ID:       1,
+					Label:    "foo",
+					Region:   "danmaaag",
+					Size:     30,
+					LinodeID: createLinodeID(10),
 				},
 			},
-			throwErr: false,
 		},
 		"volume not attached": {
 			volumes: []linodego.Volume{
 				{
-					ID:             1,
-					Label:          "bar",
-					Status:         "",
-					Region:         "",
-					Size:           30,
-					FilesystemPath: "",
+					ID:    1,
+					Label: "bar",
+					Size:  30,
 				},
 			},
-			throwErr: false,
 		},
 		"multiple volumes - with attachments": {
 			volumes: []linodego.Volume{
 				{
-					ID:             1,
-					Label:          "foo",
-					Status:         "",
-					Region:         "",
-					Size:           30,
-					LinodeID:       createLinodeID(5),
-					FilesystemPath: "",
-					Tags:           []string{},
+					ID:       1,
+					Label:    "foo",
+					Size:     30,
+					LinodeID: createLinodeID(5),
 				},
 				{
-					ID:             2,
-					Label:          "foo",
-					Status:         "",
-					Region:         "",
-					Size:           60,
-					FilesystemPath: "",
-					Tags:           []string{},
-					LinodeID:       createLinodeID(10),
+					ID:       2,
+					Label:    "foo",
+					Size:     60,
+					LinodeID: createLinodeID(10),
 				},
 			},
-			throwErr: false,
 		},
 		"multiple volumes - mixed attachments": {
 			volumes: []linodego.Volume{
 				{
-					ID:             1,
-					Label:          "foo",
-					Status:         "",
-					Region:         "",
-					Size:           30,
-					LinodeID:       createLinodeID(5),
-					FilesystemPath: "",
-					Tags:           []string{},
+					ID:       1,
+					Label:    "foo",
+					Size:     30,
+					LinodeID: createLinodeID(5),
 				},
 				{
-					ID:             2,
-					Label:          "foo",
-					Status:         "",
-					Region:         "",
-					Size:           30,
-					FilesystemPath: "",
-					Tags:           []string{},
-					LinodeID:       nil,
+					ID:    2,
+					Label: "foo",
+					Size:  30,
 				},
 			},
-			throwErr: false,
 		},
 		"Linode API error": {
-			volumes:  nil,
 			throwErr: true,
 		},
 	}
 
 	for c, tt := range cases {
 		t.Run(c, func(t *testing.T) {
-			cs := &LinodeControllerServer{
-				CloudProvider: &fakeLinodeClient{
+			cs := &ControllerServer{
+				client: &fakeLinodeClient{
 					volumes:  tt.volumes,
 					throwErr: tt.throwErr,
 				},
 			}
 
-			listVolsResp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
-			if err != nil {
-				if !tt.throwErr {
-					t.Fatalf("test case got unexpected err: %s", err)
-				}
-				return
+			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
+			if err != nil && !tt.throwErr {
+				t.Fatal("failed to list volumes:", err)
+			} else if err != nil && tt.throwErr {
+				// expected failure
+			} else if err == nil && tt.throwErr {
+				t.Fatal("should have failed to list volumes")
 			}
 
-			for _, entry := range listVolsResp.Entries {
-				gotVol := entry.GetVolume()
-				if gotVol == nil {
-					t.Fatal("vol was nil")
+			for _, entry := range resp.GetEntries() {
+				volume := entry.GetVolume()
+				if volume == nil {
+					t.Error("nil volume")
+					continue
 				}
 
-				var wantVol *linodego.Volume
+				var linodeVolume *linodego.Volume
 				for _, v := range tt.volumes {
-					v := v
-					// The issue is that the ID returned is
-					// not the same as what is passed in
 					key := common.CreateLinodeVolumeKey(v.ID, v.Label)
-					if gotVol.VolumeId == key.GetVolumeKey() {
-						wantVol = &v
+					if volume.VolumeId == key.GetVolumeKey() {
+						v := v
+						linodeVolume = &v
 						break
 					}
 				}
-
-				if wantVol == nil {
-					t.Fatalf("failed to find input volume equivalent to: %#v", gotVol)
+				if linodeVolume == nil {
+					t.Fatalf("no matching linode volume for %#v", volume)
 				}
 
-				if gotVol.CapacityBytes != int64(wantVol.Size)*gigabyte {
-					t.Errorf("volume size not equal, got: %d, want: %d", gotVol.CapacityBytes, wantVol.Size*gigabyte)
+				if want, got := int64(linodeVolume.Size<<30), volume.CapacityBytes; want != got {
+					t.Errorf("mismatched volume size: want=%d got=%d", want, got)
 				}
-
-				for _, i := range gotVol.GetAccessibleTopology() {
-					region, ok := i.Segments[VolumeTopologyRegion]
+				for _, topology := range volume.GetAccessibleTopology() {
+					region, ok := topology.Segments[VolumeTopologyRegion]
 					if !ok {
-						t.Errorf("got empty region")
+						t.Error("region not set in volume topology")
 					}
-
-					if region != wantVol.Region {
-						t.Errorf("regions do not match, got: %s, want: %s", region, wantVol.Region)
+					if region != linodeVolume.Region {
+						t.Errorf("mismatched regions: want=%q got=%q", linodeVolume.Region, region)
 					}
 				}
 
 				status := entry.GetStatus()
 				if status == nil {
-					t.Fatal("status was nil")
+					t.Error("nil status")
+					continue
 				}
-
 				if status.VolumeCondition.Abnormal {
-					t.Errorf("got abnormal volume condition")
+					t.Error("abnormal volume condition")
 				}
 
-				if len(status.GetPublishedNodeIds()) > 1 {
-					t.Errorf("volume was published on more than 1 node, got: %s", status.GetPublishedNodeIds())
+				if n := len(status.GetPublishedNodeIds()); n > 1 {
+					t.Errorf("volume published to too many nodes (%d)", n)
 				}
 
 				switch publishedNodes := status.GetPublishedNodeIds(); {
-				case len(publishedNodes) == 0 && wantVol.LinodeID == nil:
+				case len(publishedNodes) == 0 && linodeVolume.LinodeID == nil:
 				// This case is fine - having it here prevents a segfault if we try to index into publishedNodes in the last case
-				case len(publishedNodes) == 0 && wantVol.LinodeID != nil:
-					t.Errorf("expected volume to be attached, got: %s, want: %d", status.GetPublishedNodeIds(), *wantVol.LinodeID)
-				case len(publishedNodes) != 0 && wantVol.LinodeID == nil:
+				case len(publishedNodes) == 0 && linodeVolume.LinodeID != nil:
+					t.Errorf("expected volume to be attached, got: %s, want: %d", status.GetPublishedNodeIds(), *linodeVolume.LinodeID)
+				case len(publishedNodes) != 0 && linodeVolume.LinodeID == nil:
 					t.Errorf("expected volume to be unattached, got: %s", publishedNodes)
-				case publishedNodes[0] != fmt.Sprintf("%d", *wantVol.LinodeID):
-					t.Fatalf("got: %s, want: %d published node id", status.GetPublishedNodeIds()[0], *wantVol.LinodeID)
+				case publishedNodes[0] != fmt.Sprintf("%d", *linodeVolume.LinodeID):
+					t.Fatalf("got: %s, want: %d published node id", status.GetPublishedNodeIds()[0], *linodeVolume.LinodeID)
 				}
 			}
 		})
@@ -302,8 +271,8 @@ func TestControllerCanAttach(t *testing.T) {
 				Specs: &linodego.InstanceSpec{Memory: memMB},
 			}
 
-			srv := LinodeControllerServer{
-				CloudProvider: &fakeLinodeClient{
+			srv := ControllerServer{
+				client: &fakeLinodeClient{
 					volumes: vols,
 					disks:   disks,
 				},
@@ -387,8 +356,8 @@ func TestControllerMaxVolumeAttachments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &LinodeControllerServer{
-				CloudProvider: &fakeLinodeClient{
+			s := &ControllerServer{
+				client: &fakeLinodeClient{
 					disks: []linodego.InstanceDisk{
 						{
 							ID:         1,
