@@ -109,21 +109,48 @@ func NewControllerServer(driver *LinodeDriver, client linodeclient.LinodeClient,
 // CreateVolume will be called by the CO to provision a new volume on behalf of a user (to be consumed
 // as either a block device or a mounted filesystem).  This operation is idempotent.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	// Quick check to make sure the caller filled in the volume name.
 	name := req.GetName()
-
-	if len(name) == 0 {
+	if name == "" {
 		return &csi.CreateVolumeResponse{}, errNoVolumeName
 	}
 
-	volCapabilities := req.GetVolumeCapabilities()
-	if len(volCapabilities) == 0 {
+	// Make sure the caller provided some volume capabilities, and make sure
+	// they only specified ones we can support.
+	capabilities := req.GetVolumeCapabilities()
+	if len(capabilities) == 0 {
 		return &csi.CreateVolumeResponse{}, errNoVolumeCapabilities
 	}
+	for _, c := range capabilities {
+		if c == nil {
+			continue
+		}
+		switch mode := c.GetAccessMode().GetMode(); mode {
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+		// This is ok.
+		default:
+			return &csi.CreateVolumeResponse{}, errInvalidArgument("unsupported volume access mode: %q", mode)
+		}
+	}
 
-	capRange := req.GetCapacityRange()
-	size, err := getRequestCapacitySize(capRange)
-	if err != nil {
-		return &csi.CreateVolumeResponse{}, err
+	var (
+		capacity = req.GetCapacityRange()
+
+		// This funny use of max() is a shortcut to ensure that we get the
+		// larger of required or limit bytes, if one of them is not specified.
+		// If neither are specified, the result will be 0 (zero).
+		requiredSize = max(capacity.GetRequiredBytes(), capacity.GetLimitBytes())
+		limitSize    = max(capacity.GetLimitBytes(), capacity.GetRequiredBytes())
+		desiredSize  = max(requiredSize, limitSize)
+	)
+	if desiredSize == 0 {
+		// The capacity range is optional.
+		// If both the required and limit sizes are 0, this means neither was
+		// specified, so we will default to using the minimum size of a block
+		// storage volume.
+		desiredSize = MinVolumeSizeBytes
+	} else if desiredSize < MinVolumeSizeBytes {
+		return &csi.CreateVolumeResponse{}, errSmallVolumeCapacity
 	}
 
 	// to avoid mangled requests for existing volumes with hyphen,
