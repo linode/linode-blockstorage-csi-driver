@@ -25,6 +25,8 @@ import (
 
 type LinodeIdentityServer struct {
 	Driver *LinodeDriver
+
+	csi.UnimplementedIdentityServer
 }
 
 // GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)

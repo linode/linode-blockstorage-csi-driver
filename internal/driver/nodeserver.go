@@ -42,6 +42,8 @@ type LinodeNodeServer struct {
 	Metadata      Metadata
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
+
+	csi.UnimplementedNodeServer
 }
 
 var _ csi.NodeServer = &LinodeNodeServer{}
