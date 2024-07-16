@@ -77,6 +77,12 @@ const (
 	VolumeTopologyRegion string = "topology.linode.com/region"
 )
 
+// MaxVolumeLabelLength is the maximum allowed length of a label on a block
+// storage volume.
+//
+// NOTE: It is unclear if this limit is self-imposed, or from the Linode API.
+const MaxVolumeLabelLength = 32
+
 type ControllerServer struct {
 	driver   *LinodeDriver
 	client   linodeclient.LinodeClient
@@ -133,43 +139,86 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
+	// Check the capacity range.
+	//
+	// The main things we want to check, are to make sure that the caller
+	// doesn't specify a range that is smaller than the minimum volume size
+	// [MinVolumeSizeBytes].
+	//
+	// A capacity range has two values: required, and limit.
+	// Both values indicate the number of bytes.
+	// The "required" bytes is the minimum size the caller will tolerate,
+	// and the "limit" bytes is the upper bound.
+	// The caller does not need to specify both values.
+	// They can specify one value, and as long as it is larger than
+	// [MinVolumeSizeBytes], we will use it.
+	// If the caller does not specify a capacity, (specifying a capacity range
+	// is optional, as per the CSI spec) we will assume [MinVolumeSizeBytes].
+	// If both the required and limit sizes are specified, we will choose the
+	// larger of the two values.
+	//
+	// Note that the capacity range is optional.
 	var (
 		capacity = req.GetCapacityRange()
 
 		// This funny use of max() is a shortcut to ensure that we get the
-		// larger of required or limit bytes, if one of them is not specified.
+		// larger of required or limit bytes, even if one of them is not
+		// specified.
 		// If neither are specified, the result will be 0 (zero).
 		requiredSize = max(capacity.GetRequiredBytes(), capacity.GetLimitBytes())
 		limitSize    = max(capacity.GetLimitBytes(), capacity.GetRequiredBytes())
-		desiredSize  = max(requiredSize, limitSize)
+
+		// Get the larger of the required and limit sizes.
+		desiredSize = max(requiredSize, limitSize)
 	)
+	// Remember, the capacity range is optional.
+	// If the caller did not specify a size, both requiredSize and limitSize
+	// will be 0 (zero), and we will default to [MinVolumeSizeBytes].
+	// The assumption is that the user wants a volume, they just don't
+	// necessarily care what size it is.
+	//
+	// However, if the caller specified a size that is less-than
+	// [MinVolumeSizeBytes], we will error out.
 	if desiredSize == 0 {
-		// The capacity range is optional.
-		// If both the required and limit sizes are 0, this means neither was
-		// specified, so we will default to using the minimum size of a block
-		// storage volume.
 		desiredSize = MinVolumeSizeBytes
 	} else if desiredSize < MinVolumeSizeBytes {
 		return &csi.CreateVolumeResponse{}, errSmallVolumeCapacity
 	}
 
-	// to avoid mangled requests for existing volumes with hyphen,
-	// we only strip them out on creation when k8s invented the name
-	// this is still problematic because we strip "-" from volume-name-prefixes
-	// that specifically requested "-".
-	// Don't strip this when volume labels support sufficient length
-	condensedName := strings.Replace(name, "-", "", -1)
+	// Make sure the caller does not want to create a new volume by cloning
+	// a snapshot.
+	// Linode does not support snapshotting block storage volumes.
+	if req.GetVolumeContentSource().GetSnapshot() != nil {
+		return &csi.CreateVolumeResponse{}, errSnapshot
+	}
 
-	preKey := common.CreateLinodeVolumeKey(0, condensedName)
+	// Strip out any hyphens "-" from the volume name provided in the request.
+	// When we formulate a new volume name to return, it will be in the format
+	//
+	//    ID-[PREFIX]LABEL
+	//
+	// where "ID" is the Linode volume's ID, and "LABEL" is the name supplied
+	// in the request.
+	// If the driver was initialized with a volume label prefix, it will be
+	// prepended to the LABEL part of the ID.
+	// The full volume ID will be set later.
+	// For now, we will prepare the "label" part of the ID.
+	stripped := []rune(strings.ReplaceAll(name, "-", ""))
+	stripped = append(stripped, []rune(cs.driver.volumeLabelPrefix)...)
 
-	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+	var volumeName string
+	if len(stripped) > MaxVolumeLabelLength {
+		volumeName = string(stripped[:MaxVolumeLabelLength])
+	} else {
+		volumeName = string(stripped)
+	}
 
-	klog.V(4).Infoln("create volume called", map[string]interface{}{
-		"method":                  "create_volume",
-		"storage_size_giga_bytes": bytesToGB(size), // bytes -> GB
-		"volume_name":             volumeName,
-	})
-
+	// Build up the volume context.
+	//
+	// The volume context is a map of key-value pairs that carry information
+	// about the volume through to later steps.
+	//
+	// In this case, we want to propagate the LUKS-related information.
 	volumeContext := make(map[string]string)
 	if req.Parameters[LuksEncryptedAttribute] == "true" {
 		// if luks encryption is enabled add a volume context
@@ -179,85 +228,308 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
-	targetSizeGB := bytesToGB(size)
+	// Now, it is time to see about creating the volume.
+	//
+	// There are two ways we support:
+	//  - Creating the volume from scratch
+	//  - Cloning an existing volume
+	//
+	// In either case, we are going to call another method to handle the
+	// creation process, but this method is going to handle sending the
+	// response to the caller.
+	var newVolume newVolumeFunc = cs.createVolume
+	if req.GetVolumeContentSource().GetVolume() != nil {
+		newVolume = cs.cloneVolume
+	}
 
-	// Attempt to get info about the source volume.
-	// sourceVolumeInfo will be null if no content source is defined.
-	contentSource := req.GetVolumeContentSource()
-	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
+	volume, err := newVolume(ctx, req)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
-
-	// Attempt to create the volume while respecting idempotency
-	vol, err := cs.attemptCreateLinodeVolume(
-		ctx,
-		volumeName,
-		targetSizeGB,
-		req.Parameters[VolumeTags],
-		sourceVolumeInfo,
-	)
-	if err != nil {
-		return &csi.CreateVolumeResponse{}, err
-	}
-
-	// Attempt to resize the volume if necessary
-	if vol.Size != targetSizeGB {
-		klog.V(4).Infoln("resizing volume", map[string]interface{}{
-			"volume_id": vol.ID,
-			"old_size":  vol.Size,
-			"new_size":  targetSizeGB,
-		})
-
-		if err := cs.client.ResizeVolume(ctx, vol.ID, targetSizeGB); err != nil {
-			return &csi.CreateVolumeResponse{}, errInternal("resize cloned volume (%d): %v", targetSizeGB, err)
-		}
-	}
-
-	statusPollTimeout := waitTimeout()
-
-	// If we're cloning the volume we should extend the timeout
-	if sourceVolumeInfo != nil {
-		statusPollTimeout = cloneTimeout()
-	}
-
-	if _, err := cs.client.WaitForVolumeStatus(
-		ctx, vol.ID, linodego.VolumeActive, statusPollTimeout); err != nil {
-		return &csi.CreateVolumeResponse{}, errInternal("wait for volume %d to be active: %v", vol.ID, err)
-	}
-
-	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
-
-	key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
-	resp := &csi.CreateVolumeResponse{
-		Volume: &csi.Volume{
-			VolumeId:      key.GetVolumeKey(),
-			CapacityBytes: size,
-			AccessibleTopology: []*csi.Topology{
-				{
-					Segments: map[string]string{
-						VolumeTopologyRegion: vol.Region,
-					},
-				},
-			},
-			VolumeContext: volumeContext,
-		},
-	}
-
-	// Append the content source to the response
-	if sourceVolumeInfo != nil {
-		resp.Volume.ContentSource = &csi.VolumeContentSource{
-			Type: &csi.VolumeContentSource_Volume{
-				Volume: &csi.VolumeContentSource_VolumeSource{
-					VolumeId: contentSource.GetVolume().GetVolumeId(),
-				},
-			},
-		}
-	}
-
-	klog.V(4).Infoln("volume finished creation", map[string]interface{}{"response": resp})
-	return resp, nil
 }
+
+// newVolumeFunc is a functional type that creates a new
+// [github.com/linode/linodego.Volume] given the parameters in
+// [github.com/container-storage-interface/spec/lib/go/csi.CreateVolumeRequest].
+type newVolumeFunc func(context.Context, *csi.CreateVolumeRequest) (*linodego.Volume, error)
+
+// createVolume creates a brand new Linode block storage volume.
+// It is an implementation of a [newVolumeFunc].
+func (cs *ControllerServer) createVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*linodego.Volume, error) {
+	// Check to see if a volume with the name already exists.
+	// If it is in the right region, and not currently attached to another node
+	// we will use it.
+	//
+	// Since we do not have the ID of an existing volume handy, we will have to
+	// search for it by label.
+	stripped := []rune(strings.ReplaceAll(name, "-", ""))
+	stripped = append(stripped, []rune(cs.driver.volumeLabelPrefix)...)
+
+	var label string
+	if len(stripped) > MaxVolumeLabelLength {
+		label = string(stripped[:MaxVolumeLabelLength])
+	} else {
+		label = string(stripped)
+	}
+
+	volume, err := cs.getVolumeByLabel(ctx, label)
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
+		return cs.useExistingVolume(ctx, req, volume)
+	}
+
+	return nil, errNotImplemented
+}
+
+// getVolumeByLabel retrieves a single block storage volume from the Linode API
+// by its label.
+// If there are no volumes with the given label, getVolumeByLabel will return
+// a nil [github.com/linode/linodego.Volume], and a nil error.
+func (cs *ControllerServer) getVolumeByLabel(ctx context.Context, label string) (*linodego.Volume, error) {
+	filter, err := json.Marshal(map[string]string{
+		"label": label,
+	})
+	if err != nil {
+		return nil, errInternal("marshal json filter: %v", err)
+	}
+
+	volumes, err := cs.client.ListVolumes(ctx, linodego.NewListOptions(0, string(filter)))
+	if err != nil {
+		return nil, errInternal("list volumes: %v", err)
+	}
+
+	if len(volumes) > 1 {
+		return nil, status.Errorf(codes.AlreadyExists, "too many volumes with label %q", label)
+	}
+
+	if len(volumes) == 1 {
+		return &volumes[0], nil
+	}
+	return nil, nil
+}
+
+// useExistingVolume checks to see if the given volume can be used to satisfy
+// the request.
+// This method should only be called if the volume name provided in the request
+// already exists as a label on a block storage volume that exists in the
+// Linode API.
+func (cs *ControllerServer) useExistingVolume(ctx context.Context, req *csi.CreateVolumeRequest, volume *linodego.Volume) (*linodego.Volume, error) {
+	if req == nil {
+		return nil, errInternal("nil request")
+	}
+	if volume == nil {
+		return nil, errInternal("cannot use existing nil volume")
+	}
+
+	// If the volume is currently attached to a node, we cannot use it.
+	if volume.LinodeID != nil {
+		return nil, errVolumeAttached(volume.ID, *volume.LinodeID)
+	}
+
+	// Check if the existing volume can satisfy the request.
+	//
+	// First, we will check to see if the block storage volume is in the right
+	// region.
+	// While we cannot know which node the volume will be attached to ahead of
+	// time, the container orchestrator (CO) should have provided us some
+	// topology information to indicate which region the volume needs to be in.
+	// If the volume is not in the specified region, we will error out.
+	// There is not much we can do about the volume being in the wrong region,
+	// since volume labels are unique across an entire account.
+	//
+	// If no topology region is specified in the request, we will default to
+	// the region the controller server is running in.
+	desiredRegion := cs.metadata.Region
+	if accessibility := req.GetAccessibilityRequirements(); accessibility != nil {
+		// Build up a slice of the preferred topologies, followed by the
+		// requisite ("required") topologies.
+		//
+		// NOTE: We put the requisite topologies second, so that they are
+		// evaluated last, and have a chance to override any preferred
+		// topology.
+		var topologies []*csi.Topology = append(accessibility.GetPreferred(), accessibility.GetRequisite()...)
+		for _, topology := range topologies {
+			for key, value := range topology.GetSegments() {
+				switch key {
+				case "topology.kubernetes.io/region", VolumeTopologyRegion:
+					// NOTE: [VolumeTopologyRegion] is the current label key
+					// used to specify the region to the CSI driver.
+					// The addition of "topology.kubernetes.io/region" is the
+					// [well-known label] that *should* be used going forward.
+					//
+					// [well-known label]: https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesioregion
+					if value != "" {
+						desiredRegion = value
+					}
+				}
+			}
+		}
+	}
+	if volume.Region != desiredRegion {
+		return nil, errRegionMismatch(volume.Region, desiredRegion)
+	}
+
+	// Now check the to make sure the existing volume's capacity is at-least
+	// as large as the required capacity, if the capacity range has been set.
+	//
+	// If the capacity range does not set a required capacity, but does set
+	// a limit, the volume must be no more than the limit.
+	//
+	// If the existing volume's capacity is larger than the limit (if set),
+	// we will error out, because we cannot resize the volume to make it
+	// smaller.
+	//
+	// If a capacity range was not set in the request, we will allow the
+	// volume.
+	var (
+		requiredSize = req.GetCapacityRange().GetRequiredBytes()
+		limitSize    = req.GetCapacityRange().GetLimitBytes()
+		currentSize  = gbToBytes(volume.Size)
+	)
+	if requiredSize > 0 && currentSize < requiredSize {
+		return nil, status.Error(codes.AlreadyExists, "volume is smaller than the required size")
+	}
+	if limitSize > 0 && currentSize > limitSize {
+		return nil, status.Error(codes.AlreadyExists, "volume is larger than the requested capacity limit")
+	}
+
+	return nil, errNotImplemented
+}
+
+// desiredSize returns the desired capacity (in bytes) specified in the request.
+// Of the "request" and "limit" bytes, the larger of the two values will be
+// returned.
+//
+// desiredSize returns a non-nil error if the capacity range was set in the
+// request, and either the "request" or "limit" bytes are < 0.
+func desiredSize(req *csi.CreateVolumeRequest) (int64, error) {
+	capacity := req.GetCapacityRange()
+	if !isCapacitySet(capacity) {
+		return 0, nil
+	}
+
+	// This funny use of max() is a shortcut to ensure that we get the
+	// larger of required or limit bytes, even if one of them is not
+	// specified.
+	// If neither are specified, the result will be 0 (zero).
+	required := max(capacity.GetRequiredBytes(), capacity.GetLimitBytes())
+	limit := max(capacity.GetLimitBytes(), capacity.GetRequiredBytes())
+
+	return max(required, limit), nil
+}
+
+// isCapacitySet indicates whether or not the capacity range was set.
+// A nil capacity range, or a non-nil capacity range where the required and
+// limit bytes are 0 (zero), are treated as though the capacity range was not
+// set.
+func isCapacitySet(capacity *csi.CapacityRange) bool {
+	// Short-circuit the rest of this function if we were given a nil capacity
+	// range.
+	if capacity == nil {
+		return false
+	}
+
+	// If the capacity range is non-nil, but both the "required" and "limit"
+	// bytes are 0 (zero), we are going to assume it was not set.
+	if capacity.GetRequiredBytes() == 0 && capacity.GetLimitBytes() == 0 {
+		return false
+	}
+
+	return true
+}
+
+// cloneVolume creates a new Linode block storage volume by cloning an existing
+// block storage volume.
+//
+// If a larger size/capacity is requested, cloneVolume will resize the volume
+// after it is created.
+// Note that a volume cannot be resized to be smaller, so if a capacity range
+// is specified that is smaller than the source block storage volume,
+// cloneVolume will return a non-nil error before attempting to create the new
+// block storage volume.
+func (cs *ControllerServer) cloneVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*linodego.Volume, error) {
+	return nil, errNotImplemented
+}
+
+// 	// Attempt to get info about the source volume.
+// 	// sourceVolumeInfo will be null if no content source is defined.
+// 	contentSource := req.GetVolumeContentSource()
+// 	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
+// 	if err != nil {
+// 		return &csi.CreateVolumeResponse{}, err
+// 	}
+
+// 	// Attempt to create the volume while respecting idempotency
+// 	vol, err := cs.attemptCreateLinodeVolume(
+// 		ctx,
+// 		volumeName,
+// 		targetSizeGB,
+// 		req.Parameters[VolumeTags],
+// 		sourceVolumeInfo,
+// 	)
+// 	if err != nil {
+// 		return &csi.CreateVolumeResponse{}, err
+// 	}
+
+// 	// Attempt to resize the volume if necessary
+// 	if vol.Size != targetSizeGB {
+// 		klog.V(4).Infoln("resizing volume", map[string]interface{}{
+// 			"volume_id": vol.ID,
+// 			"old_size":  vol.Size,
+// 			"new_size":  targetSizeGB,
+// 		})
+
+// 		if err := cs.client.ResizeVolume(ctx, vol.ID, targetSizeGB); err != nil {
+// 			return &csi.CreateVolumeResponse{}, errInternal("resize cloned volume (%d): %v", targetSizeGB, err)
+// 		}
+// 	}
+
+// 	statusPollTimeout := waitTimeout()
+
+// 	// If we're cloning the volume we should extend the timeout
+// 	if sourceVolumeInfo != nil {
+// 		statusPollTimeout = cloneTimeout()
+// 	}
+
+// 	if _, err := cs.client.WaitForVolumeStatus(
+// 		ctx, vol.ID, linodego.VolumeActive, statusPollTimeout); err != nil {
+// 		return &csi.CreateVolumeResponse{}, errInternal("wait for volume %d to be active: %v", vol.ID, err)
+// 	}
+
+// 	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
+
+// 	key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
+// 	resp := &csi.CreateVolumeResponse{
+// 		Volume: &csi.Volume{
+// 			VolumeId:      key.GetVolumeKey(),
+// 			CapacityBytes: size,
+// 			AccessibleTopology: []*csi.Topology{
+// 				{
+// 					Segments: map[string]string{
+// 						VolumeTopologyRegion: vol.Region,
+// 					},
+// 				},
+// 			},
+// 			VolumeContext: volumeContext,
+// 		},
+// 	}
+
+// 	// Append the content source to the response
+// 	if sourceVolumeInfo != nil {
+// 		resp.Volume.ContentSource = &csi.VolumeContentSource{
+// 			Type: &csi.VolumeContentSource_Volume{
+// 				Volume: &csi.VolumeContentSource_VolumeSource{
+// 					VolumeId: contentSource.GetVolume().GetVolumeId(),
+// 				},
+// 			},
+// 		}
+// 	}
+
+// 	klog.V(4).Infoln("volume finished creation", map[string]interface{}{"response": resp})
+// 	return resp, nil
+// }
 
 // DeleteVolume deletes the given volume. The function is idempotent.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {

@@ -6,6 +6,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// errNotImplemented is a placeholder used to indicate something is not
+// currently implemented.
+//
+// Ideally, this should never be used, but can be helpful for development.
+var errNotImplemented = status.Error(codes.Unimplemented, "not implemented")
+
 // Errors that are returned from RPC methods.
 // They are defined here so they can be reused, and checked against in tests.
 var (
@@ -53,6 +59,13 @@ var (
 	//
 	// The minimum allowed size for a volume is set by [MinVolumeSizeBytes].
 	errSmallVolumeCapacity = status.Errorf(codes.OutOfRange, "specified volume capacity is less than the minimum of %d bytes", MinVolumeSizeBytes)
+
+	// errSnapshot is returned to a caller when they call
+	// [ControllerServer.CreateVolume] and specify a snapshot as the new
+	// volume's content source.
+	//
+	// Linode does not support snapshot operations on block storage volumes.
+	errSnapshot = status.Error(codes.InvalidArgument, "creating a volume from a snapshot is not supported")
 )
 
 // errRegionMismatch returns an error indicating a volume is in gotRegion, but
