@@ -246,6 +246,34 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
+
+	var contentSource *csi.VolumeContentSource
+	if src := req.GetVolumeContentSource().GetVolume(); src != nil {
+		contentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: src.GetVolumeId(),
+				},
+			},
+		}
+	}
+
+	return &csi.CreateVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      fmt.Sprintf("%d-%s", volume.ID, volumeName),
+			CapacityBytes: gbToBytes(volume.Size),
+			AccessibleTopology: []*csi.Topology{
+				{
+					Segments: map[string]string{
+						VolumeTopologyRegion:            volume.Region,
+						"topology.kubernetes.io/region": volume.Region,
+					},
+				},
+			},
+			VolumeContext: volumeContext,
+			ContentSource: contentSource,
+		},
+	}, nil
 }
 
 // newVolumeFunc is a functional type that creates a new
@@ -262,7 +290,7 @@ func (cs *ControllerServer) createVolume(ctx context.Context, req *csi.CreateVol
 	//
 	// Since we do not have the ID of an existing volume handy, we will have to
 	// search for it by label.
-	stripped := []rune(strings.ReplaceAll(name, "-", ""))
+	stripped := []rune(strings.ReplaceAll(req.GetName(), "-", ""))
 	stripped = append(stripped, []rune(cs.driver.volumeLabelPrefix)...)
 
 	var label string
