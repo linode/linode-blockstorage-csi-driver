@@ -1,8 +1,0 @@
-# dont commit temporary files written here by Terraform
-*.conf
-cluster.tf
-terraform*
-.terraform
-
-manifest/linode-blockstorage-csi-driver.yaml
-

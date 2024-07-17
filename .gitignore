@@ -7,6 +7,7 @@
 # Folders
 _obj
 _test
+bin
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -38,6 +39,4 @@ dist/
 coverage.txt
 *.coverprofile
 
-*.terraform
-e2e/test/terraform*
 *junit.xml

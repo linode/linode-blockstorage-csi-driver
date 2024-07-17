@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine as builder
+FROM golang:1.22.4-alpine as builder
 # from makefile
 ARG REV
 
@@ -9,6 +9,7 @@ COPY go.mod .
 COPY go.sum .
 COPY main.go .
 COPY pkg ./pkg
+COPY internal ./internal
 
 RUN go mod download
 

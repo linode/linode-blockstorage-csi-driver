@@ -1,12 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../sidecars/external-provisioner
-  - ../sidecars/external-attacher
-  - ../sidecars/external-resizer
-  - accounts-roles-bindings.yaml
-  - csi-driver-instance.yaml
-  - csi-storageclass.yaml
-  - ss-csi-linode-controller.yaml
-  - ds-csi-linode-node.yaml
-  - cm-get-linode-id.yaml
+- ../sidecars/external-provisioner
+- ../sidecars/external-attacher
+- ../sidecars/external-resizer
+- accounts-roles-bindings.yaml
+- csi-driver-instance.yaml
+- csi-storageclass.yaml
+- ss-csi-linode-controller.yaml
+- ds-csi-linode-node.yaml
+- cm-get-linode-id.yaml
