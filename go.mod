@@ -11,7 +11,6 @@ require (
 	golang.org/x/sys v0.22.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
-
 	k8s.io/apimachinery v0.19.2
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
