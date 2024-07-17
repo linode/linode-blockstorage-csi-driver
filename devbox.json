@@ -1,0 +1,29 @@
+{
+  "packages": [
+    "go_1_22@latest",
+    "ginkgo@latest",
+    "ctlptl@latest",
+    "clusterctl@latest",
+    "kustomize@latest",
+    "kubectl@latest",
+    "kind@latest",
+    "kustomize@latest",
+    "kyverno-chainsaw@latest",
+    "yq-go@latest",
+    "envsubst@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "export GOROOT=$(go env GOROOT)"
+    ],
+    "scripts": {
+      "local-deploy": "make local-deploy",
+      "remote-cluster-deploy": "make remote-cluster-deploy",
+      "e2e-test": "make e2e-test",
+      "cleanup-cluster": "make cleanup-cluster"
+    }
+  },
+  "env": {
+    "EXP_CLUSTER_RESOURCE_SET": "true"
+  }
+}

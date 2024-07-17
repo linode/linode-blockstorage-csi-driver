@@ -1,0 +1,45 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: (join('-', ['linode-block-storage', $namespace]))
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+    linodebs.csi.linode.com/volumeTags: (to_string($namespace))
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-filesystem
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: (join('-', ['linode-block-storage', $namespace]))
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: e2e-pod
+spec:
+  containers:
+  - name: e2e-pod
+    image: ubuntu
+    command:
+    - sleep
+    - "1000000"
+    volumeMounts:
+    - mountPath: /data
+      name: csi-volume
+  tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  volumes:
+  - name: csi-volume
+    persistentVolumeClaim:
+      claimName: pvc-filesystem
