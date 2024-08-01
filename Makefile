@@ -86,17 +86,12 @@ test-image-tags:
 
 .PHONY: remote-cluster-deploy
 remote-cluster-deploy:
-	# Create SSH_KEY for test-cluster ssh access
-	ssh-keygen -t rsa -b 4096 -N "" -f ./ssh_key
-
 	# Create a CAPL test cluster without CSI driver and wait for it to be ready
-	export PUB_KEY=$$(cat ./ssh_key.pub) && \
 	clusterctl generate cluster $(TEST_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION) \
 		--flavor kubeadm-vpcless \
 		| yq 'select(.metadata.name != "$(TEST_CLUSTER_NAME)-csi-driver-linode")' \
-		| yq e 'select(.kind == "LinodeMachineTemplate") .spec.template.spec.authorizedKeys[0] = env(PUB_KEY)' \
 		| kubectl apply -f -
 	kubectl wait --for=condition=ControlPlaneReady  cluster/$(TEST_CLUSTER_NAME) --timeout=600s
 	clusterctl get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
@@ -127,4 +122,4 @@ cleanup-cluster:
 .PHONY: e2e-test
 e2e-test:
 	openssl rand -out luks.key 64
-	KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') SSH_KEY=$$(cat $$(pwd)/ssh_key.pub) chainsaw test ./e2e/test --parallel 2
+	KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./e2e/test --parallel 2

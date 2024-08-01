@@ -8,8 +8,6 @@ spec:
   bindings:
       - name: lukskey
         value: (env('LUKS_KEY'))
-      - name: ssh_key
-        value: (env('SSH_KEY'))
   steps:
     - name: Check if CSI Driver is deployed
       try:
@@ -78,10 +76,8 @@ spec:
             env:
               - name: NAMESPACE
                 value: ($namespace)
-              - name: SSH_KEY
-                value: ($ssh_key)
             content: |
-              ssh -o StrictHostKeyChecking=no -i ../../../ssh_key root@$(kubectl get no -o wide | awk 'NR==2 {print $7}') 'blkid | grep crypto_LUKS'
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "blkid | grep crypto_LUKS"
             check:
               ($error): ~
               (contains($stdout, 'TYPE="crypto_LUKS"')): true
