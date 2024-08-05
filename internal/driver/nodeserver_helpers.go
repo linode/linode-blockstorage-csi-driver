@@ -101,6 +101,29 @@ func validateNodeUnstageVolumeRequest(req *csi.NodeUnstageVolumeRequest) error {
 	return nil
 
 }
+
+// getFSTypeAndMountOptions retrieves the file system type and mount options from the given volume capability.
+// If the capability is not set, the default file system type and empty mount options will be returned.
+func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, []string) {
+	// Use default file system type if not specified in the volume capability
+	fsType := defaultFSType
+	// Use mount options from the volume capability if specified
+	var mountOptions []string
+
+	if mnt := volumeCapability.GetMount(); mnt != nil {
+		// Use file system type from volume capability if specified
+		if mnt.FsType != "" {
+			fsType = mnt.FsType
+		}
+		// Use mount options from volume capability if specified
+		if mnt.MountFlags != nil {
+			mountOptions = mnt.MountFlags
+		}
+	}
+
+	return fsType, mountOptions
+}
+
 // findDevicePath locates the device path for a Linode Volume.
 //
 // It uses the provided LinodeVolumeKey and partition information to generate
@@ -147,6 +170,81 @@ func (ns *LinodeNodeServer) ensureMountPoint(stagingTargetPath string, fs FileSy
 	}
 	return notMnt, nil
 }
+
+// mountVolume formats and mounts a volume to the staging target path.
+//
+// It handles both encrypted (LUKS) and non-encrypted volumes. For LUKS volumes,
+// it prepares the encrypted volume before mounting. The function determines
+// the filesystem type and mount options from the volume capability.
+func (ns *LinodeNodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeRequest) error {
+	stagingTargetPath := req.GetStagingTargetPath()
+	volumeCapability := req.GetVolumeCapability()
+
+	// Retrieve the file system type and mount options from the volume capability
+	fsType, mountOptions := getFSTypeAndMountOptions(volumeCapability)
+
+	fmtAndMountSource := devicePath
+
+	// Check if LUKS encryption is enabled and prepare the LUKS volume if needed
+	luksContext := getLuksContext(req.Secrets, req.VolumeContext, VolumeLifecycleNodeStageVolume)
+	if luksContext.EncryptionEnabled {
+		var err error
+		fmtAndMountSource, err = ns.prepareLUKSVolume(devicePath, luksContext)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Format and mount the drive
+	klog.V(4).Info("formatting and mounting the drive")
+	if err := ns.Mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
+		return status.Error(codes.Internal,
+			fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
+				devicePath, stagingTargetPath, fsType, mountOptions, err))
+	}
+
+	return nil
+}
+
+// prepareLUKSVolume prepares a LUKS-encrypted volume for mounting.
+//
+// It checks if the device at devicePath is already formatted with LUKS encryption.
+// If not, it formats the device using the provided LuksContext.
+// Finally, it prepares the LUKS volume for mounting.
+func (ns *LinodeNodeServer) prepareLUKSVolume(devicePath string, luksContext LuksContext) (string, error) {
+	// LUKS encryption enabled, check if the volume needs to be formatted.
+	klog.V(4).Info("LUKS encryption enabled")
+
+	// Validate if the device is formatted with LUKS encryption or if it needs formatting.
+	formatted, err := ns.Encrypt.blkidValid(devicePath)
+	if err != nil {
+		return "", status.Error(codes.Internal, fmt.Sprintf("Failed to validate blkid (%q): %v", devicePath, err))
+	}
+
+	// If the device is not, format it.
+	if !formatted {
+		klog.V(4).Info("luks volume now formatting: ", devicePath)
+
+		// Validate the LUKS context.
+		if err := luksContext.validate(); err != nil {
+			return "", status.Error(codes.Internal, fmt.Sprintf("Failed to luks format validation (%q): %v", devicePath, err))
+		}
+
+		// Format the volume with LUKS encryption.
+		if err := ns.Encrypt.luksFormat(luksContext, devicePath); err != nil {
+			return "", status.Error(codes.Internal, fmt.Sprintf("Failed to luks format (%q): %v", devicePath, err))
+		}
+	}
+
+	// Prepare the LUKS volume for mounting.
+	luksSource, err := ns.Encrypt.luksPrepareMount(luksContext, devicePath)
+	if err != nil {
+		return "", status.Error(codes.Internal, fmt.Sprintf("Failed to prepare luks mount (%q): %v", devicePath, err))
+	}
+
+	return luksSource, nil
+}
+
 // closeMountSources closes any LUKS-encrypted mount sources associated with the given path.
 // It retrieves mount sources, checks if each source is a LUKS mapping, and closes it if so.
 // Returns an error if any operation fails during the process.

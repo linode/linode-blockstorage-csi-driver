@@ -17,10 +17,8 @@ limitations under the License.
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -236,53 +234,16 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	// VolumeMode=block
+	// Check if the volume mode is set to 'Block'
 	// Do nothing else with the mount point for stage
-	if blk := volumeCapability.GetBlock(); blk != nil {
+	if blk := req.VolumeCapability.GetBlock(); blk != nil {
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	// Part 3: Mount device to stagingTargetPath
-	// Default fstype is ext4
-	fstype := "ext4"
-	options := []string{}
-	if mnt := volumeCapability.GetMount(); mnt != nil {
-		if mnt.FsType != "" {
-			fstype = mnt.FsType
-		}
-		options = append(options, mnt.MountFlags...)
-	}
-
-	fmtAndMountSource := devicePath
-	luksContext := getLuksContext(req.Secrets, req.VolumeContext, VolumeLifecycleNodeStageVolume)
-	if luksContext.EncryptionEnabled {
-		klog.V(4).Info("luksContext encryption enabled")
-		formatted, err := blkidValid(devicePath)
-		if err != nil {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to validate blkid (%q): %v", devicePath, err))
-		}
-		if !formatted {
-			klog.V(4).Info("luks volume now formatting: ", devicePath)
-			if err := luksContext.validate(); err != nil {
-				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to luks format validation (%q): %v", devicePath, err))
-			}
-			if err := luksFormat(luksContext, devicePath); err != nil {
-				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to luks format (%q): %v", devicePath, err))
-			}
-		}
-
-		luksSource, err := luksPrepareMount(luksContext, devicePath)
-		if err != nil {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to prepare luks mount (%q): %v", devicePath, err))
-		}
-		fmtAndMountSource = luksSource
-	}
-
-	klog.V(4).Info("formatting and mounting the drive")
-	if err := ns.Mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fstype, options); err != nil {
-		return nil, status.Error(codes.Internal,
-			fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
-				devicePath, stagingTargetPath, fstype, options, err))
+	// Mount device to stagingTargetPath
+	// If LUKS is enabled, format the device accordingly
+	if err := ns.mountVolume(devicePath, req); err != nil {
+		return nil, err
 	}
 
 	return &csi.NodeStageVolumeResponse{}, nil
@@ -299,9 +260,9 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 		return nil, err
 	}
 
-	err := mount.CleanupMountPoint(stagingTargetPath, ns.Mounter.Interface, true /* bind mount */)
+	err = mount.CleanupMountPoint(req.GetStagingTargetPath(), ns.Mounter.Interface, true /* bind mount */)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", req.GetStagingTargetPath(), err))
 	}
 
 	// If LUKS volume is used, close the LUKS device
