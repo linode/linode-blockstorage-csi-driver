@@ -29,6 +29,34 @@ import (
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 )
+// ValidateNodeStageVolumeRequest validates the node stage volume request.
+// It validates the volume ID, staging target path, and volume capability.
+func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) error {
+	if req.GetVolumeId() == "" {
+		return errNoVolumeID
+	}
+	if req.GetStagingTargetPath() == "" {
+		return errNoStagingTargetPath
+	}
+	if req.GetVolumeCapability() == nil {
+		return errNoVolumeCapability
+	}
+	return nil
+
+}
+
+// validateNodeUnstageVolumeRequest validates the node unstage volume request.
+// It validates the volume ID and staging target path.
+func validateNodeUnstageVolumeRequest(req *csi.NodeUnstageVolumeRequest) error {
+	if req.GetVolumeId() == "" {
+		return errNoVolumeID
+	}
+	if req.GetStagingTargetPath() == "" {
+		return errNoStagingTargetPath
+	}
+	return nil
+
+}
 // closeMountSources closes any LUKS-encrypted mount sources associated with the given path.
 // It retrieves mount sources, checks if each source is a LUKS mapping, and closes it if so.
 // Returns an error if any operation fails during the process.

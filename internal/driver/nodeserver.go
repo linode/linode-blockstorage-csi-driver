@@ -193,21 +193,13 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	defer ns.mux.Unlock()
 	klog.V(4).Infof("NodeStageVolume called with req: %#v", req)
 
-	// Validate Arguments
-	volumeKey := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-	volumeCapability := req.GetVolumeCapability()
-	if len(volumeKey) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume ID must be provided")
-	}
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Staging Target Path must be provided")
-	}
-	if volumeCapability == nil {
-		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
+	// Before to start, validate the request object (NodeStageVolumeRequest)
+	if err := validateNodeStageVolumeRequest(req); err != nil {
+		return nil, err
 	}
 
-	key, err := common.ParseLinodeVolumeKey(volumeKey)
+	// Get the LinodeVolumeKey which we need to find the device path
+	LinodeVolumeKey, err := common.ParseLinodeVolumeKey(req.GetVolumeId())
 	if err != nil {
 		return nil, err
 	}
@@ -311,14 +303,11 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	klog.V(4).Infof("NodeUnstageVolume called with req: %#v", req)
-	// Validate arguments
-	volumeID := req.GetVolumeId()
-	stagingTargetPath := req.GetStagingTargetPath()
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Volume ID must be provided")
-	}
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Staging Target Path must be provided")
+
+	// Validate req (NodeUnstageVolumeRequest)
+	err := validateNodeUnstageVolumeRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
 	err := mount.CleanupMountPoint(stagingTargetPath, ns.Mounter.Interface, true /* bind mount */)
