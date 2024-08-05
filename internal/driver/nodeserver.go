@@ -204,36 +204,22 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 		return nil, err
 	}
 
-	// Part 1: Get device path of attached device
+	// Get device path of attached device
 	partition := ""
 
 	if part, ok := req.GetVolumeContext()["partition"]; ok {
 		partition = part
 	}
 
-	deviceName := key.GetNormalizedLabel()
-	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
-	devicePath, err := ns.DeviceUtils.VerifyDevicePath(devicePaths)
+	devicePath, err := ns.findDevicePath(*LinodeVolumeKey, partition)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err))
-	}
-	if devicePath == "" {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Unable to find device path out of attempted paths: %v", devicePaths))
+		return nil, err
 	}
 
-	klog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
-
-	// Part 2: Check if mount already exists at targetpath
-	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
+	// Check if staging target path is a valid mount point.
+	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), NewFileSystem())
 	if err != nil {
-		if os.IsNotExist(err) {
-			if err := os.MkdirAll(stagingTargetPath, os.FileMode(0755)); err != nil {
-				return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", stagingTargetPath, err))
-			}
-			notMnt = true
-		} else {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("Unknown error when checking mount point (%q): %v", stagingTargetPath, err))
-		}
+		return nil, err
 	}
 
 	if !notMnt {

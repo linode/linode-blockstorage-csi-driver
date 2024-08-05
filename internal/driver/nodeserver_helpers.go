@@ -57,6 +57,52 @@ func validateNodeUnstageVolumeRequest(req *csi.NodeUnstageVolumeRequest) error {
 	return nil
 
 }
+// findDevicePath locates the device path for a Linode Volume.
+//
+// It uses the provided LinodeVolumeKey and partition information to generate
+// possible device paths, then verifies which path actually exists on the system.
+func (ns *LinodeNodeServer) findDevicePath(key common.LinodeVolumeKey, partition string) (string, error) {
+	// Get the device name and paths from the LinodeVolumeKey and partition.
+	deviceName := key.GetNormalizedLabel()
+	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
+
+	// Verify the device path by checking if any of the paths exist.
+	devicePath, err := ns.DeviceUtils.VerifyDevicePath(devicePaths)
+	if err != nil {
+		return "", status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v",
+			key.GetVolumeLabel(), err))
+	}
+
+	// If no device path is found, return an error.
+	if devicePath == "" {
+		return "", status.Error(codes.Internal, fmt.Sprintf("Unable to find device path out of attempted paths: %v",
+			devicePaths))
+	}
+
+	// If a device path is found, return it.
+	klog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
+	return devicePath, nil
+}
+
+// ensureMountPoint checks if the staging target path is a mount point or not.
+// If not, it creates a directory at the target path.
+func (ns *LinodeNodeServer) ensureMountPoint(stagingTargetPath string, fs FileSystem) (bool, error) {
+	// Check if the staging target path is a mount point.
+	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
+	if err != nil {
+		// Checking IsNotExist returns true. If true, it mean we need to create directory at the target path.
+		if fs.IsNotExist(err) {
+			// Create the directory with read-write permissions for the owner.
+			if err := fs.MkdirAll(stagingTargetPath, rwPermission); err != nil {
+				return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", stagingTargetPath, err))
+			}
+		} else {
+			// If the error is unknown, return an error.
+			return true, status.Error(codes.Internal, fmt.Sprintf("Unknown error when checking mount point (%q): %v", stagingTargetPath, err))
+		}
+	}
+	return notMnt, nil
+}
 // closeMountSources closes any LUKS-encrypted mount sources associated with the given path.
 // It retrieves mount sources, checks if each source is a LUKS mapping, and closes it if so.
 // Returns an error if any operation fails during the process.
