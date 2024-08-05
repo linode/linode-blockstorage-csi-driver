@@ -754,19 +754,12 @@ func TestLinodeNodeServer_mountVolume(t *testing.T) {
 		},
 	}
 
-	skipOnLinux := map[string]bool{
-		"Success - Mount the volume":         true,
-		"Error - Unable to mount the volume": true,
-		"Success - mount LUKS volume":        true,
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			// Skip test on Linux for now (TEMP SOLUTION)
-			// TODO: Separate out tests for Linux and non-Linux
-			if runtime.GOOS == "linux" && skipOnLinux[tt.name] {
-				t.Skipf("Skipping test '%s' on Linux", tt.name)
+			// Skip this test on Linux. Linux supported alternative test case can be found in nodeserver_helpers_linux_test.go
+			if runtime.GOOS == "linux" {
+				t.Skipf("Skipping test on Linux")
 			}
 
 			ctrl := gomock.NewController(t)
