@@ -20,7 +20,8 @@ type (
 	}
 )
 
-const linodeBSLabelLength = 32
+// TODO: Rename this variable
+const LinodeVolumeLabelLength = 32
 
 func hashStringToInt(b string) int {
 	algorithm := fnv.New32a()
@@ -102,8 +103,8 @@ func (key *LinodeVolumeKey) GetVolumeLabel() string {
 
 func (key *LinodeVolumeKey) GetNormalizedLabel() string {
 	label := key.Label
-	if len(label) > linodeBSLabelLength {
-		label = label[:linodeBSLabelLength]
+	if len(label) > LinodeVolumeLabelLength {
+		label = label[:LinodeVolumeLabelLength]
 	}
 
 	return label
@@ -111,8 +112,8 @@ func (key *LinodeVolumeKey) GetNormalizedLabel() string {
 
 func (key *LinodeVolumeKey) GetNormalizedLabelWithPrefix(prefix string) string {
 	label := prefix + key.GetNormalizedLabel()
-	if len(label) > linodeBSLabelLength {
-		label = label[:linodeBSLabelLength]
+	if len(label) > LinodeVolumeLabelLength {
+		label = label[:LinodeVolumeLabelLength]
 	}
 	return label
 }
