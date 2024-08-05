@@ -40,8 +40,11 @@ type LinodeNodeServer struct {
 	DeviceUtils   mountmanager.DeviceUtils
 	CloudProvider linodeclient.LinodeClient
 	Metadata      Metadata
+	Encrypt       Encryption
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
+
+	csi.UnimplementedNodeServer
 }
 
 var _ csi.NodeServer = &LinodeNodeServer{}

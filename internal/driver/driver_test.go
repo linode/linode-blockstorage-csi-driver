@@ -54,6 +54,9 @@ func TestDriverSuite(t *testing.T) {
 
 	mounter := mountmanager.NewFakeSafeMounter()
 	deviceUtils := mountmanager.NewFakeDeviceUtils()
+	// TODO: Replace by mock implementation later
+	fileSystem := NewFileSystem()
+	encrypt := NewLuksEncryption(mounter.Exec, fileSystem)
 
 	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), ts.URL)
 	if err != nil {
@@ -68,7 +71,7 @@ func TestDriverSuite(t *testing.T) {
 		Memory: 4 << 30, // 4GiB
 	}
 	linodeDriver := GetLinodeDriver()
-	if err := linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix); err != nil {
+	if err := linodeDriver.SetupLinodeDriver(fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix, encrypt); err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 

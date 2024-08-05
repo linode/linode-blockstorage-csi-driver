@@ -73,6 +73,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	name,
 	vendorVersion,
 	volumeLabelPrefix string,
+	encrypt Encryption,
 ) error {
 	if name == "" {
 		return fmt.Errorf("driver name missing")
@@ -102,7 +103,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 
 	// Set up RPC Servers
 	linodeDriver.ids = NewIdentityServer(linodeDriver)
-	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata)
+	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt)
 
 	cs, err := NewControllerServer(linodeDriver, linodeClient, metadata)
 	if err != nil {
@@ -133,13 +134,14 @@ func NewIdentityServer(linodeDriver *LinodeDriver) *LinodeIdentityServer {
 	}
 }
 
-func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, cloudProvider linodeclient.LinodeClient, metadata Metadata) *LinodeNodeServer {
+func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, cloudProvider linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) *LinodeNodeServer {
 	return &LinodeNodeServer{
 		Driver:        linodeDriver,
 		Mounter:       mounter,
 		DeviceUtils:   deviceUtils,
 		CloudProvider: cloudProvider,
 		Metadata:      metadata,
+		Encrypt:       encrypt,
 	}
 }
 

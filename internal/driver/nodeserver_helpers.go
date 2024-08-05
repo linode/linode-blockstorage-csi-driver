@@ -29,6 +29,50 @@ import (
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 )
+
+const (
+	defaultFSType = "ext4"
+	rwPermission  = os.FileMode(0755)
+)
+
+type Mounter interface {
+	mount.Interface
+}
+
+type Executor interface {
+	utilexec.Interface
+}
+
+type Command interface {
+	utilexec.Cmd
+}
+
+// FileSystem defines the methods for file system operations.
+type FileSystem interface {
+	IsNotExist(err error) bool
+	MkdirAll(path string, perm os.FileMode) error
+	Stat(name string) (fs.FileInfo, error)
+}
+
+// OSFileSystem implements FileSystemInterface using the os package.
+type OSFileSystem struct{}
+
+func NewFileSystem() FileSystem {
+	return OSFileSystem{}
+}
+
+func (OSFileSystem) IsNotExist(err error) bool {
+	return os.IsNotExist(err)
+}
+
+func (OSFileSystem) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+
+func (OSFileSystem) Stat(name string) (fs.FileInfo, error) {
+	return os.Stat(name)
+}
+
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
 // It validates the volume ID, staging target path, and volume capability.
 func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) error {
