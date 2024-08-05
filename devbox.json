@@ -10,7 +10,10 @@
     "kustomize@latest",
     "kyverno-chainsaw@latest",
     "yq-go@latest",
-    "envsubst@latest"
+    "envsubst@latest",
+    "mockgen@latest",
+    "jq@latest",
+    "openssl@latest"
   ],
   "shell": {
     "init_hook": [
