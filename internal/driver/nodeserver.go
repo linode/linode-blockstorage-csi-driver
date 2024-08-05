@@ -160,26 +160,6 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func getMountSources(target string) ([]string, error) {
-	_, err := exec.LookPath("findmnt")
-	if err != nil {
-		if err == exec.ErrNotFound {
-			return nil, fmt.Errorf("%q executable not found in $PATH", "findmnt")
-		}
-		return nil, err
-	}
-	out, err := exec.Command("sh", "-c", fmt.Sprintf("findmnt -o SOURCE -n -M %s", target)).CombinedOutput()
-	if err != nil {
-		// findmnt exits with non zero exit status if it couldn't find anything
-		if strings.TrimSpace(string(out)) == "" {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("checking mounted failed: %v cmd: %q output: %q",
-			err, "findmnt", string(out))
-	}
-	return strings.Split(string(out), "\n"), nil
-}
-
 func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
@@ -200,7 +180,8 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 
 	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, targetPath)
 
-	if err := closeMountSources(targetPath); err != nil {
+	// If LUKS volume is used, close the LUKS device
+	if err := ns.closeLuksMountSources(targetPath); err != nil {
 		return nil, err
 	}
 
@@ -345,33 +326,12 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err))
 	}
 
-	if err := closeMountSources(stagingTargetPath); err != nil {
+	// If LUKS volume is used, close the LUKS device
+	if err := ns.closeLuksMountSources(req.GetStagingTargetPath()); err != nil {
 		return nil, err
 	}
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
-}
-
-func closeMountSources(path string) error {
-	mountSources, err := getMountSources(path)
-	if err != nil {
-		return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to to get mount sources %s: %v", path, err))
-	}
-	klog.V(4).Info("closing mount sources: ", mountSources)
-	for _, source := range mountSources {
-		isLuksMapping, mappingName, err := isLuksMapping(source)
-		if err != nil {
-			return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err))
-		}
-		if isLuksMapping {
-			klog.V(4).Infof("luksClose %s", mappingName)
-			if err := luksClose(mappingName); err != nil {
-				return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to close luks mount %s: %v", path, err))
-			}
-		}
-	}
-
-	return nil
 }
 
 func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
