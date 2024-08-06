@@ -11,8 +11,8 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 
 	"go.uber.org/mock/gomock"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 )
 
 func TestLinodeNodeServer_mountVolume_linux(t *testing.T) {

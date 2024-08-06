@@ -15,8 +15,8 @@ limitations under the License.
 package mountmanager
 
 import (
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 )
 
 func NewSafeMounter() *mount.SafeFormatAndMount {

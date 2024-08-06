@@ -12,8 +12,8 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 )
 
 func newSafeMounter() *mount.SafeFormatAndMount {
