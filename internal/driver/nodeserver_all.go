@@ -3,7 +3,6 @@
 package driver
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -13,7 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func nodeGetVolumeStats(req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	if req.VolumeId == "" || req.VolumePath == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID or path empty")
 	}
