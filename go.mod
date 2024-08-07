@@ -14,7 +14,11 @@ require (
 	google.golang.org/protobuf v1.34.2
 	k8s.io/apimachinery v0.19.2
 	k8s.io/klog/v2 v2.130.1
+<<<<<<< HEAD
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+=======
+	k8s.io/utils v0.0.0-20201005171033-6301aaf42dc7
+>>>>>>> main
 )
 
 require (
