@@ -17,8 +17,8 @@ import (
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
+	mount "k8s.io/mount-utils"
 	exec "k8s.io/utils/exec"
-	mount "k8s.io/utils/mount"
 )
 
 // MockMounter is a mock of Mounter interface.
@@ -42,6 +42,20 @@ func NewMockMounter(ctrl *gomock.Controller) *MockMounter {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockMounter) EXPECT() *MockMounterMockRecorder {
 	return m.recorder
+}
+
+// CanSafelySkipMountPointCheck mocks base method.
+func (m *MockMounter) CanSafelySkipMountPointCheck() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CanSafelySkipMountPointCheck")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// CanSafelySkipMountPointCheck indicates an expected call of CanSafelySkipMountPointCheck.
+func (mr *MockMounterMockRecorder) CanSafelySkipMountPointCheck() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanSafelySkipMountPointCheck", reflect.TypeOf((*MockMounter)(nil).CanSafelySkipMountPointCheck))
 }
 
 // GetMountRefs mocks base method.
@@ -72,6 +86,21 @@ func (m *MockMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 func (mr *MockMounterMockRecorder) IsLikelyNotMountPoint(file any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsLikelyNotMountPoint", reflect.TypeOf((*MockMounter)(nil).IsLikelyNotMountPoint), file)
+}
+
+// IsMountPoint mocks base method.
+func (m *MockMounter) IsMountPoint(file string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsMountPoint", file)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsMountPoint indicates an expected call of IsMountPoint.
+func (mr *MockMounterMockRecorder) IsMountPoint(file any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsMountPoint", reflect.TypeOf((*MockMounter)(nil).IsMountPoint), file)
 }
 
 // List mocks base method.
@@ -115,6 +144,34 @@ func (m *MockMounter) MountSensitive(source, target, fstype string, options, sen
 func (mr *MockMounterMockRecorder) MountSensitive(source, target, fstype, options, sensitiveOptions any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitive", reflect.TypeOf((*MockMounter)(nil).MountSensitive), source, target, fstype, options, sensitiveOptions)
+}
+
+// MountSensitiveWithoutSystemd mocks base method.
+func (m *MockMounter) MountSensitiveWithoutSystemd(source, target, fstype string, options, sensitiveOptions []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MountSensitiveWithoutSystemd", source, target, fstype, options, sensitiveOptions)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MountSensitiveWithoutSystemd indicates an expected call of MountSensitiveWithoutSystemd.
+func (mr *MockMounterMockRecorder) MountSensitiveWithoutSystemd(source, target, fstype, options, sensitiveOptions any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitiveWithoutSystemd", reflect.TypeOf((*MockMounter)(nil).MountSensitiveWithoutSystemd), source, target, fstype, options, sensitiveOptions)
+}
+
+// MountSensitiveWithoutSystemdWithMountFlags mocks base method.
+func (m *MockMounter) MountSensitiveWithoutSystemdWithMountFlags(source, target, fstype string, options, sensitiveOptions, mountFlags []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MountSensitiveWithoutSystemdWithMountFlags", source, target, fstype, options, sensitiveOptions, mountFlags)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MountSensitiveWithoutSystemdWithMountFlags indicates an expected call of MountSensitiveWithoutSystemdWithMountFlags.
+func (mr *MockMounterMockRecorder) MountSensitiveWithoutSystemdWithMountFlags(source, target, fstype, options, sensitiveOptions, mountFlags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitiveWithoutSystemdWithMountFlags", reflect.TypeOf((*MockMounter)(nil).MountSensitiveWithoutSystemdWithMountFlags), source, target, fstype, options, sensitiveOptions, mountFlags)
 }
 
 // Unmount mocks base method.

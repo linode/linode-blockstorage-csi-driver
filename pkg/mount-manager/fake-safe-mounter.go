@@ -15,13 +15,13 @@ limitations under the License.
 package mountmanager
 
 import (
-	exectesting "k8s.io/utils/exec/testing"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
+	testingexec "k8s.io/utils/exec/testing"
 )
 
 func NewFakeSafeMounter() *mount.SafeFormatAndMount {
 	fakeMounter := &mount.FakeMounter{MountPoints: []mount.MountPoint{}}
-	fakeExec := &exectesting.FakeExec{DisableScripts: true}
+	fakeExec := &testingexec.FakeExec{DisableScripts: true}
 	return &mount.SafeFormatAndMount{
 		Interface: fakeMounter,
 		Exec:      fakeExec,
