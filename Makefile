@@ -21,15 +21,14 @@ vet: fmt
 .PHONY: lint
 lint: vet
 	docker run --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
-	docker run --rm -v $(PWD):/app -w /app/e2e ${GOLANGCI_LINT_IMG} golangci-lint run -v
 
 .PHONY: test
-test: vet verify
-	go test -v ./... -cover $(TEST_ARGS)
+test: vet verify generate-mock
+	go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS)
 
 .PHONY: elevated-test
 elevated-test:
-	sudo go test -v ./... -cover -tags=elevated $(TEST_ARGS)
+	sudo go test `go list ./... | grep -v ./mocks$$` -cover -tags=elevated $(TEST_ARGS)
 
 .PHONY: build
 build:
@@ -63,6 +62,10 @@ release:
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
 
+.PHONY: generate-mock
+generate-mock:
+	mockgen -source=internal/driver/nodeserver_helpers.go -destination=mocks/mock_nodeserver.go -package=mocks
+	mockgen -source=pkg/mount-manager/device-utils.go -destination=mocks/mock_deviceutils.go -package=mocks
 
 ## --------------------------------------
 ## Testing
@@ -117,7 +120,7 @@ local-deploy:
 cleanup-cluster:
 	-kubectl delete cluster $(TEST_CLUSTER_NAME)
 	-kind delete cluster -n capl
-	-rm -f luks.key ssh_key ssh_key.pub
+	-rm -f luks.key
 
 .PHONY: e2e-test
 e2e-test:

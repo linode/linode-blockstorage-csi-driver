@@ -24,13 +24,11 @@ package driver
 import (
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	"k8s.io/klog/v2"
+	utilexec "k8s.io/utils/exec"
 )
 
 type LuksContext struct {
@@ -81,6 +79,18 @@ func (ctx *LuksContext) validate() error {
 	return err
 }
 
+type Encryption struct {
+	Exec       Executor
+	FileSystem FileSystem
+}
+
+func NewLuksEncryption(executor utilexec.Interface, fileSystem FileSystem) Encryption {
+	return Encryption{
+		Exec:       executor,
+		FileSystem: fileSystem,
+	}
+}
+
 func getLuksContext(secrets map[string]string, context map[string]string, lifecycle VolumeLifecycle) LuksContext {
 	if context[LuksEncryptedAttribute] != "true" {
 		return LuksContext{
@@ -104,8 +114,8 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 	}
 }
 
-func luksFormat(ctx LuksContext, source string) error {
-	cryptsetupCmd, err := getCryptsetupCmd()
+func (e *Encryption) luksFormat(ctx LuksContext, source string) error {
+	cryptsetupCmd, err := e.getCryptsetupCmd()
 	if err != nil {
 		return err
 	}
@@ -122,20 +132,10 @@ func luksFormat(ctx LuksContext, source string) error {
 
 	klog.V(4).Info("executing cryptsetup luksFormat command ", cryptsetupArgs)
 
-	cmd := exec.Command(cryptsetupCmd, cryptsetupArgs...)
+	cmd := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...)
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %w", err)
-	}
-
-	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
-		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %w, closing pipe: %w", err, stdin.Close())
-	}
-
-	if err := stdin.Close(); err != nil {
-		return fmt.Errorf("failed to close stdin pipe, got err: %w", err)
-	}
+	// Set the encryption key as stdin
+	cmd.SetStdin(strings.NewReader(ctx.EncryptionKey))
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -145,14 +145,14 @@ func luksFormat(ctx LuksContext, source string) error {
 
 	// open the luks partition
 	klog.V(4).Info("luksOpen ", source)
-	err = luksOpen(ctx, source)
+	err = e.luksOpen(ctx, source)
 	if err != nil {
 		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
 	}
 
 	defer func() {
-		if e := luksClose(ctx.VolumeName); e != nil {
+		if e := e.luksClose(ctx.VolumeName); e != nil {
 			klog.Errorf("cannot close luks device: %s", e.Error())
 		}
 	}()
@@ -163,15 +163,15 @@ func luksFormat(ctx LuksContext, source string) error {
 }
 
 // prepares a luks-encrypted volume for mounting and returns the path of the mapped volume
-func luksPrepareMount(ctx LuksContext, source string) (string, error) {
-	if err := luksOpen(ctx, source); err != nil {
+func (e *Encryption) luksPrepareMount(ctx LuksContext, source string) (string, error) {
+	if err := e.luksOpen(ctx, source); err != nil {
 		return "", err
 	}
 	return "/dev/mapper/" + ctx.VolumeName, nil
 }
 
-func luksClose(volume string) error {
-	cryptsetupCmd, err := getCryptsetupCmd()
+func (e *Encryption) luksClose(volume string) error {
+	cryptsetupCmd, err := e.getCryptsetupCmd()
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func luksClose(volume string) error {
 
 	klog.V(4).Info("executing cryptsetup close command")
 
-	out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
+	out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("removing luks mapping failed: %w cmd: '%s %s' output: %q",
 			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
@@ -187,14 +187,14 @@ func luksClose(volume string) error {
 	return nil
 }
 
-func luksOpen(ctx LuksContext, volume string) error {
+func (e *Encryption) luksOpen(ctx LuksContext, volume string) error {
 	// check if the luks volume is already open
-	if _, err := os.Stat("/dev/mapper/" + ctx.VolumeName); !os.IsNotExist(err) {
+	if _, err := e.FileSystem.Stat("/dev/mapper/" + ctx.VolumeName); !e.FileSystem.IsNotExist(err) {
 		klog.V(4).Infof("luks volume is already open %s", volume)
 		return nil
 	}
 
-	cryptsetupCmd, err := getCryptsetupCmd()
+	cryptsetupCmd, err := e.getCryptsetupCmd()
 	if err != nil {
 		return err
 	}
@@ -206,19 +206,10 @@ func luksOpen(ctx LuksContext, volume string) error {
 	}
 	klog.V(4).Info("executing cryptsetup luksOpen command")
 
-	cmd := exec.Command(cryptsetupCmd, cryptsetupArgs...)
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("failed to get stdin pipe for cryptsetup, got err: %w", err)
-	}
+	cmd := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...)
 
-	if _, err := io.WriteString(stdin, ctx.EncryptionKey); err != nil {
-		return fmt.Errorf("failed to write to stdin pipe for cryptsetup, got err: %w, closing pipe: %w", err, stdin.Close())
-	}
-
-	if err := stdin.Close(); err != nil {
-		return fmt.Errorf("failed to close stdin pipe, got err: %w", err)
-	}
+	// Set the encryption key as stdin
+	cmd.SetStdin(strings.NewReader(ctx.EncryptionKey))
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -229,16 +220,16 @@ func luksOpen(ctx LuksContext, volume string) error {
 }
 
 // check is a given mapping under /dev/mapper is a luks volume
-func isLuksMapping(volume string) (bool, string, error) {
+func (e *Encryption) isLuksMapping(volume string) (bool, string, error) {
 	if strings.HasPrefix(volume, "/dev/mapper/") {
 		mappingName := volume[len("/dev/mapper/"):]
-		cryptsetupCmd, err := getCryptsetupCmd()
+		cryptsetupCmd, err := e.getCryptsetupCmd()
 		if err != nil {
 			return false, mappingName, err
 		}
 		cryptsetupArgs := []string{"status", mappingName}
 
-		out, err := exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
+		out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
 		if err != nil {
 			return false, mappingName, nil
 		}
@@ -255,9 +246,9 @@ func isLuksMapping(volume string) (bool, string, error) {
 	return false, "", nil
 }
 
-func getCryptsetupCmd() (string, error) {
+func (e *Encryption) getCryptsetupCmd() (string, error) {
 	cryptsetupCmd := "cryptsetup"
-	_, err := exec.LookPath(cryptsetupCmd)
+	_, err := e.Exec.LookPath(cryptsetupCmd)
 	if err != nil {
 		if err == exec.ErrNotFound {
 			return "", fmt.Errorf("%q executable not found in $PATH", cryptsetupCmd)
@@ -267,13 +258,13 @@ func getCryptsetupCmd() (string, error) {
 	return cryptsetupCmd, nil
 }
 
-func blkidValid(source string) (bool, error) {
+func (e *Encryption) blkidValid(source string) (bool, error) {
 	if source == "" {
 		return false, errors.New("invalid source")
 	}
 
 	blkidCmd := "blkid"
-	_, err := exec.LookPath(blkidCmd)
+	_, err := e.Exec.LookPath(blkidCmd)
 	if err != nil {
 		if err == exec.ErrNotFound {
 			return false, fmt.Errorf("%q executable invalid", blkidCmd)
@@ -284,15 +275,15 @@ func blkidValid(source string) (bool, error) {
 	blkidArgs := []string{source}
 
 	exitCode := 0
-	cmd := exec.Command(blkidCmd, blkidArgs...)
+	cmd := e.Exec.Command(blkidCmd, blkidArgs...)
 	err = cmd.Run()
 	if err != nil {
-		exitError, ok := err.(*exec.ExitError)
+		exitError, ok := err.(utilexec.ExitError)
 		if !ok {
 			return false, fmt.Errorf("checking blkdid failed: %w cmd: %q, args: %q", err, blkidCmd, blkidArgs)
 		}
-		ws := exitError.Sys().(syscall.WaitStatus)
-		exitCode = ws.ExitStatus()
+		// ws := exitError.Sys().(syscall.WaitStatus)
+		exitCode = exitError.ExitStatus()
 		if exitCode == 2 {
 			return false, nil
 		}

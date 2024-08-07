@@ -97,6 +97,8 @@ func handle() error {
 
 	mounter := mountmanager.NewSafeMounter()
 	deviceUtils := mountmanager.NewDeviceUtils()
+	fileSystem := driver.NewFileSystem()
+	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem)
 
 	metadata, err := driver.GetMetadata(context.Background())
 	if err != nil {
@@ -114,6 +116,7 @@ func handle() error {
 		driver.Name,
 		vendorVersion,
 		cfg.volumeLabelPrefix,
+		encrypt,
 	); err != nil {
 		return fmt.Errorf("setup driver: %v", err)
 	}

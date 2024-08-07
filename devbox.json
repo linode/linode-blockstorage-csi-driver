@@ -11,6 +11,7 @@
     "kyverno-chainsaw@latest",
     "yq-go@latest",
     "envsubst@latest",
+    "mockgen@latest",
     "jq@latest",
     "openssl@latest"
   ],
