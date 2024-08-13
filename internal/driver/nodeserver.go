@@ -279,8 +279,7 @@ func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeE
 	klog.V(4).Infof("NodeExpandVolume called with req: %#v", req)
 
 	// Validate req (NodeExpandVolumeRequest)
-	err := validateNodeExpandVolumeRequest(req)
-	if err != nil {
+	if err := validateNodeExpandVolumeRequest(req); err != nil {
 		return nil, err
 	}
 
@@ -294,9 +293,7 @@ func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeE
 	if err != nil {
 		return nil, errInternal("marshal json filter: %v", err)
 	}
-	_, err = ns.CloudProvider.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
-	if err != nil {
-		fmt.Printf("list volumes: %v\n", err)
+	if _, err = ns.CloudProvider.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
 		return nil, status.Errorf(codes.NotFound, "list volumes: %v", err)
 	}
 
