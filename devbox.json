@@ -23,7 +23,8 @@
       "local-deploy": "make local-deploy",
       "remote-cluster-deploy": "make remote-cluster-deploy",
       "e2e-test": "make e2e-test",
-      "cleanup-cluster": "make cleanup-cluster"
+      "cleanup-cluster": "make cleanup-cluster",
+      "csi-sanity-test": "make csi-sanity-test"
     }
   },
   "env": {
