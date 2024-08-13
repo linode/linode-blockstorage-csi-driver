@@ -1,6 +1,5 @@
 {
   "packages": [
-    "go_1_22@latest",
     "ginkgo@latest",
     "ctlptl@latest",
     "clusterctl@latest",
@@ -13,11 +12,12 @@
     "envsubst@latest",
     "mockgen@latest",
     "jq@latest",
-    "openssl@latest"
+    "openssl@latest",
+    "go@1.22.5"
   ],
   "shell": {
     "init_hook": [
-      "export GOROOT=$(go env GOROOT)"
+      "echo 'Welcome to devbox!' > /dev/null"
     ],
     "scripts": {
       "local-deploy": "make local-deploy",
