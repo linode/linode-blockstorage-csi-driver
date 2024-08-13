@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"github.com/linode/linodego"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -275,6 +277,28 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 
 func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	klog.V(4).Infof("NodeExpandVolume called with req: %#v", req)
+
+	// Validate req (NodeExpandVolumeRequest)
+	err := validateNodeExpandVolumeRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check linode to see if a give volume exists by volume ID
+	// Make call to linode api using the lindoe api client
+	LinodeVolumeKey, err := common.ParseLinodeVolumeKey(req.GetVolumeId())
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "Error parsing linode volume key: %v", err)
+	}
+	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
+	if err != nil {
+		return nil, errInternal("marshal json filter: %v", err)
+	}
+	_, err = ns.CloudProvider.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
+	if err != nil {
+		fmt.Printf("list volumes: %v\n", err)
+		return nil, status.Errorf(codes.NotFound, "list volumes: %v", err)
+	}
 
 	return &csi.NodeExpandVolumeResponse{
 		CapacityBytes: req.CapacityRange.RequiredBytes,
