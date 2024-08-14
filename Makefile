@@ -126,3 +126,7 @@ cleanup-cluster:
 e2e-test:
 	openssl rand -out luks.key 64
 	KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./e2e/test --parallel 2
+
+.PHONY: csi-sanity-test
+csi-sanity-test:
+	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/csi-sanity.sh

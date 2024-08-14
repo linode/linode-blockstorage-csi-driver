@@ -1,0 +1,41 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-socat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-socat
+  template:
+    metadata:
+      labels:
+        app: csi-socat
+    spec:
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: csi-linode-controller
+            topologyKey: kubernetes.io/hostname
+            namespaces:
+            - kube-system
+      containers:
+        - name: socat
+          image: alpine/socat:1.0.3
+          args:
+            - tcp-listen:10000,fork,reuseaddr
+            - unix-connect:/csi/csi.sock
+          volumeMounts:
+          - mountPath: /csi
+            name: plugin-dir
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/plugins/linodebs.csi.linode.com
+          type: DirectoryOrCreate
+        name: plugin-dir
