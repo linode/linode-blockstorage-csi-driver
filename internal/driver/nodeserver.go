@@ -284,7 +284,7 @@ func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeE
 	}
 
 	// Check linode to see if a give volume exists by volume ID
-	// Make call to linode api using the lindoe api client
+	// Make call to linode api using the linode api client
 	LinodeVolumeKey, err := common.ParseLinodeVolumeKey(req.GetVolumeId())
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Error parsing linode volume key: %v", err)
