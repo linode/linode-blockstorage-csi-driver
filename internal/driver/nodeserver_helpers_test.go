@@ -922,3 +922,43 @@ func TestLinodeNodeServer_closeLuksMountSources(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateNodeExpandVolumeRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		req *csi.NodeExpandVolumeRequest
+		wantErr bool
+	}{
+		{
+			name: "Valid request",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:          "vol-123",
+				VolumePath: "/mnt/staging",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing volume ID",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:          "",
+				VolumePath: "/mnt/staging",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing staging target path",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:          "vol-123",
+				VolumePath: "",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodeExpandVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+				t.Errorf("validateNodeExpandVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
