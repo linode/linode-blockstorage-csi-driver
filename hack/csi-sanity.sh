@@ -10,10 +10,6 @@ DELETE_DIRECTORY="./tests/csi-sanity/rmdir_in_pod.sh"
 # Define the list of tests to skip as an array
 SKIP_TESTS=(
   "WithCapacity"
-  "Node Service NodeExpandVolume should fail when no volume id is provided"
-  "Node Service NodeExpandVolume should fail when no volume path is provided"
-  "Node Service NodeExpandVolume should fail when volume is not found"
-  "Node Service NodeExpandVolume should work if node-expand is called after node-publish"
   "should fail when requesting to create a volume with already existing name and different capacity"
   "should fail when the volume source volume is not found"
   "should fail when the volume is already published but is incompatible"
