@@ -82,3 +82,11 @@ func errInvalidVolumeCapability(capability *csi.VolumeCapability) error {
 func errInternal(format string, args ...any) error {
 	return status.Errorf(codes.Internal, format, args...)
 }
+
+// errAlreadyExists returns a gRPC error for an already existing resource.
+//
+// Parameters: format (string), args (...any)
+// Returns: error
+func errAlreadyExists(format string, args ...any) error {
+	return status.Errorf(codes.AlreadyExists, format, args...)
+}

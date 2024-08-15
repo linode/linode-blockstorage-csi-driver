@@ -136,10 +136,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	preKey := common.CreateLinodeVolumeKey(0, condensedName)
 
 	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+	targetSizeGB := bytesToGB(size)
 
 	klog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
-		"storage_size_giga_bytes": bytesToGB(size), // bytes -> GB
+		"storage_size_giga_bytes": targetSizeGB, // bytes -> GB
 		"volume_name":             volumeName,
 	})
 
@@ -152,9 +153,9 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
-	targetSizeGB := bytesToGB(size)
 
-	// Attempt to get info about the source volume.
+	// Attempt to get info about the source volume for 
+	// volume cloning if the datasource is provided in the PVC.
 	// sourceVolumeInfo will be null if no content source is defined.
 	contentSource := req.GetVolumeContentSource()
 	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
@@ -162,7 +163,8 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Attempt to create the volume while respecting idempotency
+	// Attempt to create the volume while respecting idempotency.
+	// If the content source is defined, the source volume will be cloned to create a new volume.
 	vol, err := cs.attemptCreateLinodeVolume(
 		ctx,
 		volumeName,
@@ -176,6 +178,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Attempt to resize the volume if necessary
 	if vol.Size != targetSizeGB {
+		if sourceVolumeInfo == nil {
+			// throw and error with grpc code already exits
+			return nil, errAlreadyExists("volume %d already exists of size %d", vol.ID, vol.Size)
+		}
+		// Not sure if we need to resize here?
 		klog.V(4).Infoln("resizing volume", map[string]interface{}{
 			"volume_id": vol.ID,
 			"old_size":  vol.Size,
