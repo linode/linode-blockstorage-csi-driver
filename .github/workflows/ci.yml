@@ -102,6 +102,10 @@ jobs:
       - name: Run CSI-Sanity Tests
         run: devbox run csi-sanity-test
 
+      - name: run upstream E2E Tests
+        if: github.head_ref == 'upstream-e2e-tests'
+        run: devbox run upstream-e2e-tests
+
       - name: Cleanup Resources
         if: always()
         run: devbox run cleanup-cluster

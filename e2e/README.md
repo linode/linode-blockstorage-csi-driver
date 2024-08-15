@@ -47,7 +47,7 @@ If you do not have PR open, follow the steps below:
 In order create a test cluster, run the following command:
 
 ```sh
-devbox run remote-cluster-deploy TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e
+TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e devbox run remote-cluster-deploy
 ```
 > You don't need to pass TEST_IMAGE_TAG and TEST_IMAGE_NAME if you have a PR open
 

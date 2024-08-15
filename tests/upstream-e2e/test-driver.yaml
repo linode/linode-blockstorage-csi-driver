@@ -1,0 +1,14 @@
+StorageClass:
+  FromName: true
+DriverInfo:
+  Name: linodebs.csi.linode.com
+  Capabilities:
+    block: true
+    controllerExpansion: false
+    exec: true
+    multipods: true
+    persistence: true
+    pvcDataSource: true
+    snapshotDataSource: false
+InlineVolumes:
+- Attributes: {}

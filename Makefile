@@ -7,6 +7,18 @@ IMAGE_TAG      ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.59-alpine
 RELEASE_DIR    ?= release
 
+#####################################################################
+# OS / ARCH
+#####################################################################
+OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(shell uname -m)
+ARCH_SHORT=$(ARCH)
+ifeq ($(ARCH_SHORT),x86_64)
+ARCH_SHORT := amd64
+else ifeq ($(ARCH_SHORT),aarch64)
+ARCH_SHORT := arm64
+endif
+
 .PHONY: ci
 ci: vet lint test build
 
@@ -93,6 +105,7 @@ remote-cluster-deploy:
 	clusterctl generate cluster $(TEST_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION) \
+		--control-plane-machine-count 1 --worker-machine-count 1 \
 		--flavor kubeadm-vpcless \
 		| yq 'select(.metadata.name != "$(TEST_CLUSTER_NAME)-csi-driver-linode")' \
 		| kubectl apply -f -
@@ -130,3 +143,7 @@ e2e-test:
 .PHONY: csi-sanity-test
 csi-sanity-test:
 	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/csi-sanity.sh
+
+.PHONY: upstream-e2e-tests
+upstream-e2e-tests:
+	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/upstream-e2e-tests.sh
