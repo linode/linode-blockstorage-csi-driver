@@ -6,8 +6,11 @@ metadata:
   name: pod-pvc-luks
 spec:
   bindings:
-      - name: lukskey
-        value: (env('LUKS_KEY'))
+    - name: lukskey
+      value: (env('LUKS_KEY'))
+    - name: nodes
+      # number of nodes in cluster
+      value: ((env('WORKER_NODES') | to_number(@)) + (env('CONTROLPLANE_NODES') | to_number(@)))
   steps:
     - name: Check if CSI Driver is deployed
       try:
