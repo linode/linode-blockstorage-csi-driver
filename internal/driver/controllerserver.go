@@ -115,9 +115,13 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, errNoVolumeName
 	}
 
+	// validate volume capabilities
 	volCapabilities := req.GetVolumeCapabilities()
 	if len(volCapabilities) == 0 {
 		return &csi.CreateVolumeResponse{}, errNoVolumeCapabilities
+	}
+	if !validVolumeCapabilities(volCapabilities) {
+		return &csi.CreateVolumeResponse{}, errInvalidVolumeCapability(volCapabilities)
 	}
 
 	capRange := req.GetCapacityRange()
@@ -285,9 +289,8 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	if cap == nil {
 		return &csi.ControllerPublishVolumeResponse{}, errNoVolumeCapability
 	}
-
-	if vc := req.GetVolumeCapability(); !validVolumeCapabilities([]*csi.VolumeCapability{vc}) {
-		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability(vc)
+	if !validVolumeCapabilities([]*csi.VolumeCapability{cap}) {
+		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability([]*csi.VolumeCapability{cap})
 	}
 
 	klog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
