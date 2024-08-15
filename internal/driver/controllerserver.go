@@ -180,21 +180,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Attempt to resize the volume if necessary
+	// If the existing volume size differs from the requested size, we throw an error.
 	if vol.Size != targetSizeGB {
 		if sourceVolumeInfo == nil {
-			// throw and error with grpc code already exits
+			// error with grpc code already exits
 			return nil, errAlreadyExists("volume %d already exists of size %d", vol.ID, vol.Size)
-		}
-		// Not sure if we need to resize here?
-		klog.V(4).Infoln("resizing volume", map[string]interface{}{
-			"volume_id": vol.ID,
-			"old_size":  vol.Size,
-			"new_size":  targetSizeGB,
-		})
-
-		if err := cs.client.ResizeVolume(ctx, vol.ID, targetSizeGB); err != nil {
-			return &csi.CreateVolumeResponse{}, errInternal("resize cloned volume (%d): %v", targetSizeGB, err)
 		}
 	}
 
