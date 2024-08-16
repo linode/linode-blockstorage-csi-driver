@@ -4,8 +4,8 @@ metadata:
   name: csi-linode-node
   namespace: kube-system
 status:
-  numberAvailable: 1
-  numberReady: 1
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
 ---
 apiVersion: apps/v1
 kind: StatefulSet

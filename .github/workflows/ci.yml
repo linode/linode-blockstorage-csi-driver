@@ -76,6 +76,7 @@ jobs:
       LINODE_REGION: us-sea
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
+      WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,6 +102,10 @@ jobs:
 
       - name: Run CSI-Sanity Tests
         run: devbox run csi-sanity-test
+
+      - name: run upstream E2E Tests
+        if: github.ref == 'refs/heads/main'
+        run: devbox run upstream-e2e-tests
 
       - name: Cleanup Resources
         if: always()

@@ -5,6 +5,10 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-expand-raw-block-storage
 spec:
+  bindings:
+    - name: nodes
+      # number of nodes in cluster
+      value: ((env('WORKER_NODES') | to_number(@)) + (env('CONTROLPLANE_NODES') | to_number(@)))
   steps:
     - name: Check if CSI Driver is deployed
       try:

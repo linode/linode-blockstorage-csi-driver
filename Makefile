@@ -7,6 +7,18 @@ IMAGE_TAG      ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG := golangci/golangci-lint:v1.59-alpine
 RELEASE_DIR    ?= release
 
+#####################################################################
+# OS / ARCH
+#####################################################################
+OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(shell uname -m)
+ARCH_SHORT=$(ARCH)
+ifeq ($(ARCH_SHORT),x86_64)
+ARCH_SHORT := amd64
+else ifeq ($(ARCH_SHORT),aarch64)
+ARCH_SHORT := arm64
+endif
+
 .PHONY: ci
 ci: vet lint test build
 
@@ -79,6 +91,8 @@ K8S_VERSION ?= "v1.29.1"
 CAPI_VERSION ?= "v1.6.3"
 HELM_VERSION ?= "v0.2.1"
 CAPL_VERSION ?= "v0.3.1"
+CONTROLPLANE_NODES ?= 1
+WORKER_NODES ?= 0
 
 # Setting unique cluster name
 TEST_CLUSTER_NAME ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
@@ -93,6 +107,7 @@ remote-cluster-deploy:
 	clusterctl generate cluster $(TEST_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
 		--infrastructure linode-linode:$(CAPL_VERSION) \
+		--control-plane-machine-count $(CONTROLPLANE_NODES) --worker-machine-count $(WORKER_NODES) \
 		--flavor kubeadm-vpcless \
 		| yq 'select(.metadata.name != "$(TEST_CLUSTER_NAME)-csi-driver-linode")' \
 		| kubectl apply -f -
@@ -125,8 +140,12 @@ cleanup-cluster:
 .PHONY: e2e-test
 e2e-test:
 	openssl rand -out luks.key 64
-	KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./e2e/test --parallel 2
+	CONTROLPLANE_NODES=$(CONTROLPLANE_NODES) WORKER_NODES=$(WORKER_NODES) KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./e2e/test --parallel 2
 
 .PHONY: csi-sanity-test
 csi-sanity-test:
 	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/csi-sanity.sh
+
+.PHONY: upstream-e2e-tests
+upstream-e2e-tests:
+	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/upstream-e2e-tests.sh
