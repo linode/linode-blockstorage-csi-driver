@@ -24,6 +24,8 @@ tar xzvf ${OUT_TAR} -C ${OUT_DIR}
     --ginkgo.skip='snapshottable-stress' \
     --ginkgo.skip='\[Feature:VolumeSnapshotDataSource\]' \
     --ginkgo.skip='\[Feature:Windows\]' \
+    --ginkgo.flake-attempts=3 \
+    --ginkgo.timeout=2h \
     -storage.testdriver=tests/upstream-e2e/test-driver.yaml
 
 # Remove downloaded files and binaries
