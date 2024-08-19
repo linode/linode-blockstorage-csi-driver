@@ -6,6 +6,7 @@ import "github.com/container-storage-interface/spec/lib/go/csi"
 // this driver's controller service.
 func ControllerServiceCapabilities() []*csi.ControllerServiceCapability {
 	capabilities := []csi.ControllerServiceCapability_RPC_Type{
+		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,

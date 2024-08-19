@@ -12,6 +12,9 @@ SKIP_TESTS=(
   "WithCapacity"
   # Need to skip it because we do not support volume snapshots
   "should fail when the volume source volume is not found" 
+  # This case fails because we currently do not support read only volume creation on the linode side
+  # but we are supporting it in the CSI driver by mounting the volume as read only
+  "should fail when the volume is already published but is incompatible"
 )
 
 # Join the array into a single string with '|' as the separator
