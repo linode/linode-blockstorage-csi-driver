@@ -21,6 +21,6 @@ LABEL description="Linode CSI Driver"
 
 COPY --from=builder /bin/linode-blockstorage-csi-driver /linode
 
-RUN apk add --no-cache e2fsprogs findmnt blkid cryptsetup
+RUN apk add --no-cache e2fsprogs findmnt blkid cryptsetup xfsprogs
 
 ENTRYPOINT ["/linode"]
