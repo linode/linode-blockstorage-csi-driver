@@ -174,15 +174,15 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 	}
 
 	// Unmount the target path and delete the remaining directory
-	err = mount.CleanupMountPoint(req.TargetPath, ns.Mounter.Interface, true /* bind mount */)
+	err = mount.CleanupMountPoint(req.GetTargetPath(), ns.Mounter.Interface, true /* bind mount */)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, req.TargetPath))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, req.GetTargetPath()))
 	}
 
-	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, req.TargetPath)
+	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, req.GetTargetPath())
 
 	// If LUKS volume is used, close the LUKS device
-	if err := ns.closeLuksMountSources(req.TargetPath); err != nil {
+	if err := ns.closeLuksMountSources(req.GetTargetPath()); err != nil {
 		return nil, err
 	}
 
