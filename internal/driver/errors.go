@@ -73,12 +73,20 @@ func errVolumeNotFound(volumeID int) error {
 	return status.Errorf(codes.NotFound, "volume not found: %d", volumeID)
 }
 
-func errInvalidVolumeCapability(capability *csi.VolumeCapability) error {
-	return status.Errorf(codes.InvalidArgument, "invalid volume capability: %s", capability)
+func errInvalidVolumeCapability(capability []*csi.VolumeCapability) error {
+	return status.Errorf(codes.InvalidArgument, "invalid volume capability: %v", capability)
 }
 
 // errInternal is a convenience function to return a gRPC error with an
 // INTERNAL status code.
 func errInternal(format string, args ...any) error {
 	return status.Errorf(codes.Internal, format, args...)
+}
+
+// errAlreadyExists returns a gRPC error for an already existing resource.
+//
+// Parameters: format (string), args (...any)
+// Returns: error
+func errAlreadyExists(format string, args ...any) error {
+	return status.Errorf(codes.AlreadyExists, format, args...)
 }

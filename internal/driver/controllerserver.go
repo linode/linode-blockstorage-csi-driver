@@ -115,9 +115,13 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, errNoVolumeName
 	}
 
+	// validate volume capabilities
 	volCapabilities := req.GetVolumeCapabilities()
 	if len(volCapabilities) == 0 {
 		return &csi.CreateVolumeResponse{}, errNoVolumeCapabilities
+	}
+	if !validVolumeCapabilities(volCapabilities) {
+		return &csi.CreateVolumeResponse{}, errInvalidVolumeCapability(volCapabilities)
 	}
 
 	capRange := req.GetCapacityRange()
@@ -136,10 +140,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	preKey := common.CreateLinodeVolumeKey(0, condensedName)
 
 	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+	targetSizeGB := bytesToGB(size)
 
 	klog.V(4).Infoln("create volume called", map[string]interface{}{
 		"method":                  "create_volume",
-		"storage_size_giga_bytes": bytesToGB(size), // bytes -> GB
+		"storage_size_giga_bytes": targetSizeGB, // bytes -> GB
 		"volume_name":             volumeName,
 	})
 
@@ -152,9 +157,9 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
-	targetSizeGB := bytesToGB(size)
 
-	// Attempt to get info about the source volume.
+	// Attempt to get info about the source volume for 
+	// volume cloning if the datasource is provided in the PVC.
 	// sourceVolumeInfo will be null if no content source is defined.
 	contentSource := req.GetVolumeContentSource()
 	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
@@ -162,7 +167,8 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Attempt to create the volume while respecting idempotency
+	// Attempt to create the volume while respecting idempotency.
+	// If the content source is defined, the source volume will be cloned to create a new volume.
 	vol, err := cs.attemptCreateLinodeVolume(
 		ctx,
 		volumeName,
@@ -174,16 +180,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Attempt to resize the volume if necessary
+	// If the existing volume size differs from the requested size, we throw an error.
 	if vol.Size != targetSizeGB {
-		klog.V(4).Infoln("resizing volume", map[string]interface{}{
-			"volume_id": vol.ID,
-			"old_size":  vol.Size,
-			"new_size":  targetSizeGB,
-		})
-
-		if err := cs.client.ResizeVolume(ctx, vol.ID, targetSizeGB); err != nil {
-			return &csi.CreateVolumeResponse{}, errInternal("resize cloned volume (%d): %v", targetSizeGB, err)
+		if sourceVolumeInfo == nil {
+			// error with grpc code already exits
+			return nil, errAlreadyExists("volume %d already exists of size %d", vol.ID, vol.Size)
 		}
 	}
 
@@ -278,9 +279,8 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	if cap == nil {
 		return &csi.ControllerPublishVolumeResponse{}, errNoVolumeCapability
 	}
-
-	if vc := req.GetVolumeCapability(); !validVolumeCapabilities([]*csi.VolumeCapability{vc}) {
-		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability(vc)
+	if !validVolumeCapabilities([]*csi.VolumeCapability{cap}) {
+		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability([]*csi.VolumeCapability{cap})
 	}
 
 	klog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
