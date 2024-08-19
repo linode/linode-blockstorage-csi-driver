@@ -926,13 +926,13 @@ func TestLinodeNodeServer_closeLuksMountSources(t *testing.T) {
 func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		req *csi.NodeExpandVolumeRequest
+		req     *csi.NodeExpandVolumeRequest
 		wantErr bool
 	}{
 		{
 			name: "Valid request",
 			req: &csi.NodeExpandVolumeRequest{
-				VolumeId:          "vol-123",
+				VolumeId:   "vol-123",
 				VolumePath: "/mnt/staging",
 			},
 			wantErr: false,
@@ -940,7 +940,7 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 		{
 			name: "Missing volume ID",
 			req: &csi.NodeExpandVolumeRequest{
-				VolumeId:          "",
+				VolumeId:   "",
 				VolumePath: "/mnt/staging",
 			},
 			wantErr: true,
@@ -948,7 +948,7 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 		{
 			name: "Missing staging target path",
 			req: &csi.NodeExpandVolumeRequest{
-				VolumeId:          "vol-123",
+				VolumeId:   "vol-123",
 				VolumePath: "",
 			},
 			wantErr: true,
@@ -958,6 +958,47 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateNodeExpandVolumeRequest(tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodeExpandVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		req *csi.NodeUnpublishVolumeRequest
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "Valid request",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "/mnt/staging",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing volume ID",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:          "",
+				TargetPath:        "/mnt/staging",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing staging target path",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodeUnpublishVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+				t.Errorf("validateNodeUnpublishVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

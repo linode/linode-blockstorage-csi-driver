@@ -17,6 +17,7 @@ var (
 	errNoVolumeID           = status.Error(codes.InvalidArgument, "volume id is not set")
 	errNoVolumePath         = status.Error(codes.InvalidArgument, "volume path is not set")
 	errNoStagingTargetPath  = status.Error(codes.InvalidArgument, "staging target path is not set")
+	errNoTargetPath         = status.Error(codes.InvalidArgument, "target path is not set")
 
 	// errNilInstance is a general-purpose error used to indicate a nil
 	// [github.com/linode/linodego.Instance] was passed as an argument to a
