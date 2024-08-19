@@ -10,9 +10,8 @@ DELETE_DIRECTORY="./tests/csi-sanity/rmdir_in_pod.sh"
 # Define the list of tests to skip as an array
 SKIP_TESTS=(
   "WithCapacity"
-  "should fail when requesting to create a volume with already existing name and different capacity"
-  "should fail when the volume source volume is not found"
-  "should fail when the volume is already published but is incompatible"
+  # Need to skip it because we do not support volume snapshots
+  "should fail when the volume source volume is not found" 
 )
 
 # Join the array into a single string with '|' as the separator
