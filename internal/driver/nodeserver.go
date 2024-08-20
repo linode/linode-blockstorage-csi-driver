@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -78,11 +77,12 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		options = append(options, "ro")
 	}
 
-	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
-	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate mount point: %s %v", targetPath, err)
+	// Check if target path is a valid mount point
+	notMnt, err := ns.ensureMountPoint(targetPath, NewFileSystem(), "publish", volumeCapability)
+	if err != nil {
 		return nil, err
 	}
+	// No errors but target path is not a valid mount point
 	if !notMnt {
 		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
 		/*
@@ -92,37 +92,6 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 
 		*/
 		return &csi.NodePublishVolumeResponse{}, nil
-	}
-
-	if blk := volumeCapability.GetBlock(); blk != nil {
-		// VolumeMode: Block
-		klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", targetPathDir)
-		if err := os.MkdirAll(targetPathDir, os.FileMode(0755)); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", targetPathDir, err)
-			return nil, err
-		}
-
-		// Update staging path to devicePath
-		stagingTargetPath = req.PublishContext["devicePath"]
-		klog.V(5).Infof("NodePublishVolume[block]: set stagingTargetPath to devicePath %s", stagingTargetPath)
-
-		// Make file to bind mount device to file
-		klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", targetPath)
-		file, err := os.OpenFile(targetPath, os.O_CREATE, 0660)
-		if err != nil {
-			if removeErr := os.Remove(targetPath); removeErr != nil {
-				return nil, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", targetPath, err)
-			}
-			return nil, status.Errorf(codes.Internal, "Failed to create file %s: %v", targetPath, err)
-		}
-		file.Close()
-	} else {
-		// VolumeMode: Filesystem
-		klog.V(5).Infof("NodePublishVolume[filesystem]: making targetPath %s", targetPath)
-		if err := os.MkdirAll(targetPath, os.FileMode(0755)); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
-			return nil, err
-		}
 	}
 
 	// Mount Source to Target
@@ -215,7 +184,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	}
 
 	// Check if staging target path is a valid mount point.
-	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), NewFileSystem())
+	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), NewFileSystem(), "stage", req.GetVolumeCapability())
 	if err != nil {
 		return nil, err
 	}

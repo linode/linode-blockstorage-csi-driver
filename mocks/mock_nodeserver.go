@@ -512,6 +512,35 @@ func (mr *MockFileSystemMockRecorder) MkdirAll(path, perm any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MkdirAll", reflect.TypeOf((*MockFileSystem)(nil).MkdirAll), path, perm)
 }
 
+// OpenFile mocks base method.
+func (m *MockFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenFile", name, flag, perm)
+	ret0, _ := ret[0].(*os.File)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenFile indicates an expected call of OpenFile.
+func (mr *MockFileSystemMockRecorder) OpenFile(name, flag, perm any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenFile", reflect.TypeOf((*MockFileSystem)(nil).OpenFile), name, flag, perm)
+}
+
+// Remove mocks base method.
+func (m *MockFileSystem) Remove(path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Remove", path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Remove indicates an expected call of Remove.
+func (mr *MockFileSystemMockRecorder) Remove(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockFileSystem)(nil).Remove), path)
+}
+
 // Stat mocks base method.
 func (m *MockFileSystem) Stat(name string) (fs.FileInfo, error) {
 	m.ctrl.T.Helper()

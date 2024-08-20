@@ -363,7 +363,7 @@ func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
 					Exec:      nil,
 				},
 			}
-			got, err := ns.ensureMountPoint(tt.stagingTargetPath, mockFileSystem)
+			got, err := ns.ensureMountPoint(tt.stagingTargetPath, mockFileSystem, "", &csi.VolumeCapability{})
 			if err != nil {
 				compareGRPCErrors(t, err, tt.wantErr)
 			}

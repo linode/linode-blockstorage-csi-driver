@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -33,6 +34,7 @@ import (
 const (
 	defaultFSType = "ext4"
 	rwPermission  = os.FileMode(0755)
+	ownerGroupReadWritePermissions = os.FileMode(0660)
 )
 
 type Mounter interface {
@@ -52,6 +54,8 @@ type FileSystem interface {
 	IsNotExist(err error) bool
 	MkdirAll(path string, perm os.FileMode) error
 	Stat(name string) (fs.FileInfo, error)
+	Remove(path string) error
+	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 }
 
 // OSFileSystem implements FileSystemInterface using the os package.
@@ -71,6 +75,14 @@ func (OSFileSystem) MkdirAll(path string, perm os.FileMode) error {
 
 func (OSFileSystem) Stat(name string) (fs.FileInfo, error) {
 	return os.Stat(name)
+}
+
+func (OSFileSystem) Remove(path string) error {
+	return os.Remove(path)
+}
+
+func (OSFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
 }
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
@@ -183,19 +195,42 @@ func (ns *LinodeNodeServer) findDevicePath(key common.LinodeVolumeKey, partition
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
-func (ns *LinodeNodeServer) ensureMountPoint(stagingTargetPath string, fs FileSystem) (bool, error) {
+func (ns *LinodeNodeServer) ensureMountPoint(path string, fs FileSystem, stage string, volumeCapability *csi.VolumeCapability) (bool, error) {
 	// Check if the staging target path is a mount point.
-	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(stagingTargetPath)
+	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(path)
 	if err != nil {
 		// Checking IsNotExist returns true. If true, it mean we need to create directory at the target path.
 		if fs.IsNotExist(err) {
-			// Create the directory with read-write permissions for the owner.
-			if err := fs.MkdirAll(stagingTargetPath, rwPermission); err != nil {
-				return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", stagingTargetPath, err))
+			// check in volume capability if volume is block storage
+			// if block storage, create target path dir and file in the target path dir for bind mounting
+			if blk := volumeCapability.GetBlock(); blk != nil && stage == "publish" {
+				klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", filepath.Dir(path))
+				// Create directory at the directory level of given path
+				if err := fs.MkdirAll(filepath.Dir(path), rwPermission); err != nil {
+					klog.Errorf("mkdir failed on disk %s (%v)", filepath.Dir(path), err)
+					return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", path, err))
+				}
+		
+				// Make file to bind mount block device to file
+				klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", path)
+				file, err := fs.OpenFile(path, os.O_CREATE, ownerGroupReadWritePermissions)
+				if err != nil {
+					if removeErr := fs.Remove(path); removeErr != nil {
+						return true, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", path, err)
+					}
+					return true, status.Errorf(codes.Internal, "Failed to create file %s: %v", path, err)
+				}
+				file.Close()
+
+				// We created a mount point for block, return success.
+				return false, nil
+			}
+			if err := fs.MkdirAll(path, rwPermission); err != nil {
+				return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", path, err))
 			}
 		} else {
 			// If the error is unknown, return an error.
-			return true, status.Error(codes.Internal, fmt.Sprintf("Unknown error when checking mount point (%q): %v", stagingTargetPath, err))
+			return true, status.Error(codes.Internal, fmt.Sprintf("Unknown error when checking mount point (%q): %v", path, err))
 		}
 	}
 	return notMnt, nil
