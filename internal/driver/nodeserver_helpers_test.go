@@ -926,13 +926,13 @@ func TestLinodeNodeServer_closeLuksMountSources(t *testing.T) {
 func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		req *csi.NodeExpandVolumeRequest
+		req     *csi.NodeExpandVolumeRequest
 		wantErr bool
 	}{
 		{
 			name: "Valid request",
 			req: &csi.NodeExpandVolumeRequest{
-				VolumeId:          "vol-123",
+				VolumeId:   "vol-123",
 				VolumePath: "/mnt/staging",
 			},
 			wantErr: false,
@@ -940,7 +940,7 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 		{
 			name: "Missing volume ID",
 			req: &csi.NodeExpandVolumeRequest{
-				VolumeId:          "",
+				VolumeId:   "",
 				VolumePath: "/mnt/staging",
 			},
 			wantErr: true,
@@ -948,7 +948,7 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 		{
 			name: "Missing staging target path",
 			req: &csi.NodeExpandVolumeRequest{
-				VolumeId:          "vol-123",
+				VolumeId:   "vol-123",
 				VolumePath: "",
 			},
 			wantErr: true,
@@ -958,6 +958,80 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateNodeExpandVolumeRequest(tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodeExpandVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validateNodePublishVolumeRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		req *csi.NodePublishVolumeRequest
+		wantErr bool
+	}{
+		{
+			name: "Valid request",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath: "/mnt/target",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing volume ID",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   "",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath: "/mnt/target",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing staging target path",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   "vol-123",
+				StagingTargetPath: "",
+				TargetPath: "/mnt/target",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing target path",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath: "",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing volume capability",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:   "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath: "/mnt/target",
+				VolumeCapability: nil,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodePublishVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+				t.Errorf("validateNodePublishVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
