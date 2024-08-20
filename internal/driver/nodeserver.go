@@ -55,26 +55,21 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	klog.V(4).Infof("NodePublishVolume called with req: %#v", req)
 
 	// Validate Arguments
+	if err := validateNodePublishVolumeRequest(req); err != nil {
+		return nil, err
+	}
+
 	targetPath := req.GetTargetPath()
-	targetPathDir := filepath.Dir(targetPath)
-	stagingTargetPath := req.GetStagingTargetPath()
 	readOnly := req.GetReadonly()
-	volumeID := req.GetVolumeId()
 	volumeCapability := req.GetVolumeCapability()
 
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume ID must be provided")
+	// Setting staging target path
+	stagingTargetPath := req.GetStagingTargetPath()
+	// If block volume, set staging target path to device path
+	if volumeCapability.GetBlock() != nil {
+		stagingTargetPath = req.PublishContext["devicePath"]
 	}
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Staging Target Path must be provided")
-	}
-	if len(targetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Target Path must be provided")
-	}
-	if volumeCapability == nil {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume Capability must be provided")
-	}
-
+	
 	// Set mount options:
 	//  - bind mount to the full path to allow duplicate mounts of the same PD.
 	//  - read-only if specified
