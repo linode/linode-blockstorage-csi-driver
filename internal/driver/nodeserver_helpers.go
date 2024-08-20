@@ -195,36 +195,12 @@ func (ns *LinodeNodeServer) findDevicePath(key common.LinodeVolumeKey, partition
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
-func (ns *LinodeNodeServer) ensureMountPoint(path string, fs FileSystem, stage string, volumeCapability *csi.VolumeCapability) (bool, error) {
+func (ns *LinodeNodeServer) ensureMountPoint(path string, fs FileSystem) (bool, error) {
 	// Check if the staging target path is a mount point.
 	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(path)
 	if err != nil {
 		// Checking IsNotExist returns true. If true, it mean we need to create directory at the target path.
 		if fs.IsNotExist(err) {
-			// check in volume capability if volume is block storage
-			// if block storage, create target path dir and file in the target path dir for bind mounting
-			if blk := volumeCapability.GetBlock(); blk != nil && stage == "publish" {
-				klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", filepath.Dir(path))
-				// Create directory at the directory level of given path
-				if err := fs.MkdirAll(filepath.Dir(path), rwPermission); err != nil {
-					klog.Errorf("mkdir failed on disk %s (%v)", filepath.Dir(path), err)
-					return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", path, err))
-				}
-		
-				// Make file to bind mount block device to file
-				klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", path)
-				file, err := fs.OpenFile(path, os.O_CREATE, ownerGroupReadWritePermissions)
-				if err != nil {
-					if removeErr := fs.Remove(path); removeErr != nil {
-						return true, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", path, err)
-					}
-					return true, status.Errorf(codes.Internal, "Failed to create file %s: %v", path, err)
-				}
-				file.Close()
-
-				// We created a mount point for block, return success.
-				return false, nil
-			}
 			if err := fs.MkdirAll(path, rwPermission); err != nil {
 				return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", path, err))
 			}
@@ -234,6 +210,55 @@ func (ns *LinodeNodeServer) ensureMountPoint(path string, fs FileSystem, stage s
 		}
 	}
 	return notMnt, nil
+}
+
+// nodePublishVolumeBlock handles the NodePublishVolume call for block volumes.
+//
+// It takes a CSI NodePublishVolumeRequest, a list of mount options, and a file system interface.
+// The CSI NodePublishVolumeRequest contains the volume ID, target path, and publish context.
+// The publish context is expected to contain the device path of the volume to be published.
+// The function creates the target directory, creates a file to bind mount the block device to,
+// and mounts the volume using the provided mount options.
+// It returns a CSI NodePublishVolumeResponse and an error if the operation fails.
+func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, mountOptions []string, fs FileSystem) (*csi.NodePublishVolumeResponse, error) {
+	
+	targetPath := req.GetTargetPath()
+	targetPathDir := filepath.Dir(targetPath)
+
+	// Get the device path from the request
+	devicePath := req.PublishContext["devicePath"]
+	if devicePath == "" {
+		return nil, status.Error(codes.Internal, "devicePath cannot be found")
+	}
+
+	// Create directory at the directory level of given path
+	klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", targetPathDir)
+	if err := fs.MkdirAll(targetPathDir, rwPermission); err != nil {
+		klog.Errorf("mkdir failed on disk %s (%v)", targetPathDir, err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", targetPathDir, err))
+	}
+
+	// Make the file to bind mount block device to file
+	// Make file to bind mount block device to file
+	klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", targetPath)
+	file, err := fs.OpenFile(targetPath, os.O_CREATE, ownerGroupReadWritePermissions)
+	if err != nil {
+		if removeErr := fs.Remove(targetPath); removeErr != nil {
+			return nil, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", targetPath, err)
+		}
+		return nil, status.Errorf(codes.Internal, "Failed to create file %s: %v", targetPath, err)
+	}
+	file.Close()
+
+	// Mount the volume
+	if err := ns.Mounter.Mount(devicePath, targetPath, "", mountOptions); err != nil {
+		if removeErr := fs.Remove(targetPath); removeErr != nil {
+			return nil, status.Errorf(codes.Internal, "Failed remove mount target %q: %v", targetPath, err)
+		}
+		return nil, status.Errorf(codes.Internal, "Could not mount %q at %q: %v", devicePath, targetPath, err)
+	}	
+
+	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 // mountVolume formats and mounts a volume to the staging target path.
