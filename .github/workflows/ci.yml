@@ -71,7 +71,7 @@ jobs:
     needs: docker-build
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
-      LINODE_TOKEN: ${{ secrets.DX_LINODE_TOKEN }}
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       TEST_IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || github.head_ref || github.ref_name }}
       LINODE_REGION: us-sea
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
