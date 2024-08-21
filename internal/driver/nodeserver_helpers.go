@@ -114,6 +114,18 @@ func validateNodeExpandVolumeRequest(req *csi.NodeExpandVolumeRequest) error {
 	return nil
 }
 
+// validateNodeUnpublishVolumeRequest validates the node unpublish volume request.
+// It checks the volume ID and target path in the provided request.
+func validateNodeUnpublishVolumeRequest(req *csi.NodeUnpublishVolumeRequest) error {
+	if req.GetVolumeId() == "" {
+		return errNoVolumeID
+	}
+	if req.GetTargetPath() == "" {
+		return errNoTargetPath
+	}
+	return nil
+}
+
 // getFSTypeAndMountOptions retrieves the file system type and mount options from the given volume capability.
 // If the capability is not set, the default file system type and empty mount options will be returned.
 func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, []string) {
