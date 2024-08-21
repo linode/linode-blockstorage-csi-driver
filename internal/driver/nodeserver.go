@@ -117,25 +117,23 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
-	// Validate Arguments
-	targetPath := req.GetTargetPath()
-	volID := req.GetVolumeId()
-	if len(volID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Volume ID must be provided")
-	}
-	if len(targetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Target Path must be provided")
-	}
 
-	err := mount.CleanupMountPoint(targetPath, ns.Mounter.Interface, true /* bind mount */)
+	// Validate request object
+	err := validateNodeUnpublishVolumeRequest(req)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, targetPath))
+		return nil, err
 	}
 
-	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, targetPath)
+	// Unmount the target path and delete the remaining directory
+	err = mount.CleanupMountPoint(req.GetTargetPath(), ns.Mounter.Interface, true /* bind mount */)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, req.GetTargetPath()))
+	}
+
+	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, req.GetTargetPath())
 
 	// If LUKS volume is used, close the LUKS device
-	if err := ns.closeLuksMountSources(targetPath); err != nil {
+	if err := ns.closeLuksMountSources(req.GetTargetPath()); err != nil {
 		return nil, err
 	}
 

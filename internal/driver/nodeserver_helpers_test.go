@@ -964,6 +964,47 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 	}
 }
 
+func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		req *csi.NodeUnpublishVolumeRequest
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "Valid request",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "/mnt/staging",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing volume ID",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:          "",
+				TargetPath:        "/mnt/staging",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing staging target path",
+			req: &csi.NodeUnpublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodeUnpublishVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+				t.Errorf("validateNodeUnpublishVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_validateNodePublishVolumeRequest(t *testing.T) {
 	tests := []struct {
 		name    string
