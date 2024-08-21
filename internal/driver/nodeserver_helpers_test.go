@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"os"
 	osexec "os/exec"
 	"reflect"
 	"runtime"
@@ -966,15 +967,15 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 func Test_validateNodePublishVolumeRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		req *csi.NodePublishVolumeRequest
+		req     *csi.NodePublishVolumeRequest
 		wantErr bool
 	}{
 		{
 			name: "Valid request",
 			req: &csi.NodePublishVolumeRequest{
-				VolumeId:   "vol-123",
+				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
-				TargetPath: "/mnt/target",
+				TargetPath:        "/mnt/target",
 				VolumeCapability: &csi.VolumeCapability{
 					AccessType: &csi.VolumeCapability_Mount{},
 				},
@@ -984,9 +985,9 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 		{
 			name: "Missing volume ID",
 			req: &csi.NodePublishVolumeRequest{
-				VolumeId:   "",
+				VolumeId:          "",
 				StagingTargetPath: "/mnt/staging",
-				TargetPath: "/mnt/target",
+				TargetPath:        "/mnt/target",
 				VolumeCapability: &csi.VolumeCapability{
 					AccessType: &csi.VolumeCapability_Mount{},
 				},
@@ -996,9 +997,9 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 		{
 			name: "Missing staging target path",
 			req: &csi.NodePublishVolumeRequest{
-				VolumeId:   "vol-123",
+				VolumeId:          "vol-123",
 				StagingTargetPath: "",
-				TargetPath: "/mnt/target",
+				TargetPath:        "/mnt/target",
 				VolumeCapability: &csi.VolumeCapability{
 					AccessType: &csi.VolumeCapability_Mount{},
 				},
@@ -1008,9 +1009,9 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 		{
 			name: "Missing target path",
 			req: &csi.NodePublishVolumeRequest{
-				VolumeId:   "vol-123",
+				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
-				TargetPath: "",
+				TargetPath:        "",
 				VolumeCapability: &csi.VolumeCapability{
 					AccessType: &csi.VolumeCapability_Mount{},
 				},
@@ -1020,10 +1021,10 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 		{
 			name: "Missing volume capability",
 			req: &csi.NodePublishVolumeRequest{
-				VolumeId:   "vol-123",
+				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
-				TargetPath: "/mnt/target",
-				VolumeCapability: nil,
+				TargetPath:        "/mnt/target",
+				VolumeCapability:  nil,
 			},
 			wantErr: true,
 		},
@@ -1032,6 +1033,215 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateNodePublishVolumeRequest(tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodePublishVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLinodeNodeServer_nodePublishVolumeBlock(t *testing.T) {
+	tests := []struct {
+		name    string
+		req          *csi.NodePublishVolumeRequest
+		mountOptions []string
+		expectFsCalls     func(m *mocks.MockFileSystem, f *mocks.MockFileInterface)
+		expectMounterCalls func(m *mocks.MockMounter)
+		expectFileCalls    func(m *mocks.MockFileInterface)
+		want    *csi.NodePublishVolumeResponse
+		wantErr bool
+	}{
+		{
+			name: "Valid request",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "/dev/sda",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
+				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(f, nil)
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().Mount("/dev/sda", "/mnt/target", "", []string{"bind"}).Return(nil)
+			},
+			expectFileCalls:    func(m *mocks.MockFileInterface) {
+				m.EXPECT().Close().Return(nil)
+			},
+			want:              &csi.NodePublishVolumeResponse{},
+			wantErr:           false,
+		},
+		{
+			name: "Error - devicePath missing",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     nil,
+			expectMounterCalls: nil,
+			expectFileCalls:    nil,
+			want:              nil,
+			wantErr:           true,
+		},
+		{
+			name: "Error - unable to create targetPathDir",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "/dev/sda",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(fmt.Errorf("unable to create targetPathDir..."))
+			},
+			expectMounterCalls: nil,
+			expectFileCalls:    nil,
+			want:              nil,
+			wantErr:           true,
+		},
+		{
+			name: "Error - unable to create file at targetPath",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "/dev/sda",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
+				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(nil, fmt.Errorf("unable to create file..."))
+				m.EXPECT().Remove("/mnt/target").Return(nil)
+			},
+			expectMounterCalls: nil,
+			expectFileCalls:    nil,
+			want:              nil,
+			wantErr:           true,
+		},
+		{
+			name: "Error - unable to create file at targetPath and remove targetPath fails",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "/dev/sda",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
+				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(nil, fmt.Errorf("unable to create file..."))
+				m.EXPECT().Remove("/mnt/target").Return(fmt.Errorf("unable to remove %s...", "/mnt/target"))
+			},
+			expectMounterCalls: nil,
+			expectFileCalls:    nil,
+			want:              nil,
+			wantErr:           true,
+		},
+		{
+			name: "Error - unable to mount the block device to targetPath",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "/dev/sda",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
+				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(f, nil)
+				m.EXPECT().Remove("/mnt/target").Return(nil)
+			},
+			expectMounterCalls: func (m *mocks.MockMounter) {
+				m.EXPECT().Mount("/dev/sda", "/mnt/target", "", []string{"bind"}).Return(fmt.Errorf("unable to mount..."))
+			},
+			expectFileCalls:    func (f *mocks.MockFileInterface) {
+				f.EXPECT().Close().Return(nil)
+			},
+			want:              nil,
+			wantErr:           true,
+		},
+		{
+			name: "Error - unable to mount the block device to targetPath and remove targetPath fails",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				StagingTargetPath: "/mnt/staging",
+				TargetPath:        "/mnt/target",
+				PublishContext:    map[string]string{
+					"devicePath": "/dev/sda",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			mountOptions:      []string{"bind"},
+			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
+				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(f, nil)
+				m.EXPECT().Remove("/mnt/target").Return(fmt.Errorf("unable to remove %s...", "/mnt/target"))
+			},
+			expectMounterCalls: func (m *mocks.MockMounter) {
+				m.EXPECT().Mount("/dev/sda", "/mnt/target", "", []string{"bind"}).Return(fmt.Errorf("unable to mount the block device at %s...", "/mnt/target"))
+			},
+			expectFileCalls:    func (f *mocks.MockFileInterface) {
+				f.EXPECT().Close().Return(nil)
+			},
+			want:              nil,
+			wantErr:           true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockMounter := mocks.NewMockMounter(ctrl)
+			mockFileSystem := mocks.NewMockFileSystem(ctrl)
+			mockFileInterface := mocks.NewMockFileInterface(ctrl)
+
+			if tt.expectFsCalls != nil {
+				tt.expectFsCalls(mockFileSystem, mockFileInterface)
+			}
+			if tt.expectFileCalls != nil {
+				tt.expectFileCalls(mockFileInterface)
+			}
+			if tt.expectMounterCalls != nil {
+				tt.expectMounterCalls(mockMounter)
+			}
+
+			ns := &LinodeNodeServer{
+				Mounter: &mount.SafeFormatAndMount{
+					Interface: mockMounter,
+					Exec:      nil,
+				},
+			}
+
+			got, err := ns.nodePublishVolumeBlock(tt.req, tt.mountOptions, mockFileSystem)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LinodeNodeServer.nodePublishVolumeBlock() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LinodeNodeServer.nodePublishVolumeBlock() = %v, want %v", got, tt.want)
 			}
 		})
 	}
