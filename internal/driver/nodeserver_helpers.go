@@ -16,7 +16,6 @@ limitations under the License.
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -37,6 +37,7 @@ const (
 	ownerGroupReadWritePermissions = os.FileMode(0660)
 )
 
+// TODO: Figure out a better home for these interfaces
 type Mounter interface {
 	mount.Interface
 }
@@ -47,42 +48,6 @@ type Executor interface {
 
 type Command interface {
 	utilexec.Cmd
-}
-
-// FileSystem defines the methods for file system operations.
-type FileSystem interface {
-	IsNotExist(err error) bool
-	MkdirAll(path string, perm os.FileMode) error
-	Stat(name string) (fs.FileInfo, error)
-	Remove(path string) error
-	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
-}
-
-// OSFileSystem implements FileSystemInterface using the os package.
-type OSFileSystem struct{}
-
-func NewFileSystem() FileSystem {
-	return OSFileSystem{}
-}
-
-func (OSFileSystem) IsNotExist(err error) bool {
-	return os.IsNotExist(err)
-}
-
-func (OSFileSystem) MkdirAll(path string, perm os.FileMode) error {
-	return os.MkdirAll(path, perm)
-}
-
-func (OSFileSystem) Stat(name string) (fs.FileInfo, error) {
-	return os.Stat(name)
-}
-
-func (OSFileSystem) Remove(path string) error {
-	return os.Remove(path)
-}
-
-func (OSFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	return os.OpenFile(name, flag, perm)
 }
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
@@ -195,9 +160,9 @@ func (ns *LinodeNodeServer) findDevicePath(key common.LinodeVolumeKey, partition
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
-func (ns *LinodeNodeServer) ensureMountPoint(path string, fs FileSystem) (bool, error) {
+func (ns *LinodeNodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) (bool, error) {
 	// Check if the staging target path is a mount point.
-	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(path)
+	notMnt, err := ns.Mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
 		// Checking IsNotExist returns true. If true, it mean we need to create directory at the target path.
 		if fs.IsNotExist(err) {
@@ -220,8 +185,7 @@ func (ns *LinodeNodeServer) ensureMountPoint(path string, fs FileSystem) (bool, 
 // The function creates the target directory, creates a file to bind mount the block device to,
 // and mounts the volume using the provided mount options.
 // It returns a CSI NodePublishVolumeResponse and an error if the operation fails.
-func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, mountOptions []string, fs FileSystem) (*csi.NodePublishVolumeResponse, error) {
-	
+func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, mountOptions []string, fs mountmanager.FileSystem) (*csi.NodePublishVolumeResponse, error) {
 	targetPath := req.GetTargetPath()
 	targetPathDir := filepath.Dir(targetPath)
 
@@ -238,7 +202,6 @@ func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeReq
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", targetPathDir, err))
 	}
 
-	// Make the file to bind mount block device to file
 	// Make file to bind mount block device to file
 	klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", targetPath)
 	file, err := fs.OpenFile(targetPath, os.O_CREATE, ownerGroupReadWritePermissions)

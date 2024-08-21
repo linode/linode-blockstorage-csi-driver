@@ -55,7 +55,7 @@ func TestDriverSuite(t *testing.T) {
 	mounter := mountmanager.NewFakeSafeMounter()
 	deviceUtils := mountmanager.NewFakeDeviceUtils()
 	// TODO: Replace by mock implementation later
-	fileSystem := NewFileSystem()
+	fileSystem := mountmanager.NewFileSystem()
 	encrypt := NewLuksEncryption(mounter.Exec, fileSystem)
 
 	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), ts.URL)

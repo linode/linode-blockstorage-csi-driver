@@ -17,7 +17,6 @@ limitations under the License.
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"sync"
 
@@ -66,6 +65,8 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	
 	readOnly := req.GetReadonly()
 	volumeCapability := req.GetVolumeCapability()
+
+	fs := mountmanager.NewFileSystem()
 	
 	// Set mount options:
 	//  - bind mount to the full path to allow duplicate mounts of the same PD.
@@ -77,12 +78,12 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 
 	// publish block volume
 	if volumeCapability.GetBlock() != nil {
-		return ns.nodePublishVolumeBlock(req, options, NewFileSystem())
+		return ns.nodePublishVolumeBlock(req, options, fs)
 	}
 
 	// Check if target path is a valid mount point. 
 	// If not, create it.
-	notMnt, err := ns.ensureMountPoint(targetPath, NewFileSystem())
+	notMnt, err := ns.ensureMountPoint(targetPath, fs)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	// Mount stagingTargetPath to targetPath
 	err = ns.Mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
-		os.Remove(targetPath)
+		fs.Remove(targetPath)
 		klog.Errorf("Mount of disk %s failed: %v", targetPath, err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Could not mount %q at %q: %v", stagingTargetPath, targetPath, err))
 	}
@@ -167,7 +168,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	}
 
 	// Check if staging target path is a valid mount point.
-	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), NewFileSystem())
+	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), mountmanager.NewFileSystem())
 	if err != nil {
 		return nil, err
 	}
