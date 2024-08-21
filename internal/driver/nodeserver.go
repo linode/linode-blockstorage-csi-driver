@@ -102,12 +102,8 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	// Mount stagingTargetPath to targetPath
 	err = ns.Mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
-		if err := fs.Remove(targetPath); err != nil {
-			klog.Errorf(" Mount Failed - unable to remove mount directory %s: %v", targetPath, err)
-			return nil, status.Errorf(codes.Internal, "Mount Failed - unable to remove mount target %q: %v", targetPath, err)
-		}
 		klog.Errorf("Mount of disk %s failed: %v", targetPath, err)
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Could not mount %q at %q: %v", stagingTargetPath, targetPath, err))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err))
 	}
 
 	klog.V(4).Infof("NodePublishVolume successfully mounted %s", targetPath)
