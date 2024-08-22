@@ -57,30 +57,22 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 		return nil, err
 	}
 
-	// Path to where we want to mount the volume inside the pod
-	targetPath := req.GetTargetPath()
-
-	// Path to the volume on the host where the volume is currently staged (mounted)
-	stagingTargetPath := req.GetStagingTargetPath()
-	
-	readOnly := req.GetReadonly()
-	volumeCapability := req.GetVolumeCapability()
-
-	fs := mountmanager.NewFileSystem()
-	
 	// Set mount options:
 	//  - bind mount to the full path to allow duplicate mounts of the same PD.
 	//  - read-only if specified
 	options := []string{"bind"}
-	if readOnly {
+	if req.GetReadonly() {
 		options = append(options, "ro")
 	}
-
+	
+	fs := mountmanager.NewFileSystem()
 	// publish block volume
-	if volumeCapability.GetBlock() != nil {
+	if req.GetVolumeCapability().GetBlock() != nil {
 		return ns.nodePublishVolumeBlock(req, options, fs)
 	}
-
+	
+	// Path to where we want to mount the volume inside the pod
+	targetPath := req.GetTargetPath()
 	// Check if target path is a valid mount point. 
 	// If not, create it.
 	notMnt, err := ns.ensureMountPoint(targetPath, fs)
@@ -91,14 +83,16 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	if !notMnt {
 		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
 		/*
-			1) Target Path MUST be the vol referenced by vol ID
-			2) VolumeCapability MUST match
-			3) Readonly MUST match
-
+		1) Target Path MUST be the vol referenced by vol ID
+		2) VolumeCapability MUST match
+		3) Readonly MUST match
+		
 		*/
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-
+	
+	// Path to the volume on the host where the volume is currently staged (mounted)
+	stagingTargetPath := req.GetStagingTargetPath()
 	// Mount stagingTargetPath to targetPath
 	err = ns.Mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
