@@ -97,7 +97,7 @@ func handle() error {
 
 	mounter := mountmanager.NewSafeMounter()
 	deviceUtils := mountmanager.NewDeviceUtils()
-	fileSystem := driver.NewFileSystem()
+	fileSystem := mountmanager.NewFileSystem()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem)
 
 	metadata, err := driver.GetMetadata(context.Background())

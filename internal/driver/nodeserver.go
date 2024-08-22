@@ -17,8 +17,6 @@ limitations under the License.
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -54,109 +52,52 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	defer ns.mux.Unlock()
 	klog.V(4).Infof("NodePublishVolume called with req: %#v", req)
 
-	// Validate Arguments
-	targetPath := req.GetTargetPath()
-	targetPathDir := filepath.Dir(targetPath)
-	stagingTargetPath := req.GetStagingTargetPath()
-	readOnly := req.GetReadonly()
-	volumeID := req.GetVolumeId()
-	volumeCapability := req.GetVolumeCapability()
-
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume ID must be provided")
-	}
-	if len(stagingTargetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Staging Target Path must be provided")
-	}
-	if len(targetPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Target Path must be provided")
-	}
-	if volumeCapability == nil {
-		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume Capability must be provided")
+	// Validate the request object
+	if err := validateNodePublishVolumeRequest(req); err != nil {
+		return nil, err
 	}
 
 	// Set mount options:
 	//  - bind mount to the full path to allow duplicate mounts of the same PD.
 	//  - read-only if specified
 	options := []string{"bind"}
-	if readOnly {
+	if req.GetReadonly() {
 		options = append(options, "ro")
 	}
-
-	notMnt, err := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
-	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate mount point: %s %v", targetPath, err)
+	
+	fs := mountmanager.NewFileSystem()
+	// publish block volume
+	if req.GetVolumeCapability().GetBlock() != nil {
+		return ns.nodePublishVolumeBlock(req, options, fs)
+	}
+	
+	// Path to where we want to mount the volume inside the pod
+	targetPath := req.GetTargetPath()
+	// Check if target path is a valid mount point. 
+	// If not, create it.
+	notMnt, err := ns.ensureMountPoint(targetPath, fs)
+	if err != nil {
 		return nil, err
 	}
+	// No errors but target path is not a valid mount point
 	if !notMnt {
 		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
 		/*
-			1) Target Path MUST be the vol referenced by vol ID
-			2) VolumeCapability MUST match
-			3) Readonly MUST match
-
+		1) Target Path MUST be the vol referenced by vol ID
+		2) VolumeCapability MUST match
+		3) Readonly MUST match
+		
 		*/
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-
-	if blk := volumeCapability.GetBlock(); blk != nil {
-		// VolumeMode: Block
-		klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", targetPathDir)
-		if err := os.MkdirAll(targetPathDir, os.FileMode(0755)); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", targetPathDir, err)
-			return nil, err
-		}
-
-		// Update staging path to devicePath
-		stagingTargetPath = req.PublishContext["devicePath"]
-		klog.V(5).Infof("NodePublishVolume[block]: set stagingTargetPath to devicePath %s", stagingTargetPath)
-
-		// Make file to bind mount device to file
-		klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", targetPath)
-		file, err := os.OpenFile(targetPath, os.O_CREATE, 0660)
-		if err != nil {
-			if removeErr := os.Remove(targetPath); removeErr != nil {
-				return nil, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", targetPath, err)
-			}
-			return nil, status.Errorf(codes.Internal, "Failed to create file %s: %v", targetPath, err)
-		}
-		file.Close()
-	} else {
-		// VolumeMode: Filesystem
-		klog.V(5).Infof("NodePublishVolume[filesystem]: making targetPath %s", targetPath)
-		if err := os.MkdirAll(targetPath, os.FileMode(0755)); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", targetPath, err)
-			return nil, err
-		}
-	}
-
-	// Mount Source to Target
-	err = ns.Mounter.Interface.Mount(stagingTargetPath, targetPath, "ext4", options)
+	
+	// Path to the volume on the host where the volume is currently staged (mounted)
+	stagingTargetPath := req.GetStagingTargetPath()
+	// Mount stagingTargetPath to targetPath
+	err = ns.Mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
-		notMnt, mntErr := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
-		if mntErr != nil {
-			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-			return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume failed to check whether target path is a mount point: %v", err))
-		}
-		if !notMnt {
-			if mntErr = ns.Mounter.Interface.Unmount(targetPath); mntErr != nil {
-				klog.Errorf("Failed to unmount: %v", mntErr)
-				return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume failed to unmount target path: %v", err))
-			}
-			notMnt, mntErr := ns.Mounter.Interface.IsLikelyNotMountPoint(targetPath)
-			if mntErr != nil {
-				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-				return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume failed to check whether target path is a mount point: %v", err))
-			}
-			if !notMnt {
-				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", targetPath)
-				return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume something is wrong with mounting: %v", err))
-			}
-		}
-		os.Remove(targetPath)
 		klog.Errorf("Mount of disk %s failed: %v", targetPath, err)
-		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume mount of disk failed: %v", err))
+		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err))
 	}
 
 	klog.V(4).Infof("NodePublishVolume successfully mounted %s", targetPath)
@@ -218,7 +159,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	}
 
 	// Check if staging target path is a valid mount point.
-	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), NewFileSystem())
+	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), mountmanager.NewFileSystem())
 	if err != nil {
 		return nil, err
 	}

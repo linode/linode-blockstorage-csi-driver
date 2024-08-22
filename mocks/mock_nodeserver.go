@@ -12,8 +12,6 @@ package mocks
 import (
 	context "context"
 	io "io"
-	fs "io/fs"
-	os "os"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -459,70 +457,4 @@ func (m *MockCommand) Wait() error {
 func (mr *MockCommandMockRecorder) Wait() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockCommand)(nil).Wait))
-}
-
-// MockFileSystem is a mock of FileSystem interface.
-type MockFileSystem struct {
-	ctrl     *gomock.Controller
-	recorder *MockFileSystemMockRecorder
-}
-
-// MockFileSystemMockRecorder is the mock recorder for MockFileSystem.
-type MockFileSystemMockRecorder struct {
-	mock *MockFileSystem
-}
-
-// NewMockFileSystem creates a new mock instance.
-func NewMockFileSystem(ctrl *gomock.Controller) *MockFileSystem {
-	mock := &MockFileSystem{ctrl: ctrl}
-	mock.recorder = &MockFileSystemMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockFileSystem) EXPECT() *MockFileSystemMockRecorder {
-	return m.recorder
-}
-
-// IsNotExist mocks base method.
-func (m *MockFileSystem) IsNotExist(err error) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsNotExist", err)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// IsNotExist indicates an expected call of IsNotExist.
-func (mr *MockFileSystemMockRecorder) IsNotExist(err any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsNotExist", reflect.TypeOf((*MockFileSystem)(nil).IsNotExist), err)
-}
-
-// MkdirAll mocks base method.
-func (m *MockFileSystem) MkdirAll(path string, perm os.FileMode) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MkdirAll", path, perm)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MkdirAll indicates an expected call of MkdirAll.
-func (mr *MockFileSystemMockRecorder) MkdirAll(path, perm any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MkdirAll", reflect.TypeOf((*MockFileSystem)(nil).MkdirAll), path, perm)
-}
-
-// Stat mocks base method.
-func (m *MockFileSystem) Stat(name string) (fs.FileInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Stat", name)
-	ret0, _ := ret[0].(fs.FileInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Stat indicates an expected call of Stat.
-func (mr *MockFileSystemMockRecorder) Stat(name any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stat", reflect.TypeOf((*MockFileSystem)(nil).Stat), name)
 }

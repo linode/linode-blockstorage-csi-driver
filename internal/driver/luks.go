@@ -29,6 +29,8 @@ import (
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 type LuksContext struct {
@@ -81,10 +83,10 @@ func (ctx *LuksContext) validate() error {
 
 type Encryption struct {
 	Exec       Executor
-	FileSystem FileSystem
+	FileSystem mountmanager.FileSystem
 }
 
-func NewLuksEncryption(executor utilexec.Interface, fileSystem FileSystem) Encryption {
+func NewLuksEncryption(executor utilexec.Interface, fileSystem mountmanager.FileSystem) Encryption {
 	return Encryption{
 		Exec:       executor,
 		FileSystem: fileSystem,
