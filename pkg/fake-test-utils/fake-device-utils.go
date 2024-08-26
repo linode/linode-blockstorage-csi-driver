@@ -12,12 +12,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mountmanager
+package faketestutils
+
+import (
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+)
 
 type fakeDeviceUtils struct {
 }
 
-var _ DeviceUtils = &fakeDeviceUtils{}
+var _ mountmanager.DeviceUtils = &fakeDeviceUtils{}
 
 func NewFakeDeviceUtils() *fakeDeviceUtils {
 	return &fakeDeviceUtils{}

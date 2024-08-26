@@ -1,18 +1,12 @@
 package driver
 
 import (
-	"encoding/json"
 	"fmt"
-	"math/rand"
-	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
-	"time"
 
+	faketestutils "github.com/linode/linode-blockstorage-csi-driver/pkg/fake-test-utils"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 
@@ -34,10 +28,10 @@ func TestDriverSuite(t *testing.T) {
 	bsPrefix := "test-"
 
 	// mock Linode Server, not working yet ...
-	fake := &fakeAPI{
-		t:       t,
-		volumes: map[string]linodego.Volume{},
-		instance: &linodego.Instance{
+	fake := &faketestutils.FakeAPI{
+		T:       t,
+		Volumes: map[string]linodego.Volume{},
+		Instance: &linodego.Instance{
 			Label:      "linode123",
 			Region:     "us-east",
 			Image:      "linode/debian9",
@@ -52,8 +46,8 @@ func TestDriverSuite(t *testing.T) {
 	ts := httptest.NewServer(fake)
 	defer ts.Close()
 
-	mounter := mountmanager.NewFakeSafeMounter()
-	deviceUtils := mountmanager.NewFakeDeviceUtils()
+	mounter := faketestutils.NewFakeSafeMounter()
+	deviceUtils := faketestutils.NewFakeDeviceUtils()
 	// TODO: Replace by mock implementation later
 	fileSystem := mountmanager.NewFileSystem()
 	encrypt := NewLuksEncryption(mounter.Exec, fileSystem)
@@ -66,8 +60,8 @@ func TestDriverSuite(t *testing.T) {
 	// TODO fake metadata
 	md := Metadata{
 		ID:     123,
-		Label:  fake.instance.Label,
-		Region: fake.instance.Region,
+		Label:  fake.Instance.Label,
+		Region: fake.Instance.Region,
 		Memory: 4 << 30, // 4GiB
 	}
 	linodeDriver := GetLinodeDriver()
@@ -83,185 +77,3 @@ func TestDriverSuite(t *testing.T) {
 	// sanity.Test(t, cfg)
 }
 
-// fakeAPI implements a fake, cached Linode API
-type fakeAPI struct {
-	t        *testing.T
-	volumes  map[string]linodego.Volume
-	instance *linodego.Instance
-}
-
-func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	switch r.Method {
-	case "GET":
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/v4/volumes/"):
-			// single volume get
-			id := filepath.Base(r.URL.Path)
-			vol, ok := f.volumes[id]
-			if ok {
-				rr, _ := json.Marshal(vol)
-				_, _ = w.Write(rr)
-			} else {
-				w.WriteHeader(404)
-				resp := linodego.APIError{
-					Errors: []linodego.APIErrorReason{
-						{Reason: "Not Found"},
-					},
-				}
-				rr, _ := json.Marshal(resp)
-				_, _ = w.Write(rr)
-			}
-			return
-		case strings.HasPrefix(r.URL.Path, "/v4/volumes"):
-			res := 0
-			data := []linodego.Volume{}
-
-			var filters map[string]string
-			hf := r.Header.Get("X-Filter")
-			if hf != "" {
-				_ = json.Unmarshal([]byte(hf), &filters)
-			}
-
-			for _, vol := range f.volumes {
-
-				if filters["label"] != "" && filters["label"] != vol.Label {
-					continue
-				}
-				data = append(data, vol)
-			}
-			resp := linodego.VolumesPagedResponse{
-				PageOptions: &linodego.PageOptions{
-					Page:    1,
-					Pages:   1,
-					Results: res,
-				},
-				Data: data,
-			}
-			rr, _ := json.Marshal(resp)
-			_, _ = w.Write(rr)
-			return
-		case strings.HasPrefix(r.URL.Path, "/v4/linode/instances/"):
-			id := filepath.Base(r.URL.Path)
-			if id == strconv.Itoa(f.instance.ID) {
-				rr, _ := json.Marshal(&f.instance)
-				_, _ = w.Write(rr)
-				return
-			} else {
-				w.WriteHeader(404)
-				resp := linodego.APIError{
-					Errors: []linodego.APIErrorReason{
-						{Reason: "Not Found"},
-					},
-				}
-				rr, _ := json.Marshal(resp)
-				_, _ = w.Write(rr)
-			}
-		case strings.HasPrefix(r.URL.Path, "/v4/linode/instances"):
-			res := 1
-			data := []linodego.Instance{}
-
-			data = append(data, *f.instance)
-			resp := linodego.InstancesPagedResponse{
-				PageOptions: &linodego.PageOptions{
-					Page:    1,
-					Pages:   1,
-					Results: res,
-				},
-				Data: data,
-			}
-			rr, _ := json.Marshal(resp)
-			_, _ = w.Write(rr)
-			return
-
-		}
-
-	case "POST":
-		tp := filepath.Base(r.URL.Path)
-		var vol linodego.Volume
-		var found bool
-		if tp == "attach" {
-			v := new(linodego.VolumeAttachOptions)
-			if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-				f.t.Fatal(err)
-			}
-			parts := strings.Split(r.URL.Path, "/")
-			if len(parts) != 4 {
-				f.t.Fatal("url not good")
-			}
-			vol, found = f.volumes[parts[2]]
-			if !found {
-				w.WriteHeader(404)
-				resp := linodego.APIError{
-					Errors: []linodego.APIErrorReason{
-						{Reason: "Not Found"},
-					},
-				}
-				rr, _ := json.Marshal(resp)
-				_, _ = w.Write(rr)
-				return
-			}
-			if vol.LinodeID != nil {
-				f.t.Fatal("volume already attached")
-				return
-			}
-			vol.LinodeID = &v.LinodeID
-			f.volumes[parts[2]] = vol
-
-		} else if tp == "detach" {
-			parts := strings.Split(r.URL.Path, "/")
-			if len(parts) != 4 {
-				f.t.Fatal("url not good")
-			}
-			vol, found = f.volumes[parts[2]]
-			if !found {
-				w.WriteHeader(404)
-				resp := linodego.APIError{
-					Errors: []linodego.APIErrorReason{
-						{Reason: "Not Found"},
-					},
-				}
-				rr, _ := json.Marshal(resp)
-				_, _ = w.Write(rr)
-				return
-			}
-			vol.LinodeID = nil
-			f.volumes[parts[2]] = vol
-			return
-		} else {
-			v := new(linodego.VolumeCreateOptions)
-			err := json.NewDecoder(r.Body).Decode(v)
-			if err != nil {
-				f.t.Fatal(err)
-			}
-
-			id := rand.Intn(99999)
-			name := v.Label
-			path := fmt.Sprintf("/dev/disk/by-id/scsi-0Linode_Volume_%v", name)
-			now := time.Now()
-			vol = linodego.Volume{
-				ID:             id,
-				Region:         v.Region,
-				Label:          name,
-				Size:           v.Size,
-				FilesystemPath: path,
-				Status:         linodego.VolumeActive,
-				Tags:           v.Tags,
-				Created:        &now,
-				Updated:        &now,
-			}
-
-			f.volumes[strconv.Itoa(id)] = vol
-
-		}
-
-		resp, err := json.Marshal(vol)
-		if err != nil {
-			f.t.Fatal(err)
-		}
-		_, _ = w.Write(resp)
-	case "DELETE":
-		id := filepath.Base(r.URL.Path)
-		delete(f.volumes, id)
-	}
-}
