@@ -116,7 +116,7 @@ remote-cluster-deploy:
 	clusterctl get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 
 	# Install CSI driver and wait for it to be ready
-	cat e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
+	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 	hack/generate-yaml.sh $(TEST_IMAGE_TAG) $(TEST_IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
@@ -124,7 +124,7 @@ remote-cluster-deploy:
 
 .PHONY: local-deploy
 local-deploy:
-	ctlptl apply -f e2e/setup/ctlptl-config.yaml
+	ctlptl apply -f tests/e2e/setup/ctlptl-config.yaml
 	clusterctl init \
 		--wait-providers \
 		--wait-provider-timeout 600 \
@@ -141,12 +141,12 @@ cleanup-cluster:
 .PHONY: e2e-test
 e2e-test:
 	openssl rand -out luks.key 64
-	CONTROLPLANE_NODES=$(CONTROLPLANE_NODES) WORKER_NODES=$(WORKER_NODES) KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./e2e/test --parallel 2
+	CONTROLPLANE_NODES=$(CONTROLPLANE_NODES) WORKER_NODES=$(WORKER_NODES) KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./tests/e2e --parallel 2
 
 .PHONY: csi-sanity-test
 csi-sanity-test:
-	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/csi-sanity.sh
+	KUBECONFIG=test-cluster-kubeconfig.yaml ./tests/csi-sanity/run-tests.sh
 
 .PHONY: upstream-e2e-tests
 upstream-e2e-tests:
-	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/upstream-e2e-tests.sh
+	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=test-cluster-kubeconfig.yaml ./tests/upstream-e2e/run-tests.sh
