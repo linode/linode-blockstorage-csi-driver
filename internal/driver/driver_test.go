@@ -6,11 +6,14 @@ import (
 	"os"
 	"testing"
 
-	faketestutils "github.com/linode/linode-blockstorage-csi-driver/pkg/fake-test-utils"
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	drivertest "github.com/linode/linode-blockstorage-csi-driver/pkg/driver-test"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"k8s.io/mount-utils"
 
 	"github.com/linode/linodego"
+
+	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -28,7 +31,7 @@ func TestDriverSuite(t *testing.T) {
 	bsPrefix := "test-"
 
 	// mock Linode Server, not working yet ...
-	fake := &faketestutils.FakeAPI{
+	fake := &drivertest.FakeAPI{
 		T:       t,
 		Volumes: map[string]linodego.Volume{},
 		Instance: &linodego.Instance{
@@ -46,10 +49,15 @@ func TestDriverSuite(t *testing.T) {
 	ts := httptest.NewServer(fake)
 	defer ts.Close()
 
-	mounter := faketestutils.NewFakeSafeMounter()
-	deviceUtils := faketestutils.NewFakeDeviceUtils()
-	// TODO: Replace by mock implementation later
-	fileSystem := mountmanager.NewFileSystem()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mounter := &mount.SafeFormatAndMount{
+		Interface: mocks.NewMockMounter(mockCtrl), 
+		Exec: mocks.NewMockExecutor(mockCtrl),
+	}
+	deviceUtils := mocks.NewMockDeviceUtils(mockCtrl)
+	fileSystem := mocks.NewMockFileSystem(mockCtrl)
 	encrypt := NewLuksEncryption(mounter.Exec, fileSystem)
 
 	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), ts.URL)

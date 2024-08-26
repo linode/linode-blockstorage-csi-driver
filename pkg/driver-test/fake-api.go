@@ -1,4 +1,4 @@
-package faketestutils
+package drivertest
 
 import (
 	"encoding/json"
