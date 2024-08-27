@@ -41,7 +41,7 @@ type LinodeDriver struct {
 	vendorVersion     string
 	volumeLabelPrefix string
 
-	ids *LinodeIdentityServer
+	ids *IdentityServer
 	ns  *LinodeNodeServer
 	cs  *ControllerServer
 
@@ -102,7 +102,10 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
 
 	// Set up RPC Servers
-	linodeDriver.ids = NewIdentityServer(linodeDriver)
+	linodeDriver.ids, err = NewIdentityServer(linodeDriver)
+	if err != nil {
+		return fmt.Errorf("new identity server: %w", err)
+	}
 	linodeDriver.ns = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt)
 
 	cs, err := NewControllerServer(linodeDriver, linodeClient, metadata)
@@ -126,12 +129,6 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(c csi.Control
 	}
 
 	return status.Error(codes.InvalidArgument, "Invalid controller service request")
-}
-
-func NewIdentityServer(linodeDriver *LinodeDriver) *LinodeIdentityServer {
-	return &LinodeIdentityServer{
-		Driver: linodeDriver,
-	}
 }
 
 func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, cloudProvider linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) *LinodeNodeServer {
