@@ -24,8 +24,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
@@ -155,14 +153,12 @@ func (ns *NodeServer) findDevicePath(key common.LinodeVolumeKey, partition strin
 	// Verify the device path by checking if any of the paths exist.
 	devicePath, err := ns.deviceutils.VerifyDevicePath(devicePaths)
 	if err != nil {
-		return "", status.Error(codes.Internal, fmt.Sprintf("Error verifying Linode Volume (%q) is attached: %v",
-			key.GetVolumeLabel(), err))
+		return "", errInternal("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err)
 	}
 
 	// If no device path is found, return an error.
 	if devicePath == "" {
-		return "", status.Error(codes.Internal, fmt.Sprintf("Unable to find device path out of attempted paths: %v",
-			devicePaths))
+		return "", errInternal("Unable to find device path out of attempted paths: %v", devicePaths)
 	}
 
 	// If a device path is found, return it.
@@ -179,11 +175,11 @@ func (ns *NodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) 
 		// Checking IsNotExist returns true. If true, it mean we need to create directory at the target path.
 		if fs.IsNotExist(err) {
 			if err := fs.MkdirAll(path, rwPermission); err != nil {
-				return true, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", path, err))
+				return true, errInternal("Failed to create directory (%q): %v", path, err)
 			}
 		} else {
 			// If the error is unknown, return an error.
-			return true, status.Error(codes.Internal, fmt.Sprintf("Unknown error when checking mount point (%q): %v", path, err))
+			return true, errInternal("Unknown error when checking mount point (%q): %v", path, err)
 		}
 	}
 	return notMnt, nil
@@ -204,14 +200,14 @@ func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, 
 	// Get the device path from the request
 	devicePath := req.PublishContext["devicePath"]
 	if devicePath == "" {
-		return nil, status.Error(codes.Internal, "devicePath cannot be found")
+		return nil, errInternal("devicePath cannot be found")
 	}
 
 	// Create directory at the directory level of given path
 	klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", targetPathDir)
 	if err := fs.MkdirAll(targetPathDir, rwPermission); err != nil {
 		klog.Errorf("mkdir failed on disk %s (%v)", targetPathDir, err)
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Failed to create directory (%q): %v", targetPathDir, err))
+		return nil, errInternal("Failed to create directory %q: %v", targetPathDir, err)
 	}
 
 	// Make file to bind mount block device to file
@@ -219,18 +215,18 @@ func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, 
 	file, err := fs.OpenFile(targetPath, os.O_CREATE, ownerGroupReadWritePermissions)
 	if err != nil {
 		if removeErr := fs.Remove(targetPath); removeErr != nil {
-			return nil, status.Errorf(codes.Internal, "Failed remove mount target %s: %v", targetPath, err)
+			return nil, errInternal("Failed remove mount target %q: %v", targetPath, err)
 		}
-		return nil, status.Errorf(codes.Internal, "Failed to create file %s: %v", targetPath, err)
+		return nil, errInternal("Failed to create file %s: %v", targetPath, err)
 	}
 	file.Close()
 
 	// Mount the volume
 	if err := ns.mounter.Mount(devicePath, targetPath, "", mountOptions); err != nil {
 		if removeErr := fs.Remove(targetPath); removeErr != nil {
-			return nil, status.Errorf(codes.Internal, "Failed remove mount target %q: %v", targetPath, err)
+			return nil, errInternal("Failed remove mount target %q: %v", targetPath, err)
 		}
-		return nil, status.Errorf(codes.Internal, "Could not mount %q at %q: %v", devicePath, targetPath, err)
+		return nil, errInternal("Could not mount %q at %q: %v", devicePath, targetPath, err)
 	}	
 
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -263,9 +259,8 @@ func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeReq
 	// Format and mount the drive
 	klog.V(4).Info("formatting and mounting the drive")
 	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
-		return status.Error(codes.Internal,
-			fmt.Sprintf("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
-				devicePath, stagingTargetPath, fsType, mountOptions, err))
+		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v", 
+				devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}
 
 	return nil
@@ -283,7 +278,7 @@ func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksConte
 	// Validate if the device is formatted with LUKS encryption or if it needs formatting.
 	formatted, err := ns.encrypt.blkidValid(devicePath)
 	if err != nil {
-		return "", status.Error(codes.Internal, fmt.Sprintf("Failed to validate blkid (%q): %v", devicePath, err))
+		return "", errInternal("Failed to validate blkid (%q): %v", devicePath, err)
 	}
 
 	// If the device is not, format it.
@@ -292,19 +287,19 @@ func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksConte
 
 		// Validate the LUKS context.
 		if err := luksContext.validate(); err != nil {
-			return "", status.Error(codes.Internal, fmt.Sprintf("Failed to luks format validation (%q): %v", devicePath, err))
+			return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
 		}
 
 		// Format the volume with LUKS encryption.
 		if err := ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
-			return "", status.Error(codes.Internal, fmt.Sprintf("Failed to luks format (%q): %v", devicePath, err))
+			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 		}
 	}
 
 	// Prepare the LUKS volume for mounting.
 	luksSource, err := ns.encrypt.luksPrepareMount(luksContext, devicePath)
 	if err != nil {
-		return "", status.Error(codes.Internal, fmt.Sprintf("Failed to prepare luks mount (%q): %v", devicePath, err))
+		return "", errInternal("Failed to prepare luks mount (%q): %v", devicePath, err)
 	}
 
 	return luksSource, nil
@@ -316,18 +311,18 @@ func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksConte
 func (ns *NodeServer) closeLuksMountSources(path string) error {
 	mountSources, err := ns.getMountSources(path)
 	if err != nil {
-		return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to to get mount sources %s: %v", path, err))
+		return errInternal("closeMountSources failed to to get mount sources %s: %v", path, err)
 	}
 	klog.V(4).Info("closing mount sources: ", mountSources)
 	for _, source := range mountSources {
 		isLuksMapping, mappingName, err := ns.encrypt.isLuksMapping(source)
 		if err != nil {
-			return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err))
+			return errInternal("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err)
 		}
 		if isLuksMapping {
 			klog.V(4).Infof("luksClose %s", mappingName)
 			if err := ns.encrypt.luksClose(mappingName); err != nil {
-				return status.Error(codes.Internal, fmt.Sprintf("closeMountSources failed to close luks mount %s: %v", path, err))
+				return errInternal("closeMountSources failed to close luks mount %s: %v", path, err)
 			}
 		}
 	}

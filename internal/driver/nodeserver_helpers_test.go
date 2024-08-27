@@ -12,7 +12,6 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	"go.uber.org/mock/gomock"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
@@ -214,7 +213,7 @@ func TestLinodeNodeServer_findDevicePath(t *testing.T) {
 				dUtils.EXPECT().VerifyDevicePath(gomock.Any()).Return("", fmt.Errorf("no volume attached"))
 			},
 			wantDevicePath: "",
-			wantErr:        status.Error(codes.Internal, "Error verifying Linode Volume (\"test\") is attached: no volume attached"),
+			wantErr:        errInternal("Error verifying Linode Volume (\"test\") is attached: no volume attached"),
 		},
 		{
 			name: "Error - Couldn't get the devicepath to linode volume",
@@ -227,7 +226,7 @@ func TestLinodeNodeServer_findDevicePath(t *testing.T) {
 				dUtils.EXPECT().VerifyDevicePath(gomock.Any()).Return("", nil)
 			},
 			wantDevicePath: "",
-			wantErr:        status.Error(codes.Internal, "Unable to find device path out of attempted paths: [some/path]"),
+			wantErr:        errInternal("Unable to find device path out of attempted paths: [some/path]"),
 		},
 		{
 			name: "Success",
@@ -312,7 +311,7 @@ func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
 				m.EXPECT().MkdirAll(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			want:    false,
-			wantErr: status.Error(codes.Internal, "Failed to create directory (\"/mnt/staging\"): couldn't create directory"),
+			wantErr: errInternal("Failed to create directory (/mnt/staging): couldn't create directory"),
 		},
 		{
 			name:              "Error -  mount point check fails and error is not IsNotExist",
@@ -325,7 +324,7 @@ func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(false)
 			},
 			want:    true,
-			wantErr: status.Error(codes.Internal, "Unknown error when checking mount point (\"/mnt/staging\"): some error"),
+			wantErr: errInternal("Unknown error when checking mount point (\"/mnt/staging\"): some error"),
 		},
 		{
 			name:              "Error -  Mount point didn't exist and ran into error when create a new mount point or directory",
@@ -339,7 +338,7 @@ func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
 				m.EXPECT().MkdirAll(gomock.Any(), gomock.Any()).Return(fmt.Errorf("couldn't create directory"))
 			},
 			want:    true,
-			wantErr: status.Error(codes.Internal, "Failed to create directory (\"/mnt/staging\"): couldn't create directory"),
+			wantErr: errInternal("Failed to create directory (\"/mnt/staging\"): couldn't create directory"),
 		},
 	}
 	for _, tt := range tests {

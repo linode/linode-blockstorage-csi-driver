@@ -26,8 +26,6 @@ import (
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/linode/linodego"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 )
@@ -121,7 +119,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	err = ns.mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
 		klog.Errorf("Mount of disk %s failed: %v", targetPath, err)
-		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err))
+		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
 
 	klog.V(4).Infof("NodePublishVolume successfully mounted %s", targetPath)
@@ -141,7 +139,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	// Unmount the target path and delete the remaining directory
 	err = mount.CleanupMountPoint(req.GetTargetPath(), ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, req.GetTargetPath()))
+		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", req.GetTargetPath(), err)
 	}
 
 	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, req.GetTargetPath())
@@ -227,7 +225,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	err = mount.CleanupMountPoint(req.GetStagingTargetPath(), ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", req.GetStagingTargetPath(), err))
+		return nil, errInternal("NodeUnstageVolume failed to unmount at path %s: %v", req.GetStagingTargetPath(), err)
 	}
 
 	// If LUKS volume is used, close the LUKS device
@@ -250,14 +248,14 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	// Make call to linode api using the linode api client
 	LinodeVolumeKey, err := common.ParseLinodeVolumeKey(req.GetVolumeId())
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "Error parsing linode volume key: %v", err)
+		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
 	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
 	if err != nil {
 		return nil, errInternal("marshal json filter: %v", err)
 	}
 	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
-		return nil, status.Errorf(codes.NotFound, "list volumes: %v", err)
+		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
 
 	return &csi.NodeExpandVolumeResponse{
@@ -284,7 +282,7 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// devices that can be attached.
 	disks, err := ns.client.ListInstanceDisks(ctx, ns.metadata.ID, nil)
 	if err != nil {
-		return &csi.NodeGetInfoResponse{}, status.Errorf(codes.Internal, "list instance disks: %v", err)
+		return &csi.NodeGetInfoResponse{}, errInternal("list instance disks: %v", err)
 	}
 	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(disks)
 
