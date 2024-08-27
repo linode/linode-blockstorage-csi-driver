@@ -32,22 +32,46 @@ import (
 	"k8s.io/mount-utils"
 )
 
-type LinodeNodeServer struct {
-	Driver        *LinodeDriver
-	Mounter       *mount.SafeFormatAndMount
-	DeviceUtils   mountmanager.DeviceUtils
-	CloudProvider linodeclient.LinodeClient
-	Metadata      Metadata
-	Encrypt       Encryption
+type NodeServer struct {
+	driver        *LinodeDriver
+	mounter       *mount.SafeFormatAndMount
+	deviceutils   mountmanager.DeviceUtils
+	client        linodeclient.LinodeClient
+	metadata      Metadata
+	encrypt       Encryption
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
 
 	csi.UnimplementedNodeServer
 }
 
-var _ csi.NodeServer = &LinodeNodeServer{}
+var _ csi.NodeServer = &NodeServer{}
 
-func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
+	if linodeDriver == nil {
+		return nil, fmt.Errorf("linodeDriver is nil")
+	}
+	if mounter == nil {
+		return nil, fmt.Errorf("mounter is nil")
+	}
+	if deviceUtils == nil {
+		return nil, fmt.Errorf("deviceUtils is nil")
+	}
+	if client == nil {
+		return nil, fmt.Errorf("linode client is nil")
+	}
+
+	return &NodeServer{
+		driver:        linodeDriver,
+		mounter:       mounter,
+		deviceutils:   deviceUtils,
+		client:        client,
+		metadata:      metadata,
+		encrypt:       encrypt,
+	}, nil
+}
+
+func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	klog.V(4).Infof("NodePublishVolume called with req: %#v", req)
@@ -94,7 +118,7 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	// Path to the volume on the host where the volume is currently staged (mounted)
 	stagingTargetPath := req.GetStagingTargetPath()
 	// Mount stagingTargetPath to targetPath
-	err = ns.Mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
+	err = ns.mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
 		klog.Errorf("Mount of disk %s failed: %v", targetPath, err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err))
@@ -104,7 +128,7 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
@@ -115,7 +139,7 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 	}
 
 	// Unmount the target path and delete the remaining directory
-	err = mount.CleanupMountPoint(req.GetTargetPath(), ns.Mounter.Interface, true /* bind mount */)
+	err = mount.CleanupMountPoint(req.GetTargetPath(), ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("Unmount failed: %v\nUnmounting arguments: %s\n", err, req.GetTargetPath()))
 	}
@@ -130,7 +154,7 @@ func (ns *LinodeNodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.No
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	klog.V(4).Infof("NodeStageVolume called with req: %#v", req)
@@ -190,7 +214,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 	klog.V(4).Infof("NodeUnstageVolume called with req: %#v", req)
@@ -201,7 +225,7 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 		return nil, err
 	}
 
-	err = mount.CleanupMountPoint(req.GetStagingTargetPath(), ns.Mounter.Interface, true /* bind mount */)
+	err = mount.CleanupMountPoint(req.GetStagingTargetPath(), ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnstageVolume failed to unmount at path %s: %v", req.GetStagingTargetPath(), err))
 	}
@@ -214,7 +238,7 @@ func (ns *LinodeNodeServer) NodeUnstageVolume(ctx context.Context, req *csi.Node
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	klog.V(4).Infof("NodeExpandVolume called with req: %#v", req)
 
 	// Validate req (NodeExpandVolumeRequest)
@@ -232,7 +256,7 @@ func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeE
 	if err != nil {
 		return nil, errInternal("marshal json filter: %v", err)
 	}
-	if _, err = ns.CloudProvider.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
+	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
 		return nil, status.Errorf(codes.NotFound, "list volumes: %v", err)
 	}
 
@@ -241,15 +265,15 @@ func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeE
 	}, nil
 }
 
-func (ns *LinodeNodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	klog.V(4).Infof("NodeGetCapabilities called with req: %#v", req)
 
 	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: ns.Driver.nscap,
+		Capabilities: ns.driver.nscap,
 	}, nil
 }
 
-func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	// Get the number of currently attached instance disks, and subtract it
 	// from the limit of block devices that can be attached to the instance,
 	// which will effectively give us the number of block storage volumes
@@ -258,23 +282,23 @@ func (ns *LinodeNodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInf
 	// This is what the spec wants us to report: the actual number of volumes
 	// that can be attached, and not the theoretical maximum number of
 	// devices that can be attached.
-	disks, err := ns.CloudProvider.ListInstanceDisks(ctx, ns.Metadata.ID, nil)
+	disks, err := ns.client.ListInstanceDisks(ctx, ns.metadata.ID, nil)
 	if err != nil {
 		return &csi.NodeGetInfoResponse{}, status.Errorf(codes.Internal, "list instance disks: %v", err)
 	}
-	maxVolumes := maxVolumeAttachments(ns.Metadata.Memory) - len(disks)
+	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(disks)
 
 	return &csi.NodeGetInfoResponse{
-		NodeId:            strconv.Itoa(ns.Metadata.ID),
+		NodeId:            strconv.Itoa(ns.metadata.ID),
 		MaxVolumesPerNode: int64(maxVolumes),
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
-				"topology.linode.com/region": ns.Metadata.Region,
+				"topology.linode.com/region": ns.metadata.Region,
 			},
 		},
 	}, nil
 }
 
-func (ns *LinodeNodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	return nodeGetVolumeStats(req)
 }

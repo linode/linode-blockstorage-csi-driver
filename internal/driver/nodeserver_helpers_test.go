@@ -260,12 +260,12 @@ func TestLinodeNodeServer_findDevicePath(t *testing.T) {
 
 			// Create a new LinodeNodeServer with the mocked DeviceUtils
 			// No need to set other fields as the function we are testing doesn't use them
-			ns := &LinodeNodeServer{
-				Driver:        nil,
-				Mounter:       nil,
-				DeviceUtils:   mockDeviceUtils,
-				CloudProvider: nil,
-				Metadata:      Metadata{},
+			ns := &NodeServer{
+				driver:        nil,
+				mounter:       nil,
+				deviceutils:   mockDeviceUtils,
+				client: nil,
+				metadata:      Metadata{},
 			}
 
 			// Call the function we are testing
@@ -358,8 +358,8 @@ func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
 				tt.fsExpects(mockFileSystem)
 			}
 
-			ns := &LinodeNodeServer{
-				Mounter: &mount.SafeFormatAndMount{
+			ns := &NodeServer{
+				mounter: &mount.SafeFormatAndMount{
 					Interface: mockMounter,
 					Exec:      nil,
 				},
@@ -644,8 +644,8 @@ func TestLinodeNodeServer_prepareLUKSVolume(t *testing.T) {
 				tt.expectExecCalls(mockExec, mockCommand)
 			}
 
-			ns := &LinodeNodeServer{
-				Encrypt: NewLuksEncryption(mockExec, mockFileSystem),
+			ns := &NodeServer{
+				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 
 			got, err := ns.prepareLUKSVolume(tt.devicePath, tt.luksContext)
@@ -781,12 +781,12 @@ func TestLinodeNodeServer_mountVolume(t *testing.T) {
 				tt.expectMounterCalls(mockMounter)
 			}
 
-			ns := &LinodeNodeServer{
-				Mounter: &mount.SafeFormatAndMount{
+			ns := &NodeServer{
+				mounter: &mount.SafeFormatAndMount{
 					Interface: mockMounter,
 					Exec:      mockExec,
 				},
-				Encrypt: NewLuksEncryption(mockExec, mockFileSystem),
+				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 			if err := ns.mountVolume(tt.devicePath, tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("LinodeNodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
@@ -910,12 +910,12 @@ func TestLinodeNodeServer_closeLuksMountSources(t *testing.T) {
 				tt.expectMounterCalls(mockMounter)
 			}
 
-			ns := &LinodeNodeServer{
-				Mounter: &mount.SafeFormatAndMount{
+			ns := &NodeServer{
+				mounter: &mount.SafeFormatAndMount{
 					Interface: mockMounter,
 					Exec:      mockExec,
 				},
-				Encrypt: NewLuksEncryption(mockExec, mockFileSystem),
+				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 			if err := ns.closeLuksMountSources(tt.path); (err != nil) != tt.wantErr {
 				t.Errorf("LinodeNodeServer.closeLuksMountSources() error = %v, wantErr %v", err, tt.wantErr)
@@ -1269,8 +1269,8 @@ func TestLinodeNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				tt.expectMounterCalls(mockMounter)
 			}
 
-			ns := &LinodeNodeServer{
-				Mounter: &mount.SafeFormatAndMount{
+			ns := &NodeServer{
+				mounter: &mount.SafeFormatAndMount{
 					Interface: mockMounter,
 					Exec:      nil,
 				},
