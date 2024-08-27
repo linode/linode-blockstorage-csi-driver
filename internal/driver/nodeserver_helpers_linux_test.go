@@ -160,12 +160,12 @@ func TestLinodeNodeServer_mountVolume_linux(t *testing.T) {
 				tt.expectMounterCalls(mockMounter)
 			}
 
-			ns := &LinodeNodeServer{
-				Mounter: &mount.SafeFormatAndMount{
+			ns := &NodeServer{
+				mounter: &mount.SafeFormatAndMount{
 					Interface: mockMounter,
 					Exec:      mockExec,
 				},
-				Encrypt: NewLuksEncryption(mockExec, mockFileSystem),
+				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 			if err := ns.mountVolume(tt.devicePath, tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("LinodeNodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
