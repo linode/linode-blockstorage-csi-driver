@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linodego"
 )
 
@@ -100,7 +100,7 @@ func TestListVolumes(t *testing.T) {
 
 				var linodeVolume *linodego.Volume
 				for _, v := range tt.volumes {
-					key := common.CreateLinodeVolumeKey(v.ID, v.Label)
+					key := linodevolumes.CreateLinodeVolumeKey(v.ID, v.Label)
 					if volume.VolumeId == key.GetVolumeKey() {
 						v := v
 						linodeVolume = &v

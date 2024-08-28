@@ -22,16 +22,16 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 )
 
 const (
-	defaultFSType = "ext4"
-	rwPermission  = os.FileMode(0755)
+	defaultFSType                  = "ext4"
+	rwPermission                   = os.FileMode(0755)
 	ownerGroupReadWritePermissions = os.FileMode(0660)
 )
 
@@ -97,7 +97,7 @@ func validateNodePublishVolumeRequest(req *csi.NodePublishVolumeRequest) error {
 	}
 	if req.GetStagingTargetPath() == "" {
 		return errNoStagingTargetPath
-	} 
+	}
 	if req.GetTargetPath() == "" {
 		return errNoTargetPath
 	}
@@ -145,7 +145,7 @@ func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, [
 //
 // It uses the provided LinodeVolumeKey and partition information to generate
 // possible device paths, then verifies which path actually exists on the system.
-func (ns *NodeServer) findDevicePath(key common.LinodeVolumeKey, partition string) (string, error) {
+func (ns *NodeServer) findDevicePath(key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
 	// Get the device name and paths from the LinodeVolumeKey and partition.
 	deviceName := key.GetNormalizedLabel()
 	devicePaths := ns.deviceutils.GetDiskByIdPaths(deviceName, partition)
@@ -227,7 +227,7 @@ func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, 
 			return nil, errInternal("Failed remove mount target %q: %v", targetPath, err)
 		}
 		return nil, errInternal("Could not mount %q at %q: %v", devicePath, targetPath, err)
-	}	
+	}
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }

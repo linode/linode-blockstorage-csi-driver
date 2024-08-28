@@ -10,7 +10,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
@@ -197,14 +197,14 @@ func Test_getFSTypeAndMountOptions(t *testing.T) {
 func TestNodeServer_findDevicePath(t *testing.T) {
 	tests := []struct {
 		name           string
-		key            common.LinodeVolumeKey
+		key            linodevolumes.LinodeVolumeKey
 		expects        func(dUtils *mocks.MockDeviceUtils)
 		wantDevicePath string
 		wantErr        error
 	}{
 		{
 			name: "Error - Couldn't verify Linode Volume is attached",
-			key: common.LinodeVolumeKey{
+			key: linodevolumes.LinodeVolumeKey{
 				VolumeID: 123,
 				Label:    "test",
 			},
@@ -217,7 +217,7 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 		},
 		{
 			name: "Error - Couldn't get the devicepath to linode volume",
-			key: common.LinodeVolumeKey{
+			key: linodevolumes.LinodeVolumeKey{
 				VolumeID: 123,
 				Label:    "test",
 			},
@@ -230,7 +230,7 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 		},
 		{
 			name: "Success",
-			key: common.LinodeVolumeKey{
+			key: linodevolumes.LinodeVolumeKey{
 				VolumeID: 123,
 				Label:    "test",
 			},
@@ -966,31 +966,31 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
 	tests := []struct {
 		name    string
-		req *csi.NodeUnpublishVolumeRequest
+		req     *csi.NodeUnpublishVolumeRequest
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 		{
 			name: "Valid request",
 			req: &csi.NodeUnpublishVolumeRequest{
-				VolumeId:          "vol-123",
-				TargetPath:        "/mnt/staging",
+				VolumeId:   "vol-123",
+				TargetPath: "/mnt/staging",
 			},
 			wantErr: false,
 		},
 		{
 			name: "Missing volume ID",
 			req: &csi.NodeUnpublishVolumeRequest{
-				VolumeId:          "",
-				TargetPath:        "/mnt/staging",
+				VolumeId:   "",
+				TargetPath: "/mnt/staging",
 			},
 			wantErr: true,
 		},
 		{
 			name: "Missing staging target path",
 			req: &csi.NodeUnpublishVolumeRequest{
-				VolumeId:          "vol-123",
-				TargetPath:        "",
+				VolumeId:   "vol-123",
+				TargetPath: "",
 			},
 			wantErr: true,
 		},
@@ -1080,14 +1080,14 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 
 func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 	tests := []struct {
-		name    string
-		req          *csi.NodePublishVolumeRequest
-		mountOptions []string
-		expectFsCalls     func(m *mocks.MockFileSystem, f *mocks.MockFileInterface)
+		name               string
+		req                *csi.NodePublishVolumeRequest
+		mountOptions       []string
+		expectFsCalls      func(m *mocks.MockFileSystem, f *mocks.MockFileInterface)
 		expectMounterCalls func(m *mocks.MockMounter)
 		expectFileCalls    func(m *mocks.MockFileInterface)
-		want    *csi.NodePublishVolumeResponse
-		wantErr bool
+		want               *csi.NodePublishVolumeResponse
+		wantErr            bool
 	}{
 		{
 			name: "Valid request",
@@ -1095,24 +1095,24 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "/dev/sda",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+			mountOptions: []string{"bind"},
+			expectFsCalls: func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
 				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
 				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(f, nil)
 			},
 			expectMounterCalls: func(m *mocks.MockMounter) {
 				m.EXPECT().Mount("/dev/sda", "/mnt/target", "", []string{"bind"}).Return(nil)
 			},
-			expectFileCalls:    func(m *mocks.MockFileInterface) {
+			expectFileCalls: func(m *mocks.MockFileInterface) {
 				m.EXPECT().Close().Return(nil)
 			},
-			want:              &csi.NodePublishVolumeResponse{},
-			wantErr:           false,
+			want:    &csi.NodePublishVolumeResponse{},
+			wantErr: false,
 		},
 		{
 			name: "Error - devicePath missing",
@@ -1120,17 +1120,17 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     nil,
+			mountOptions:       []string{"bind"},
+			expectFsCalls:      nil,
 			expectMounterCalls: nil,
 			expectFileCalls:    nil,
-			want:              nil,
-			wantErr:           true,
+			want:               nil,
+			wantErr:            true,
 		},
 		{
 			name: "Error - unable to create targetPathDir",
@@ -1138,19 +1138,19 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "/dev/sda",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+			mountOptions: []string{"bind"},
+			expectFsCalls: func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
 				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(fmt.Errorf("unable to create targetPathDir..."))
 			},
 			expectMounterCalls: nil,
 			expectFileCalls:    nil,
-			want:              nil,
-			wantErr:           true,
+			want:               nil,
+			wantErr:            true,
 		},
 		{
 			name: "Error - unable to create file at targetPath",
@@ -1158,21 +1158,21 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "/dev/sda",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+			mountOptions: []string{"bind"},
+			expectFsCalls: func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
 				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
 				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(nil, fmt.Errorf("unable to create file..."))
 				m.EXPECT().Remove("/mnt/target").Return(nil)
 			},
 			expectMounterCalls: nil,
 			expectFileCalls:    nil,
-			want:              nil,
-			wantErr:           true,
+			want:               nil,
+			wantErr:            true,
 		},
 		{
 			name: "Error - unable to create file at targetPath and remove targetPath fails",
@@ -1180,21 +1180,21 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "/dev/sda",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+			mountOptions: []string{"bind"},
+			expectFsCalls: func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
 				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
 				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(nil, fmt.Errorf("unable to create file..."))
 				m.EXPECT().Remove("/mnt/target").Return(fmt.Errorf("unable to remove %s...", "/mnt/target"))
 			},
 			expectMounterCalls: nil,
 			expectFileCalls:    nil,
-			want:              nil,
-			wantErr:           true,
+			want:               nil,
+			wantErr:            true,
 		},
 		{
 			name: "Error - unable to mount the block device to targetPath",
@@ -1202,25 +1202,25 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "/dev/sda",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+			mountOptions: []string{"bind"},
+			expectFsCalls: func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
 				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
 				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(f, nil)
 				m.EXPECT().Remove("/mnt/target").Return(nil)
 			},
-			expectMounterCalls: func (m *mocks.MockMounter) {
+			expectMounterCalls: func(m *mocks.MockMounter) {
 				m.EXPECT().Mount("/dev/sda", "/mnt/target", "", []string{"bind"}).Return(fmt.Errorf("unable to mount..."))
 			},
-			expectFileCalls:    func (f *mocks.MockFileInterface) {
+			expectFileCalls: func(f *mocks.MockFileInterface) {
 				f.EXPECT().Close().Return(nil)
 			},
-			want:              nil,
-			wantErr:           true,
+			want:    nil,
+			wantErr: true,
 		},
 		{
 			name: "Error - unable to mount the block device to targetPath and remove targetPath fails",
@@ -1228,25 +1228,25 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				VolumeId:          "vol-123",
 				StagingTargetPath: "/mnt/staging",
 				TargetPath:        "/mnt/target",
-				PublishContext:    map[string]string{
+				PublishContext: map[string]string{
 					"devicePath": "/dev/sda",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
-			mountOptions:      []string{"bind"},
-			expectFsCalls:     func (m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
+			mountOptions: []string{"bind"},
+			expectFsCalls: func(m *mocks.MockFileSystem, f *mocks.MockFileInterface) {
 				m.EXPECT().MkdirAll("/mnt", rwPermission).Return(nil)
 				m.EXPECT().OpenFile("/mnt/target", os.O_CREATE, ownerGroupReadWritePermissions).Return(f, nil)
 				m.EXPECT().Remove("/mnt/target").Return(fmt.Errorf("unable to remove %s...", "/mnt/target"))
 			},
-			expectMounterCalls: func (m *mocks.MockMounter) {
+			expectMounterCalls: func(m *mocks.MockMounter) {
 				m.EXPECT().Mount("/dev/sda", "/mnt/target", "", []string{"bind"}).Return(fmt.Errorf("unable to mount the block device at %s...", "/mnt/target"))
 			},
-			expectFileCalls:    func (f *mocks.MockFileInterface) {
+			expectFileCalls: func(f *mocks.MockFileInterface) {
 				f.EXPECT().Close().Return(nil)
 			},
-			want:              nil,
-			wantErr:           true,
+			want:    nil,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

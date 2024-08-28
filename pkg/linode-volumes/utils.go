@@ -1,4 +1,4 @@
-package common
+package linodevolumes
 
 import (
 	"fmt"
