@@ -15,6 +15,8 @@ limitations under the License.
 package driver
 
 import (
+	"fmt"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -23,27 +25,36 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type LinodeIdentityServer struct {
-	Driver *LinodeDriver
+type IdentityServer struct {
+	driver *LinodeDriver
 
 	csi.UnimplementedIdentityServer
 }
 
+func NewIdentityServer(linodeDriver *LinodeDriver) (*IdentityServer, error) {
+	if linodeDriver == nil {
+		return nil, fmt.Errorf("linodeDriver cannot be nil")
+	}
+	return &IdentityServer{
+		driver: linodeDriver,
+	}, nil
+}
+
 // GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
-func (linodeIdentity *LinodeIdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+func (linodeIdentity *IdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	klog.V(5).Infof("Using default GetPluginInfo")
 
-	if linodeIdentity.Driver.name == "" {
+	if linodeIdentity.driver.name == "" {
 		return nil, status.Error(codes.Unavailable, "Driver name not configured")
 	}
 
 	return &csi.GetPluginInfoResponse{
-		Name:          linodeIdentity.Driver.name,
-		VendorVersion: linodeIdentity.Driver.vendorVersion,
+		Name:          linodeIdentity.driver.name,
+		VendorVersion: linodeIdentity.driver.vendorVersion,
 	}, nil
 }
 
-func (linodeIdentity *LinodeIdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
+func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	klog.V(5).Infof("Using default GetPluginCapabilities")
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
@@ -72,14 +83,14 @@ func (linodeIdentity *LinodeIdentityServer) GetPluginCapabilities(ctx context.Co
 	}, nil
 }
 
-func (linodeIdentity *LinodeIdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+func (linodeIdentity *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	klog.V(4).Infof("Probe called with args: %#v", req)
-	linodeIdentity.Driver.readyMu.Lock()
-	defer linodeIdentity.Driver.readyMu.Unlock()
+	linodeIdentity.driver.readyMu.Lock()
+	defer linodeIdentity.driver.readyMu.Unlock()
 
 	return &csi.ProbeResponse{
 		Ready: &wrapperspb.BoolValue{
-			Value: linodeIdentity.Driver.ready,
+			Value: linodeIdentity.driver.ready,
 		},
 	}, nil
 }
