@@ -113,8 +113,6 @@ remote-cluster-deploy:
 		| yq 'select(.metadata.name != "$(TEST_CLUSTER_NAME)-csi-driver-linode")' \
 		| kubectl apply -f -
 	kubectl wait --for=condition=ControlPlaneReady  cluster/$(TEST_CLUSTER_NAME) --timeout=600s
-	kubectl describe cluster $(TEST_CLUSTER_NAME)
-	kubectl get all -A
 	clusterctl get kubeconfig $(TEST_CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 
 	# Install CSI driver and wait for it to be ready
