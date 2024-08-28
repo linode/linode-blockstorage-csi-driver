@@ -13,20 +13,19 @@ curl -L ${URL} -o ${OUT_TAR}
 tar xzvf ${OUT_TAR} -C ${OUT_DIR}
 
 # Run k8s e2e tests for storage driver
-./${OUT_DIR}/kubernetes/test/bin/e2e.test \
-    -ginkgo.v \
-    -ginkgo.focus='External.Storage' \
-    --ginkgo.skip='disruptive' \
-    --ginkgo.skip='ephemeral' \
-    --ginkgo.skip='volume-expand' \
-    --ginkgo.skip='multiVolume' \
-    --ginkgo.skip='snapshottable' \
-    --ginkgo.skip='snapshottable-stress' \
-    --ginkgo.skip='\[Feature:VolumeSnapshotDataSource\]' \
-    --ginkgo.skip='\[Feature:Windows\]' \
-    --ginkgo.flake-attempts=3 \
-    --ginkgo.timeout=2h \
-    -storage.testdriver=tests/upstream-e2e/test-driver.yaml
+./${OUT_DIR}/kubernetes/test/bin/e2e.test                   `# runs kubernetes e2e tests` \
+    -ginkgo.v                                               `# enables verbose output` \
+    -ginkgo.focus='External.Storage'                        `# onl run external storage tests` \
+    --ginkgo.skip='\[Disruptive\]'                          `# skip disruptive tests as they need ssh access to nodes` \
+    --ginkgo.skip='volume-expand'                           `# skip volume-expand as its done manually for now` \
+    --ginkgo.skip='multiVolume'                             `# skip multi volume as some e2e tests were failing` \
+    --ginkgo.skip='snapshottable'                           `# skip as we don't support snapshots` \
+    --ginkgo.skip='snapshottable-stress'                    `# skip as we don't support snapshots` \
+    --ginkgo.skip='\[Feature:VolumeSnapshotDataSource\]'    `# skip as we don't support snapshots` \
+    --ginkgo.skip='\[Feature:Windows\]'                     `# skip as we don't support windows` \
+    --ginkgo.flake-attempts=3                               `# retry 3 times for flaky tests` \
+    --ginkgo.timeout=2h                                     `# tests can run for max 2 hours` \
+    -storage.testdriver=tests/upstream-e2e/test-driver.yaml `# configuration file for storage driver capabilities`
 
 # Remove downloaded files and binaries
 rm -rf ${OUT_DIR}
