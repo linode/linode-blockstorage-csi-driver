@@ -1,13 +1,11 @@
-package common_test
+package linodevolumes
 
 import (
 	"testing"
-
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 )
 
 func TestGetNormalizedLabelWithPrefix(t *testing.T) {
-	key := common.CreateLinodeVolumeKey(123, "foobar")
+	key := CreateLinodeVolumeKey(123, "foobar")
 	prefixed := key.GetNormalizedLabelWithPrefix("prefix-")
 
 	if prefixed != "prefix-foobar" {
@@ -16,7 +14,7 @@ func TestGetNormalizedLabelWithPrefix(t *testing.T) {
 }
 
 func TestGetVolumeKey(t *testing.T) {
-	key := common.CreateLinodeVolumeKey(123, "foobar")
+	key := CreateLinodeVolumeKey(123, "foobar")
 
 	label := key.GetNormalizedLabel()
 
@@ -27,7 +25,7 @@ func TestGetVolumeKey(t *testing.T) {
 
 func TestParseLinodeVolumeKey(t *testing.T) {
 	strKey := "123-foobar"
-	key, err := common.ParseLinodeVolumeKey(strKey)
+	key, err := ParseLinodeVolumeKey(strKey)
 	if err != nil {
 		t.Errorf("Error parsing volume key: %s", err)
 	}

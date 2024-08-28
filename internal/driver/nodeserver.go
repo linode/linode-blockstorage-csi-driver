@@ -20,8 +20,8 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/linode/linodego"
 	"golang.org/x/net/context"
@@ -61,16 +61,16 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	if req.GetReadonly() {
 		options = append(options, "ro")
 	}
-	
+
 	fs := mountmanager.NewFileSystem()
 	// publish block volume
 	if req.GetVolumeCapability().GetBlock() != nil {
 		return ns.nodePublishVolumeBlock(req, options, fs)
 	}
-	
+
 	// Path to where we want to mount the volume inside the pod
 	targetPath := req.GetTargetPath()
-	// Check if target path is a valid mount point. 
+	// Check if target path is a valid mount point.
 	// If not, create it.
 	notMnt, err := ns.ensureMountPoint(targetPath, fs)
 	if err != nil {
@@ -80,14 +80,14 @@ func (ns *LinodeNodeServer) NodePublishVolume(ctx context.Context, req *csi.Node
 	if !notMnt {
 		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
 		/*
-		1) Target Path MUST be the vol referenced by vol ID
-		2) VolumeCapability MUST match
-		3) Readonly MUST match
-		
+			1) Target Path MUST be the vol referenced by vol ID
+			2) VolumeCapability MUST match
+			3) Readonly MUST match
+
 		*/
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-	
+
 	// Path to the volume on the host where the volume is currently staged (mounted)
 	stagingTargetPath := req.GetStagingTargetPath()
 	// Mount stagingTargetPath to targetPath
@@ -138,7 +138,7 @@ func (ns *LinodeNodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeSt
 	}
 
 	// Get the LinodeVolumeKey which we need to find the device path
-	LinodeVolumeKey, err := common.ParseLinodeVolumeKey(req.GetVolumeId())
+	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(req.GetVolumeId())
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ func (ns *LinodeNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeE
 
 	// Check linode to see if a give volume exists by volume ID
 	// Make call to linode api using the linode api client
-	LinodeVolumeKey, err := common.ParseLinodeVolumeKey(req.GetVolumeId())
+	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(req.GetVolumeId())
 	if err != nil {
 		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}

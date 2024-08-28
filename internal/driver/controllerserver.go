@@ -15,8 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/common"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -137,7 +137,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Don't strip this when volume labels support sufficient length
 	condensedName := strings.Replace(name, "-", "", -1)
 
-	preKey := common.CreateLinodeVolumeKey(0, condensedName)
+	preKey := linodevolumes.CreateLinodeVolumeKey(0, condensedName)
 
 	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 	targetSizeGB := bytesToGB(size)
@@ -157,8 +157,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
-
-	// Attempt to get info about the source volume for 
+	// Attempt to get info about the source volume for
 	// volume cloning if the datasource is provided in the PVC.
 	// sourceVolumeInfo will be null if no content source is defined.
 	contentSource := req.GetVolumeContentSource()
@@ -202,7 +201,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
 
-	key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
+	key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      key.GetVolumeKey(),
@@ -235,7 +234,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 // DeleteVolume deletes the given volume. The function is idempotent.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	volID, statusErr := common.VolumeIdAsInt("DeleteVolume", req)
+	volID, statusErr := linodevolumes.VolumeIdAsInt("DeleteVolume", req)
 	if statusErr != nil {
 		return &csi.DeleteVolumeResponse{}, statusErr
 	}
@@ -265,12 +264,12 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 // ControllerPublishVolume attaches the given volume to the node
 func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	linodeID, statusErr := common.NodeIdAsInt("ControllerPublishVolume", req)
+	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
 		return &csi.ControllerPublishVolumeResponse{}, statusErr
 	}
 
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerPublishVolume", req)
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerPublishVolume", req)
 	if statusErr != nil {
 		return &csi.ControllerPublishVolumeResponse{}, statusErr
 	}
@@ -408,12 +407,12 @@ func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *l
 
 // ControllerUnpublishVolume deattaches the given volume from the node
 func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerUnpublishVolume", req)
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
-	linodeID, statusErr := common.NodeIdAsInt("ControllerUnpublishVolume", req)
+	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
@@ -452,7 +451,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 // ValidateVolumeCapabilities checks whether the volume capabilities requested are supported.
 func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
 	if statusErr != nil {
 		return &csi.ValidateVolumeCapabilitiesResponse{}, statusErr
 	}
@@ -518,7 +517,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
 	for _, vol := range volumes {
-		key := common.CreateLinodeVolumeKey(vol.ID, vol.Label)
+		key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
 
 		// If the volume is attached to a Linode instance, add it to the list.
 		//
@@ -578,7 +577,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 }
 
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	volumeID, statusErr := common.VolumeIdAsInt("ControllerExpandVolume", req)
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -622,7 +621,7 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 }
 
 // attemptGetContentSourceVolume attempts to get information about the Linode volume to clone from.
-func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*common.LinodeVolumeKey, error) {
+func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*linodevolumes.LinodeVolumeKey, error) {
 	// No content source was defined; no clone operation
 	if contentSource == nil {
 		return nil, nil
@@ -637,7 +636,7 @@ func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, c
 		return nil, errNoSourceVolume
 	}
 
-	volumeInfo, err := common.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
+	volumeInfo, err := linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
 	if err != nil {
 		return nil, errInternal("parse volume info from content source: %v", err)
 	}
@@ -656,7 +655,7 @@ func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, c
 
 // attemptCreateLinodeVolume attempts to create a volume while respecting
 // idempotency.
-func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *common.LinodeVolumeKey) (*linodego.Volume, error) {
+func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *linodevolumes.LinodeVolumeKey) (*linodego.Volume, error) {
 	// List existing volumes
 	jsonFilter, err := json.Marshal(map[string]string{"label": label})
 	if err != nil {
