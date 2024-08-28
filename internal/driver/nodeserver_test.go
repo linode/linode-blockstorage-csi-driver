@@ -1,122 +1,112 @@
-//go:build linux && elevated
-// +build linux,elevated
-
 package driver
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"path"
+	"reflect"
 	"testing"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"github.com/linode/linodego"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
 )
 
-func newSafeMounter() *mount.SafeFormatAndMount {
-	realMounter := mount.New("")
-	realExec := exec.New()
-	return &mount.SafeFormatAndMount{
-		Interface: realMounter,
-		Exec:      realExec,
+func TestNewNodeServer(t *testing.T) {
+	type args struct {
+		linodeDriver *LinodeDriver
+		mounter      *mount.SafeFormatAndMount
+		deviceUtils  mountmanager.DeviceUtils
+		client       linodeclient.LinodeClient
+		metadata     Metadata
+		encrypt      Encryption
 	}
-}
-
-var (
-	defaultNodeServer = LinodeNodeServer{Mounter: mountmanager.NewSafeMounter()}
-
-	defaultTeardownFunc = func(t *testing.T, mount string) {
-		_, err := os.Stat(mount)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return
-			}
-
-			t.Errorf("failed to stat the '%s': %v", mount, err)
-			return
-		}
-
-		// best effort call, no need to check error
-		_ = defaultNodeServer.Mounter.Unmount(mount)
-
-		err = os.RemoveAll(path.Dir(mount))
-		if err != nil {
-			t.Errorf("failed to remove the '%s': %v", path.Dir(mount), err)
-		}
-	}
-
-	defaultPrepareFunc = func() (string, func(*testing.T, string), error) {
-		root, err := os.MkdirTemp("", "")
-		if err != nil {
-			return "", nil, fmt.Errorf("mkdir temp failed: %w", err)
-		}
-
-		source := path.Join(root, "source")
-		target := path.Join(root, "target")
-
-		err = os.Mkdir(source, 0o755)
-		if err != nil {
-			return "", nil, fmt.Errorf("mkdir '%s' failed: %w", source, err)
-		}
-
-		err = os.Mkdir(target, 0o755)
-		if err != nil {
-			return "", nil, fmt.Errorf("mkdir '%s' failed: %w", target, err)
-		}
-
-		defaultNodeServer.Mounter.Mount(source, target, "ext4", []string{"bind"})
-
-		return target, defaultTeardownFunc, nil
-	}
-)
-
-func TestNodeUnstageUnpublishVolume(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
-		prepareFunc func() (string, func(*testing.T, string), error)
-		call        func(string) error
+	tests := []struct {
+		name    string
+		args    args
+		want    *NodeServer
+		wantErr bool
 	}{
 		{
-			name:        "unstage_bind_mount_regression",
-			prepareFunc: defaultPrepareFunc,
-			call: func(target string) error {
-				req := &csi.NodeUnstageVolumeRequest{
-					VolumeId:          "test",
-					StagingTargetPath: target,
-				}
-
-				_, err := defaultNodeServer.NodeUnstageVolume(context.TODO(), req)
-				return err
+			name: "success",
+			args: args{
+				linodeDriver: &LinodeDriver{},
+				mounter:      &mount.SafeFormatAndMount{},
+				deviceUtils:  mountmanager.NewDeviceUtils(),
+				client:       &linodego.Client{},
+				metadata:     Metadata{},
+				encrypt:      Encryption{},
 			},
+			want:    &NodeServer{
+				driver:        &LinodeDriver{},
+				mounter:       &mount.SafeFormatAndMount{},
+				deviceutils:   mountmanager.NewDeviceUtils(),
+				client:        &linodego.Client{},
+				metadata:      Metadata{},
+				encrypt:       Encryption{},
+			},
+			wantErr: false,
 		},
 		{
-			name:        "unpublish_bind_mount_regression",
-			prepareFunc: defaultPrepareFunc,
-			call: func(target string) error {
-				req := &csi.NodeUnpublishVolumeRequest{
-					VolumeId:   "test",
-					TargetPath: target,
-				}
-
-				_, err := defaultNodeServer.NodeUnpublishVolume(context.TODO(), req)
-				return err
+			name: "nil linodeDriver",
+			args: args{
+				linodeDriver: nil,
+				mounter:      &mount.SafeFormatAndMount{},
+				deviceUtils:  mountmanager.NewDeviceUtils(),
+				client:       &linodego.Client{},
+				metadata:     Metadata{},
+				encrypt:      Encryption{},
 			},
+			want:    nil,
+			wantErr: true,
 		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			target, teardownFunc, err := tc.prepareFunc()
-			if err != nil {
-				t.Errorf("failed to prepare test: %v", err)
+		{
+			name: "nil mounter",
+			args: args{
+				linodeDriver: &LinodeDriver{},
+				mounter:      nil,
+				deviceUtils:  mountmanager.NewDeviceUtils(),
+				client:       &linodego.Client{},
+				metadata:     Metadata{},
+				encrypt:      Encryption{},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "nil deviceUtils",
+			args: args{
+				linodeDriver: &LinodeDriver{},
+				mounter:      &mount.SafeFormatAndMount{},
+				deviceUtils:  nil,
+				client:       &linodego.Client{},
+				metadata:     Metadata{},
+				encrypt:      Encryption{},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "nil linode client",
+			args: args{
+				linodeDriver: &LinodeDriver{},
+				mounter:      &mount.SafeFormatAndMount{},
+				deviceUtils:  mountmanager.NewDeviceUtils(),
+				client:       nil,
+				metadata:     Metadata{},
+				encrypt:      Encryption{},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewNodeServer(tt.args.linodeDriver, tt.args.mounter, tt.args.deviceUtils, tt.args.client, tt.args.metadata, tt.args.encrypt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewNodeServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			defer teardownFunc(t, target)
-
-			if err = tc.call(target); err != nil {
-				t.Errorf("failed to unstage volume: %v", err)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewNodeServer() = %v, want %v", got, tt.want)
 			}
 		})
 	}

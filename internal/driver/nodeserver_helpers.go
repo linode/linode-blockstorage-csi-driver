@@ -145,13 +145,13 @@ func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, [
 //
 // It uses the provided LinodeVolumeKey and partition information to generate
 // possible device paths, then verifies which path actually exists on the system.
-func (ns *LinodeNodeServer) findDevicePath(key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
+func (ns *NodeServer) findDevicePath(key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
 	// Get the device name and paths from the LinodeVolumeKey and partition.
 	deviceName := key.GetNormalizedLabel()
-	devicePaths := ns.DeviceUtils.GetDiskByIdPaths(deviceName, partition)
+	devicePaths := ns.deviceutils.GetDiskByIdPaths(deviceName, partition)
 
 	// Verify the device path by checking if any of the paths exist.
-	devicePath, err := ns.DeviceUtils.VerifyDevicePath(devicePaths)
+	devicePath, err := ns.deviceutils.VerifyDevicePath(devicePaths)
 	if err != nil {
 		return "", errInternal("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err)
 	}
@@ -168,9 +168,9 @@ func (ns *LinodeNodeServer) findDevicePath(key linodevolumes.LinodeVolumeKey, pa
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
-func (ns *LinodeNodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) (bool, error) {
+func (ns *NodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) (bool, error) {
 	// Check if the staging target path is a mount point.
-	notMnt, err := ns.Mounter.IsLikelyNotMountPoint(path)
+	notMnt, err := ns.mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
 		// Checking IsNotExist returns true. If true, it mean we need to create directory at the target path.
 		if fs.IsNotExist(err) {
@@ -193,7 +193,7 @@ func (ns *LinodeNodeServer) ensureMountPoint(path string, fs mountmanager.FileSy
 // The function creates the target directory, creates a file to bind mount the block device to,
 // and mounts the volume using the provided mount options.
 // It returns a CSI NodePublishVolumeResponse and an error if the operation fails.
-func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, mountOptions []string, fs mountmanager.FileSystem) (*csi.NodePublishVolumeResponse, error) {
+func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, mountOptions []string, fs mountmanager.FileSystem) (*csi.NodePublishVolumeResponse, error) {
 	targetPath := req.GetTargetPath()
 	targetPathDir := filepath.Dir(targetPath)
 
@@ -222,7 +222,7 @@ func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeReq
 	file.Close()
 
 	// Mount the volume
-	if err := ns.Mounter.Mount(devicePath, targetPath, "", mountOptions); err != nil {
+	if err := ns.mounter.Mount(devicePath, targetPath, "", mountOptions); err != nil {
 		if removeErr := fs.Remove(targetPath); removeErr != nil {
 			return nil, errInternal("Failed remove mount target %q: %v", targetPath, err)
 		}
@@ -237,7 +237,7 @@ func (ns *LinodeNodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeReq
 // It handles both encrypted (LUKS) and non-encrypted volumes. For LUKS volumes,
 // it prepares the encrypted volume before mounting. The function determines
 // the filesystem type and mount options from the volume capability.
-func (ns *LinodeNodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeRequest) error {
+func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeRequest) error {
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeCapability := req.GetVolumeCapability()
 
@@ -258,9 +258,9 @@ func (ns *LinodeNodeServer) mountVolume(devicePath string, req *csi.NodeStageVol
 
 	// Format and mount the drive
 	klog.V(4).Info("formatting and mounting the drive")
-	if err := ns.Mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
-		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
-			devicePath, stagingTargetPath, fsType, mountOptions, err)
+	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
+		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v", 
+				devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}
 
 	return nil
@@ -271,12 +271,12 @@ func (ns *LinodeNodeServer) mountVolume(devicePath string, req *csi.NodeStageVol
 // It checks if the device at devicePath is already formatted with LUKS encryption.
 // If not, it formats the device using the provided LuksContext.
 // Finally, it prepares the LUKS volume for mounting.
-func (ns *LinodeNodeServer) prepareLUKSVolume(devicePath string, luksContext LuksContext) (string, error) {
+func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksContext) (string, error) {
 	// LUKS encryption enabled, check if the volume needs to be formatted.
 	klog.V(4).Info("LUKS encryption enabled")
 
 	// Validate if the device is formatted with LUKS encryption or if it needs formatting.
-	formatted, err := ns.Encrypt.blkidValid(devicePath)
+	formatted, err := ns.encrypt.blkidValid(devicePath)
 	if err != nil {
 		return "", errInternal("Failed to validate blkid (%q): %v", devicePath, err)
 	}
@@ -291,13 +291,13 @@ func (ns *LinodeNodeServer) prepareLUKSVolume(devicePath string, luksContext Luk
 		}
 
 		// Format the volume with LUKS encryption.
-		if err := ns.Encrypt.luksFormat(luksContext, devicePath); err != nil {
+		if err := ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
 			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 		}
 	}
 
 	// Prepare the LUKS volume for mounting.
-	luksSource, err := ns.Encrypt.luksPrepareMount(luksContext, devicePath)
+	luksSource, err := ns.encrypt.luksPrepareMount(luksContext, devicePath)
 	if err != nil {
 		return "", errInternal("Failed to prepare luks mount (%q): %v", devicePath, err)
 	}
@@ -308,20 +308,20 @@ func (ns *LinodeNodeServer) prepareLUKSVolume(devicePath string, luksContext Luk
 // closeMountSources closes any LUKS-encrypted mount sources associated with the given path.
 // It retrieves mount sources, checks if each source is a LUKS mapping, and closes it if so.
 // Returns an error if any operation fails during the process.
-func (ns *LinodeNodeServer) closeLuksMountSources(path string) error {
+func (ns *NodeServer) closeLuksMountSources(path string) error {
 	mountSources, err := ns.getMountSources(path)
 	if err != nil {
 		return errInternal("closeMountSources failed to to get mount sources %s: %v", path, err)
 	}
 	klog.V(4).Info("closing mount sources: ", mountSources)
 	for _, source := range mountSources {
-		isLuksMapping, mappingName, err := ns.Encrypt.isLuksMapping(source)
+		isLuksMapping, mappingName, err := ns.encrypt.isLuksMapping(source)
 		if err != nil {
 			return errInternal("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err)
 		}
 		if isLuksMapping {
 			klog.V(4).Infof("luksClose %s", mappingName)
-			if err := ns.Encrypt.luksClose(mappingName); err != nil {
+			if err := ns.encrypt.luksClose(mappingName); err != nil {
 				return errInternal("closeMountSources failed to close luks mount %s: %v", path, err)
 			}
 		}
@@ -333,15 +333,15 @@ func (ns *LinodeNodeServer) closeLuksMountSources(path string) error {
 // getMountSources retrieves the mount sources for a given target path using the 'findmnt' command.
 // It returns a slice of strings containing the mount sources, or an error if the operation fails.
 // If 'findmnt' is not found or returns no results, appropriate errors or an empty slice are returned.
-func (ns *LinodeNodeServer) getMountSources(target string) ([]string, error) {
-	_, err := ns.Mounter.Exec.LookPath("findmnt")
+func (ns *NodeServer) getMountSources(target string) ([]string, error) {
+	_, err := ns.mounter.Exec.LookPath("findmnt")
 	if err != nil {
 		if err == exec.ErrNotFound {
 			return nil, fmt.Errorf("%q executable not found in $PATH", "findmnt")
 		}
 		return nil, err
 	}
-	out, err := ns.Mounter.Exec.Command("sh", "-c", fmt.Sprintf("findmnt -o SOURCE -n -M %s", target)).CombinedOutput()
+	out, err := ns.mounter.Exec.Command("sh", "-c", fmt.Sprintf("findmnt -o SOURCE -n -M %s", target)).CombinedOutput()
 	if err != nil {
 		// findmnt exits with non zero exit status if it couldn't find anything
 		if strings.TrimSpace(string(out)) == "" {
