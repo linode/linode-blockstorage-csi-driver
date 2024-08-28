@@ -26,7 +26,7 @@ func newSafeMounter() *mount.SafeFormatAndMount {
 }
 
 var (
-	defaultNodeServer = NodeServer{Mounter: mountmanager.NewSafeMounter()}
+	defaultNodeServer = NodeServer{mounter: mountmanager.NewSafeMounter()}
 
 	defaultTeardownFunc = func(t *testing.T, mount string) {
 		_, err := os.Stat(mount)
@@ -40,7 +40,7 @@ var (
 		}
 
 		// best effort call, no need to check error
-		_ = defaultNodeServer.Mounter.Unmount(mount)
+		_ = defaultNodeServer.mounter.Unmount(mount)
 
 		err = os.RemoveAll(path.Dir(mount))
 		if err != nil {
@@ -67,7 +67,7 @@ var (
 			return "", nil, fmt.Errorf("mkdir '%s' failed: %w", target, err)
 		}
 
-		defaultNodeServer.Mounter.Mount(source, target, "ext4", []string{"bind"})
+		defaultNodeServer.mounter.Mount(source, target, "ext4", []string{"bind"})
 
 		return target, defaultTeardownFunc, nil
 	}
