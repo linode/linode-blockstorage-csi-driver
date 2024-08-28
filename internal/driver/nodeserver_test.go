@@ -26,7 +26,7 @@ func newSafeMounter() *mount.SafeFormatAndMount {
 }
 
 var (
-	defaultNodeServer = LinodeNodeServer{Mounter: mountmanager.NewSafeMounter()}
+	defaultNodeServer = NodeServer{Mounter: mountmanager.NewSafeMounter()}
 
 	defaultTeardownFunc = func(t *testing.T, mount string) {
 		_, err := os.Stat(mount)

@@ -15,7 +15,7 @@ import (
 	"k8s.io/utils/exec"
 )
 
-func TestLinodeNodeServer_mountVolume_linux(t *testing.T) {
+func TestNodeServer_mountVolume_linux(t *testing.T) {
 	var emptyStringArray []string
 	tests := []struct {
 		name               string
@@ -168,7 +168,7 @@ func TestLinodeNodeServer_mountVolume_linux(t *testing.T) {
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 			if err := ns.mountVolume(tt.devicePath, tt.req); (err != nil) != tt.wantErr {
-				t.Errorf("LinodeNodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

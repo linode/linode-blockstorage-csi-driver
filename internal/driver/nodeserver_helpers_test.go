@@ -194,7 +194,7 @@ func Test_getFSTypeAndMountOptions(t *testing.T) {
 	}
 }
 
-func TestLinodeNodeServer_findDevicePath(t *testing.T) {
+func TestNodeServer_findDevicePath(t *testing.T) {
 	tests := []struct {
 		name           string
 		key            common.LinodeVolumeKey
@@ -257,7 +257,7 @@ func TestLinodeNodeServer_findDevicePath(t *testing.T) {
 				tt.expects(mockDeviceUtils)
 			}
 
-			// Create a new LinodeNodeServer with the mocked DeviceUtils
+			// Create a new NodeServer with the mocked DeviceUtils
 			// No need to set other fields as the function we are testing doesn't use them
 			ns := &NodeServer{
 				driver:        nil,
@@ -273,13 +273,13 @@ func TestLinodeNodeServer_findDevicePath(t *testing.T) {
 				compareGRPCErrors(t, err, tt.wantErr)
 			}
 			if got != tt.wantDevicePath {
-				t.Errorf("LinodeNodeServer.findDevicePath() = %v, want %v", got, tt.wantDevicePath)
+				t.Errorf("NodeServer.findDevicePath() = %v, want %v", got, tt.wantDevicePath)
 			}
 		})
 	}
 }
 
-func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
+func TestNodeServer_ensureMountPoint(t *testing.T) {
 	tests := []struct {
 		name              string
 		stagingTargetPath string
@@ -368,13 +368,13 @@ func TestLinodeNodeServer_ensureMountPoint(t *testing.T) {
 				compareGRPCErrors(t, err, tt.wantErr)
 			}
 			if got != tt.want {
-				t.Errorf("LinodeNodeServer.ensureMountPoint() = %v, want %v", got, tt.want)
+				t.Errorf("NodeServer.ensureMountPoint() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestLinodeNodeServer_prepareLUKSVolume(t *testing.T) {
+func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 	tests := []struct {
 		name            string
 		expectFsCalls   func(m *mocks.MockFileSystem)
@@ -649,17 +649,17 @@ func TestLinodeNodeServer_prepareLUKSVolume(t *testing.T) {
 
 			got, err := ns.prepareLUKSVolume(tt.devicePath, tt.luksContext)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("LinodeNodeServer.prepareLUKSVolume() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeServer.prepareLUKSVolume() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("LinodeNodeServer.prepareLUKSVolume() = %v, want %v", got, tt.want)
+				t.Errorf("NodeServer.prepareLUKSVolume() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestLinodeNodeServer_mountVolume(t *testing.T) {
+func TestNodeServer_mountVolume(t *testing.T) {
 	tests := []struct {
 		name               string
 		devicePath         string
@@ -788,13 +788,13 @@ func TestLinodeNodeServer_mountVolume(t *testing.T) {
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 			if err := ns.mountVolume(tt.devicePath, tt.req); (err != nil) != tt.wantErr {
-				t.Errorf("LinodeNodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestLinodeNodeServer_closeLuksMountSources(t *testing.T) {
+func TestNodeServer_closeLuksMountSources(t *testing.T) {
 	tests := []struct {
 		name               string
 		expectMounterCalls func(m *mocks.MockMounter)
@@ -917,7 +917,7 @@ func TestLinodeNodeServer_closeLuksMountSources(t *testing.T) {
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 			if err := ns.closeLuksMountSources(tt.path); (err != nil) != tt.wantErr {
-				t.Errorf("LinodeNodeServer.closeLuksMountSources() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeServer.closeLuksMountSources() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -1078,7 +1078,7 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 	}
 }
 
-func TestLinodeNodeServer_nodePublishVolumeBlock(t *testing.T) {
+func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 	tests := []struct {
 		name    string
 		req          *csi.NodePublishVolumeRequest
@@ -1277,11 +1277,11 @@ func TestLinodeNodeServer_nodePublishVolumeBlock(t *testing.T) {
 
 			got, err := ns.nodePublishVolumeBlock(tt.req, tt.mountOptions, mockFileSystem)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("LinodeNodeServer.nodePublishVolumeBlock() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeServer.nodePublishVolumeBlock() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("LinodeNodeServer.nodePublishVolumeBlock() = %v, want %v", got, tt.want)
+				t.Errorf("NodeServer.nodePublishVolumeBlock() = %v, want %v", got, tt.want)
 			}
 		})
 	}
