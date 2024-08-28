@@ -4,7 +4,6 @@
 package driver
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -13,18 +12,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"golang.org/x/net/context"
-	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
 )
-
-func newSafeMounter() *mount.SafeFormatAndMount {
-	realMounter := mount.New("")
-	realExec := exec.New()
-	return &mount.SafeFormatAndMount{
-		Interface: realMounter,
-		Exec:      realExec,
-	}
-}
 
 var (
 	defaultNodeServer = NodeServer{mounter: mountmanager.NewSafeMounter()}
