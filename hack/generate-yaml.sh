@@ -1,5 +1,5 @@
 #!/bin/bash -e
-set -o pipefail
+set -ox pipefail
 # Generate manifests for deployment on Kubernetes
 
 # A tag name _must_ be supplied as the first argument

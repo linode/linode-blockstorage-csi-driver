@@ -86,14 +86,15 @@ generate-mock:
 
 ##@ Testing:
 
-TEST_IMAGE_TAG ?= $(shell git rev-parse --abbrev-ref HEAD)
-TEST_IMAGE_NAME ?= "linode/linode-blockstorage-csi-driver"
-K8S_VERSION ?= "v1.29.1"
-CAPI_VERSION ?= "v1.6.3"
-HELM_VERSION ?= "v0.2.1"
-CAPL_VERSION ?= "v0.3.1"
-CONTROLPLANE_NODES ?= 1
-WORKER_NODES ?= 0
+TEST_REGISTRY_NAME  ?= "docker.io"
+TEST_IMAGE_NAME     ?= "amoldeodhar/linode-blockstorage-csi-driver"
+TEST_IMAGE_TAG      ?= test
+K8S_VERSION         ?= "v1.29.1"
+CAPI_VERSION        ?= "v1.6.3"
+HELM_VERSION        ?= "v0.2.1"
+CAPL_VERSION        ?= "v0.3.1"
+CONTROLPLANE_NODES  ?= 1
+WORKER_NODES        ?= 0
 
 # Setting unique cluster name
 TEST_CLUSTER_NAME ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
@@ -102,8 +103,20 @@ TEST_CLUSTER_NAME ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
 test-image-tags:
 	@echo $(TEST_IMAGE_TAG)
 
+.PHONY: juju
+juju:
+	@echo $(shell git rev-parse --abbrev-ref HEAD)
+
+.PHONY: docker-build-and-push-test
+docker-build-and-push-test:
+	@echo Amol
+	@echo $(TEST_REGISTRY_NAME)/$(TEST_IMAGE_NAME):$(TEST_IMAGE_TAG)
+	@echo Deodhar
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(TEST_REGISTRY_NAME)/$(TEST_IMAGE_NAME):$(TEST_IMAGE_TAG) --build-arg REV=$(REV) -f ./Dockerfile .
+	DOCKER_BUILDKIT=1 docker push $(TEST_REGISTRY_NAME)/$(TEST_IMAGE_NAME):$(TEST_IMAGE_TAG)
+
 .PHONY: remote-cluster-deploy
-remote-cluster-deploy:
+remote-cluster-deploy: docker-build-and-push-test local-deploy
 	# Create a CAPL test cluster without CSI driver and wait for it to be ready
 	clusterctl generate cluster $(TEST_CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
