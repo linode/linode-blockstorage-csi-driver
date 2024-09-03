@@ -74,8 +74,13 @@ func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context,
 			},
 			{
 				Type: &csi.PluginCapability_VolumeExpansion_{
+					// We currently only support offline volume expansion
+					// In order to use the feature:
+					// 	1. Update your PersistentVolumeClaim k8s object to desired size(note that the size needs to be more than what it currently is)
+					// 	2. Delete and recreate the pod that is using the PVC(or scale replicas accordingly)
+					// 	3. This operation should detach and re-attach the volume to the newly created pod allowing you to use the updated size
 					VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
-						Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+						Type: csi.PluginCapability_VolumeExpansion_OFFLINE,
 					},
 				},
 			},

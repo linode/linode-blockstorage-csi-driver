@@ -7,9 +7,13 @@ spec:
     - name: csi-example-container
       image: busybox
       volumeMounts:
-      - mountPath: "/data"
-        name: csi-example-volume
-      command: [ "sleep", "1000000" ]
+        - mountPath: "/data"
+          name: csi-example-volume
+      command: ["sleep", "1000000"]
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
   volumes:
     - name: csi-example-volume
       persistentVolumeClaim:
