@@ -297,7 +297,17 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 	if volume.LinodeID != nil {
 		if *volume.LinodeID == linodeID {
-			return &csi.ControllerPublishVolumeResponse{}, nil
+			klog.V(4).Infof("[ControllerPublishVolume] volume %d is attached on instance %d with path '%s'",
+				volume.ID,
+				*volume.LinodeID,
+				volume.FilesystemPath,
+			)
+			pvInfo := map[string]string{
+				devicePathKey: volume.FilesystemPath,
+			}
+			return &csi.ControllerPublishVolumeResponse{
+				PublishContext: pvInfo,
+			}, nil
 		}
 		return &csi.ControllerPublishVolumeResponse{}, errVolumeAttached(volumeID, linodeID)
 	}
