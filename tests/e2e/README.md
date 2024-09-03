@@ -23,7 +23,7 @@ export KUBERNETES_VERSION=v1.29.1
 export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
 export LINODE_MACHINE_TYPE=g6-standard-2
 
-devbox run local-deploy
+devbox run mgmt-cluster
 ```
 This will download all the necessary binaries to local bin and create a local mgmt cluster.
 
@@ -47,9 +47,9 @@ If you do not have PR open, follow the steps below:
 In order create a test cluster, run the following command:
 
 ```sh
-TEST_IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver TEST_IMAGE_TAG=test-e2e devbox run remote-cluster-deploy
+IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_VERSION=test-e2e devbox run capl-cluster
 ```
-> You don't need to pass TEST_IMAGE_TAG and TEST_IMAGE_NAME if you have a PR open
+> You don't need to pass IMAGE_NAME and IMAGE_VERSION if you have a PR open
 
 The above command will create a test cluster, install CSI driver using the test image, and export kubeconfig of test-cluster to the root directory
 
