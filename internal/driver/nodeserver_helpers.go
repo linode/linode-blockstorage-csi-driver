@@ -259,8 +259,8 @@ func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeReq
 	// Format and mount the drive
 	klog.V(4).Info("formatting and mounting the drive")
 	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
-		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v", 
-				devicePath, stagingTargetPath, fsType, mountOptions, err)
+		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
+			devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}
 
 	return nil
@@ -272,6 +272,7 @@ func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeReq
 // If not, it formats the device using the provided LuksContext.
 // Finally, it prepares the LUKS volume for mounting.
 func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksContext) (string, error) {
+	var luksSource string
 	// LUKS encryption enabled, check if the volume needs to be formatted.
 	klog.V(4).Info("LUKS encryption enabled")
 
@@ -291,15 +292,9 @@ func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksConte
 		}
 
 		// Format the volume with LUKS encryption.
-		if err := ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
+		if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
 			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 		}
-	}
-
-	// Prepare the LUKS volume for mounting.
-	luksSource, err := ns.encrypt.luksPrepareMount(luksContext, devicePath)
-	if err != nil {
-		return "", errInternal("Failed to prepare luks mount (%q): %v", devicePath, err)
 	}
 
 	return luksSource, nil
@@ -341,7 +336,7 @@ func (ns *NodeServer) getMountSources(target string) ([]string, error) {
 		}
 		return nil, err
 	}
-	out, err := ns.mounter.Exec.Command("sh", "-c", fmt.Sprintf("findmnt -o SOURCE -n -M %s", target)).CombinedOutput()
+	out, err := ns.mounter.Exec.Command("sh", "-c", fmt.Sprintf("findmnt -o SOURCE -n -M %s", target)).CombinedOutput() // https://pkg.go.dev/k8s.io/utils/mount#GetDeviceNameFromMount
 	if err != nil {
 		// findmnt exits with non zero exit status if it couldn't find anything
 		if strings.TrimSpace(string(out)) == "" {

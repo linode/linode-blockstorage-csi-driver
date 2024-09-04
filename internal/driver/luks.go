@@ -25,12 +25,14 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	cryptsetup "github.com/martinjungblut/go-cryptsetup"
 )
 
 type LuksContext struct {
@@ -116,59 +118,39 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 	}
 }
 
-func (e *Encryption) luksFormat(ctx LuksContext, source string) error {
-	cryptsetupCmd, err := e.getCryptsetupCmd()
+func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) {
+	luks2 := cryptsetup.LUKS2{SectorSize: 512}
+	keySize, err := strconv.Atoi(ctx.EncryptionKeySize)
 	if err != nil {
-		return err
-	}
-
-	// initialize the luks partition
-	cryptsetupArgs := []string{
-		"-v",
-		"--batch-mode",
-		"--cipher", ctx.EncryptionCipher,
-		"--key-size", ctx.EncryptionKeySize,
-		"--key-file", "-",
-		"luksFormat", source,
-	}
-
-	klog.V(4).Info("executing cryptsetup luksFormat command ", cryptsetupArgs)
-
-	cmd := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...)
-
-	// Set the encryption key as stdin
-	cmd.SetStdin(strings.NewReader(ctx.EncryptionKey))
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("cryptsetup luksFormat failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
-	}
-
-	// open the luks partition
-	klog.V(4).Info("luksOpen ", source)
-	err = e.luksOpen(ctx, source)
-	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
-	}
-
-	defer func() {
-		if e := e.luksClose(ctx.VolumeName); e != nil {
-			klog.Errorf("cannot close luks device: %s", e.Error())
-		}
-	}()
-
-	klog.V(4).Info("The LUKS volume name is ", ctx.VolumeName)
-
-	return nil
-}
-
-// prepares a luks-encrypted volume for mounting and returns the path of the mapped volume
-func (e *Encryption) luksPrepareMount(ctx LuksContext, source string) (string, error) {
-	if err := e.luksOpen(ctx, source); err != nil {
 		return "", err
 	}
+	genericParams := cryptsetup.GenericParams{
+		Cipher:        ctx.EncryptionCipher,
+		CipherMode:    "xts-plain64",
+		VolumeKeySize: keySize,
+	}
+	device, err := cryptsetup.Init(source)
+	if err != nil {
+		return "", err
+	}
+	err = device.Format(luks2, genericParams)
+	if err != nil {
+		return "", err
+	}
+	err = device.KeyslotAddByVolumeKey(0, "", "")
+	if err != nil {
+		return "", err
+	}
+	defer device.Free()
+	err = device.Load(nil)
+	if err != nil {
+		return "", err
+	}
+	err = device.ActivateByPassphrase(ctx.VolumeName, 0, "", 0)
+	if err != nil {
+		return "", err
+	}
+	klog.V(4).Info("The volume has been LUKS formatted ", ctx.VolumeName)
 	return "/dev/mapper/" + ctx.VolumeName, nil
 }
 

@@ -72,6 +72,8 @@ github.com/linode/go-metadata v0.2.0/go.mod h1:XraDbSwms0+CtA7/Qh7agkSvGDc6H0s78
 github.com/linode/linodego v1.35.0 h1:rIhUeCHBLEDlkoRnOTwzSGzljQ3ksXwLxacmXnrV+Do=
 github.com/linode/linodego v1.35.0/go.mod h1:JxuhOEAMfSxun6RU5/MgTKH2GGTmFrhKRj3wL1NFin0=
 github.com/mailru/easyjson v0.0.0-20160728113105-d5b7844b561a/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
+github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6 h1:YDjLk3wsL5ZLhLC4TIwIvT2NkSCAdAV6pzzZaRfj4jk=
+github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6/go.mod h1:gZoZ0+POlM1ge/VUxWpMmZVNPzzMJ7l436CgkQ5+qzU=
 github.com/moby/sys/mountinfo v0.6.2 h1:BzJjoreD5BMFNmD9Rus6gdd1pLuecOFPt8wC+Vygl78=
 github.com/moby/sys/mountinfo v0.6.2/go.mod h1:IJb6JQeOklcdMU9F5xQ8ZALD+CUr5VlGpwtX+VE0rpI=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
