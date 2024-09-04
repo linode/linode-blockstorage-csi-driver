@@ -142,8 +142,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 	targetSizeGB := bytesToGB(size)
 
-	klog.V(4).Infoln("create volume called", map[string]interface{}{
-		"method":                  "create_volume",
+	klog.V(4).Infoln("CreateVolume() called", map[string]interface{}{
 		"storage_size_giga_bytes": targetSizeGB, // bytes -> GB
 		"volume_name":             volumeName,
 	})
@@ -168,6 +167,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Attempt to create the volume while respecting idempotency.
 	// If the content source is defined, the source volume will be cloned to create a new volume.
+	klog.V(4).Infof("[CreateVolume] calling api to create volume %s", volumeName)
 	vol, err := cs.attemptCreateLinodeVolume(
 		ctx,
 		volumeName,
@@ -194,12 +194,13 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		statusPollTimeout = cloneTimeout()
 	}
 
+	klog.V(4).Infof("[CreateVolume] waiting for volume %d to be active", vol.ID)
 	if _, err := cs.client.WaitForVolumeStatus(
 		ctx, vol.ID, linodego.VolumeActive, statusPollTimeout); err != nil {
-		return &csi.CreateVolumeResponse{}, errInternal("wait for volume %d to be active: %v", vol.ID, err)
+		return &csi.CreateVolumeResponse{}, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}
 
-	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
+	klog.V(4).Infof("[CreateVolume] volume %d is active", vol.ID)
 
 	key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
 	resp := &csi.CreateVolumeResponse{
@@ -228,7 +229,9 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	klog.V(4).Infoln("volume finished creation", map[string]interface{}{"response": resp})
+	klog.V(4).Infoln("[CreateVolume] volume created successfully", map[string]interface{}{
+	    "response": 				resp,
+	})
 	return resp, nil
 }
 
@@ -239,11 +242,13 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return &csi.DeleteVolumeResponse{}, statusErr
 	}
 
-	klog.V(4).Infoln("delete volume called", map[string]interface{}{
+	klog.V(4).Infoln("DeleteVolume() called", map[string]interface{}{
 		"volume_id": volID,
 		"method":    "delete_volume",
 	})
 
+	// Check if the volume exists
+	klog.V(4).Infof("[DeleteVolume] checking if volume %d exists", volID)
 	vol, err := cs.client.GetVolume(ctx, volID)
 	if linodego.IsNotFound(err) {
 		return &csi.DeleteVolumeResponse{}, nil
@@ -254,11 +259,13 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return &csi.DeleteVolumeResponse{}, errVolumeInUse
 	}
 
+	// Delete the volume
+	klog.V(4).Infof("[DeleteVolume] deleting volume %d", volID)
 	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
 		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
 	}
 
-	klog.V(4).Info("volume is deleted")
+	klog.V(4).Infof("[DeleteVolume] volume %d is deleted successfully", volID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
@@ -282,11 +289,10 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability([]*csi.VolumeCapability{cap})
 	}
 
-	klog.V(4).Infof("controller publish volume called with %v", map[string]interface{}{
+	klog.V(4).Infoln("ControllerPublishVolume() called ", map[string]interface{}{
 		"volume_id": volumeID,
 		"node_id":   linodeID,
 		"cap":       cap,
-		"method":    "controller_publish_volume",
 	})
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
@@ -319,6 +325,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return &csi.ControllerPublishVolumeResponse{}, errInternal("get linode instance %d: %v", linodeID, err)
 	}
 
+	klog.V(4).Infof("[ControllerPublishVolume] checking volume %d can be attached to %d", volumeID, linodeID)
 	// Check to see if there is room to attach this volume to the instance.
 	if canAttach, err := cs.canAttach(ctx, instance); err != nil {
 		return &csi.ControllerPublishVolumeResponse{}, err
@@ -327,7 +334,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		// for the caller.
 		limit, err := cs.maxVolumeAttachments(ctx, instance)
 		if errors.Is(err, errNilInstance) {
-			return &csi.ControllerPublishVolumeResponse{}, status.Error(codes.Internal, "cannot calculate max volume attachments for a nil instance")
+			return &csi.ControllerPublishVolumeResponse{}, errInternal("cannot calculate max volume attachments for a nil instance")
 		} else if err != nil {
 			return &csi.ControllerPublishVolumeResponse{}, errMaxAttachments
 		}
@@ -343,6 +350,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// config.
 	persist := false
 
+	klog.V(4).Infof("[ControllerPublishVolume] executing attach volume %d on linode instance %d", volumeID, linodeID)
 	if _, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID:           linodeID,
 		PersistAcrossBoots: &persist,
@@ -354,12 +362,12 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return &csi.ControllerPublishVolumeResponse{}, status.Errorf(code, "attach volume: %v", err)
 	}
 
-	klog.V(4).Infoln("waiting for volume to attach")
+	klog.V(4).Infof("[ControllerPublishVolume] waiting for volume %d to attach", volumeID)
 	volume, err = cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
 		return &csi.ControllerPublishVolumeResponse{}, errInternal("wait for volume to attach: %v", err)
 	}
-	klog.V(4).Infof("volume %d is attached to instance %d with path '%s'",
+	klog.V(4).Infof("[ControllerPublishVolume] volume %d is attached on instance %d with path '%s'",
 		volume.ID,
 		*volume.LinodeID,
 		volume.FilesystemPath,
@@ -390,7 +398,7 @@ func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Ins
 
 	volumes, err := s.client.ListInstanceVolumes(ctx, instance.ID, nil)
 	if err != nil {
-		return false, status.Errorf(codes.Internal, "list instance volumes: %v", err)
+		return false, errInternal("list instance volumes: %v", err)
 	}
 
 	return len(volumes) < limit, nil
@@ -427,10 +435,9 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
-	klog.V(4).Infoln("controller unpublish volume called", map[string]interface{}{
+	klog.V(4).Infoln("ControllerUnpublishVolume() called", map[string]interface{}{
 		"volume_id": volumeID,
 		"node_id":   linodeID,
-		"method":    "controller_unpublish_volume",
 	})
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
@@ -440,22 +447,23 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
 	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
-		klog.V(4).Infof("volume is attached to %d, not to %d, skipping", *volume.LinodeID, linodeID)
+		klog.V(4).Infof("[ControllerUnpublishVolume] volume is attached to %d, not to %d, skipping", *volume.LinodeID, linodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
+	klog.V(4).Infof("[ControllerUnpublishVolume] executing detach volume %d on linode instance %d", volumeID, linodeID)
 	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
 	}
 
-	klog.V(4).Infoln("waiting for detaching volume")
+	klog.V(4).Infof("[ControllerUnpublishVolume] waiting for detaching volume %d on linode instance %d", volumeID, linodeID)
 	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
 	}
 
-	klog.V(4).Info("volume is detached")
+	klog.V(4).Infof("[ControllerUnpublishVolume] volume %d is detached", volumeID)
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
@@ -477,17 +485,16 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errInternal("get volume: %v", err)
 	}
 
-	klog.V(4).Infoln("validate volume capabilities called", map[string]interface{}{
+	klog.V(4).Infoln("ValidateVolumeCapabilities() called", map[string]interface{}{
 		"volume_id":           req.VolumeId,
 		"volume_capabilities": req.VolumeCapabilities,
-		"method":              "validate_volume_capabilities",
 	})
 
 	resp := &csi.ValidateVolumeCapabilitiesResponse{}
 	if validVolumeCapabilities(volumeCapabilities) {
 		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
 	}
-	klog.V(4).Infoln("supported capabilities", map[string]interface{}{"response": resp})
+	klog.V(4).Infoln("[ValidateVolumeCapabilities] supported capabilities", map[string]interface{}{"response": resp})
 
 	return resp, nil
 }
@@ -514,12 +521,13 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
-	klog.V(4).Infoln("list volumes called", map[string]interface{}{
+	klog.V(4).Infoln("ListVolumes() called", map[string]interface{}{
 		"list_opts":          listOpts,
 		"req_starting_token": req.StartingToken,
-		"method":             "list_volumes",
 	})
 
+	// List all volumes
+	klog.V(4).Infoln("[ListVolumes] listing volumes with options", map[string]interface{}{"list_opts": listOpts})
 	volumes, err := cs.client.ListVolumes(ctx, listOpts)
 	if err != nil {
 		return &csi.ListVolumesResponse{}, errInternal("list volumes: %v", err)
@@ -569,7 +577,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		NextToken: nextToken,
 	}
 
-	klog.V(4).Infoln("volumes listed", map[string]interface{}{"response": resp})
+	klog.V(4).Infoln("[ListVolumes] volumes listed", map[string]interface{}{"response": resp})
 	return resp, nil
 }
 
@@ -579,9 +587,8 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 		Capabilities: cs.driver.cscap,
 	}
 
-	klog.V(4).Infoln("controller get capabilities called", map[string]interface{}{
+	klog.V(4).Infoln("ControllerGetCapabilities() called", map[string]interface{}{
 		"response": resp,
-		"method":   "controller_get_capabilities",
 	})
 	return resp, nil
 }
@@ -597,11 +604,12 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		return &csi.ControllerExpandVolumeResponse{}, errInternal("get requested size from capacity range: %v", err)
 	}
 
-	klog.V(4).Infoln("expand volume called", map[string]interface{}{
+	klog.V(4).Infoln("ControllerExpandVolume() called", map[string]interface{}{
 		"volume_id": volumeID,
-		"method":    "controller_expand_volume",
 	})
 
+	// Get the volume
+	klog.V(4).Infof("[ControllerExpandVolume] checking if volume %d exists", volumeID)
 	vol, err := cs.client.GetVolume(ctx, volumeID)
 	if err != nil {
 		return &csi.ControllerExpandVolumeResponse{}, errInternal("get volume: %v", err)
@@ -612,18 +620,21 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		return &csi.ControllerExpandVolumeResponse{}, errResizeDown
 	}
 
+	// Resize the volume
+	klog.V(4).Infof("[ControllerExpandVolume] calling api to resize volume %d", volumeID)
 	if err := cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
 		return &csi.ControllerExpandVolumeResponse{}, errInternal("resize volume %d: %v", volumeID, err)
 	}
 
+	// Wait for the volume to become active
+	klog.V(4).Infof("[ControllerExpandVolume] waiting for volume %d to become active", volumeID)
 	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
 	if err != nil {
-		return &csi.ControllerExpandVolumeResponse{}, errInternal("wait for volume %d to become active: %v", volumeID, err)
+		return &csi.ControllerExpandVolumeResponse{}, errInternal("timed out waiting for volume %d to become active: %v", volumeID, err)
 	}
+	klog.V(4).Infoln("[ControllerExpandVolume] volume active", map[string]interface{}{"vol": vol})
 
-	klog.V(4).Infoln("volume active", map[string]interface{}{"vol": vol})
-
-	klog.V(4).Info("volume is resized")
+	klog.V(4).Infof("[ControllerExpandVolume] volume %d is resized successfully", volumeID)
 	return &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         size,
 		NodeExpansionRequired: false,
