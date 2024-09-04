@@ -14,11 +14,10 @@ tar xzvf ${OUT_TAR} -C ${OUT_DIR}
 
 # Run k8s e2e tests for storage driver
 ./${OUT_DIR}/kubernetes/test/bin/e2e.test                   `# runs kubernetes e2e tests` \
-    -ginkgo.v                                               `# enables verbose output` \
-    -ginkgo.focus='External.Storage'                        `# onl run external storage tests` \
+    --ginkgo.vv                                             `# enables verbose output` \
+    --ginkgo.focus='External.Storage'                       `# only run external storage tests` \
     --ginkgo.skip='\[Disruptive\]'                          `# skip disruptive tests as they need ssh access to nodes` \
     --ginkgo.skip='volume-expand'                           `# skip volume-expand as its done manually for now` \
-    --ginkgo.skip='multiVolume'                             `# skip multi volume as some e2e tests were failing` \
     --ginkgo.skip='snapshottable'                           `# skip as we don't support snapshots` \
     --ginkgo.skip='snapshottable-stress'                    `# skip as we don't support snapshots` \
     --ginkgo.skip='\[Feature:VolumeSnapshotDataSource\]'    `# skip as we don't support snapshots` \
