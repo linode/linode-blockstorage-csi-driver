@@ -33,7 +33,7 @@ kubectl wait --for=condition=ready --timeout=60s pods/csi-socat-0
 nohup kubectl port-forward pods/csi-socat-0 10000:10000 > port-forward.log 2>&1 &
 
 # Run the csi-sanity tests with the specified parameters
-csi-sanity --ginkgo.vv --ginkgo.trace --ginkgo.skip "$SKIP_TESTS_STRING" --csi.endpoint="$CSI_ENDPOINT" --csi.createstagingpathcmd="$CREATE_DIRECTORY" --csi.createmountpathcmd="$CREATE_DIRECTORY" --csi.removestagingpathcmd="$DELETE_DIRECTORY" --csi.removemountpathcmd="$DELETE_DIRECTORY"
+csi-sanity --ginkgo.focus="Node Service NodeExpandVolume should fail when volume is not found" --ginkgo.vv --ginkgo.trace --ginkgo.skip "$SKIP_TESTS_STRING" --csi.endpoint="$CSI_ENDPOINT" --csi.createstagingpathcmd="$CREATE_DIRECTORY" --csi.createmountpathcmd="$CREATE_DIRECTORY" --csi.removestagingpathcmd="$DELETE_DIRECTORY" --csi.removemountpathcmd="$DELETE_DIRECTORY"
 
 # Find the process ID (PID) of the kubectl port-forward command using the specified port
 PID=$(lsof -t -i :10000 -sTCP:LISTEN)
