@@ -12,6 +12,10 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
+      - name: Install cryptsetup
+        run: |
+          apt install libcryptsetup12 libcryptset-dev
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
