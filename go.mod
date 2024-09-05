@@ -4,6 +4,8 @@ go 1.22.5
 
 require (
 	github.com/container-storage-interface/spec v1.10.0
+	github.com/go-logr/logr v1.4.1
+	github.com/google/uuid v1.6.0
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
 	github.com/linode/go-metadata v0.2.0
 	github.com/linode/linodego v1.35.0
@@ -19,7 +21,6 @@ require (
 )
 
 require (
-	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
 	golang.org/x/text v0.16.0 // indirect

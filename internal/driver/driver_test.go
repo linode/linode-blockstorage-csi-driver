@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"os"
@@ -53,8 +54,8 @@ func TestDriverSuite(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mounter := &mount.SafeFormatAndMount{
-		Interface: mocks.NewMockMounter(mockCtrl), 
-		Exec: mocks.NewMockExecutor(mockCtrl),
+		Interface: mocks.NewMockMounter(mockCtrl),
+		Exec:      mocks.NewMockExecutor(mockCtrl),
 	}
 	deviceUtils := mocks.NewMockDeviceUtils(mockCtrl)
 	fileSystem := mocks.NewMockFileSystem(mockCtrl)
@@ -77,11 +78,10 @@ func TestDriverSuite(t *testing.T) {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 
-	go linodeDriver.Run(endpoint)
+	go linodeDriver.Run(context.Background(), endpoint)
 
 	// TODO: fix sanity checks for e2e, disable for ci
 	// cfg := sanity.NewTestConfig()
 	// cfg.Address = endpoint
 	// sanity.Test(t, cfg)
 }
-
