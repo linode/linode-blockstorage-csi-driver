@@ -58,15 +58,22 @@ type LinodeDriver struct {
 // prefix.
 const MaxVolumeLabelPrefixLength = 12
 
-func GetLinodeDriver() *LinodeDriver {
-	return &LinodeDriver{
+func GetLinodeDriver(ctx context.Context) *LinodeDriver {
+	log, _, done := logger.GetLogger(ctx).WithMethod("GetLinodeDriver")
+	defer done()
+
+	log.V(4).Info("Creating LinodeDriver")
+	driver := &LinodeDriver{
 		vcap:  VolumeCapabilityAccessModes(),
 		cscap: ControllerServiceCapabilities(),
 		nscap: NodeServiceCapabilities(),
 	}
+	log.V(4).Info("LinodeDriver created successfully")
+	return driver
 }
 
 func (linodeDriver *LinodeDriver) SetupLinodeDriver(
+	ctx context.Context,
 	linodeClient linodeclient.LinodeClient,
 	mounter *mount.SafeFormatAndMount,
 	deviceUtils mountmanager.DeviceUtils,
@@ -76,6 +83,11 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	volumeLabelPrefix string,
 	encrypt Encryption,
 ) error {
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
+	defer done()
+
+	log.V(4).Info("Setting up LinodeDriver")
+
 	if name == "" {
 		return fmt.Errorf("driver name missing")
 	}
@@ -83,13 +95,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.name = name
 	linodeDriver.vendorVersion = vendorVersion
 
-	// Validate the volume label prefix, if it is set.
-	//
-	// First, we want to make sure it is the right length, then we will make
-	// sure it only contains the acceptable characters.
-	//
-	// When checking the length, we will convert it to a []rune first, to count
-	// the number of unicode characters.
+	log.V(3).Info("Validating volume label prefix", "prefix", volumeLabelPrefix)
 	if r := []rune(volumeLabelPrefix); len(r) > MaxVolumeLabelPrefixLength {
 		return fmt.Errorf("volume label prefix is too long: length=%d max=%d", len(r), MaxVolumeLabelPrefixLength)
 	}
@@ -102,33 +108,41 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	}
 	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
 
-	// Set up RPC Servers
-	linodeDriver.ns, err = NewNodeServer(linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt)
+	log.V(3).Info("Setting up RPC Servers")
+	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt)
 	if err != nil {
 		return fmt.Errorf("new node server: %w", err)
 	}
 
-	linodeDriver.ids, err = NewIdentityServer(linodeDriver)
+	linodeDriver.ids, err = NewIdentityServer(ctx, linodeDriver)
 	if err != nil {
 		return fmt.Errorf("new identity server: %w", err)
 	}
 
-	cs, err := NewControllerServer(linodeDriver, linodeClient, metadata)
+	cs, err := NewControllerServer(ctx, linodeDriver, linodeClient, metadata)
 	if err != nil {
 		return fmt.Errorf("new controller server: %w", err)
 	}
 	linodeDriver.cs = cs
 
+	log.V(4).Info("LinodeDriver setup completed successfully")
 	return nil
 }
 
-func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(c csi.ControllerServiceCapability_RPC_Type) error {
+func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.Context, c csi.ControllerServiceCapability_RPC_Type) error {
+	log, _, done := logger.GetLogger(ctx).WithMethod("ValidateControllerServiceRequest")
+	defer done()
+
+	log.V(4).Info("Validating controller service request", "type", c)
+
 	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
+		log.V(4).Info("Unknown controller service capability, skipping validation")
 		return nil
 	}
 
 	for _, cap := range linodeDriver.cscap {
 		if c == cap.GetRpc().Type {
+			log.V(4).Info("Controller service request validated successfully")
 			return nil
 		}
 	}
@@ -137,8 +151,10 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(c csi.Control
 }
 
 func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
-	log := logger.GetLogger(ctx)
-	log.V(4).Info("Driver", "name", linodeDriver.name)
+	log, _, done := logger.GetLogger(ctx).WithMethod("Run")
+	defer done()
+
+	log.V(4).Info("Starting LinodeDriver", "name", linodeDriver.name)
 	if len(linodeDriver.volumeLabelPrefix) > 0 {
 		log.V(4).Info("BS Volume Prefix", "prefix", linodeDriver.volumeLabelPrefix)
 	}
@@ -147,12 +163,10 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 	linodeDriver.ready = true
 	linodeDriver.readyMu.Unlock()
 
-	// Start the nonblocking GRPC
+	log.V(3).Info("Starting non-blocking GRPC server")
 	s := NewNonBlockingGRPCServer()
-	// TODO(#34): Only start specific servers based on a flag.
-	// In the future have this only run specific combinations of servers depending on which version this is.
-	// The schema for that was in util. basically it was just s.start but with some nil servers.
-
 	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
+	log.V(3).Info("GRPC server started successfully")
 	s.Wait()
+	log.V(4).Info("LinodeDriver run completed")
 }

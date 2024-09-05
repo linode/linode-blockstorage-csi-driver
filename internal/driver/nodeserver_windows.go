@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -8,6 +9,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func nodeGetVolumeStats(req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeGetVolumeStats is not yet implemented on Windows"))
 }
