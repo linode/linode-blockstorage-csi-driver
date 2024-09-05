@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	metadata "github.com/linode/go-metadata"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linodego"
 )
 
@@ -26,22 +27,39 @@ type Metadata struct {
 // function otherwise returns a non-nil error, callers should call
 // [GetMetadataFromAPI].
 func GetMetadata(ctx context.Context) (Metadata, error) {
+	log := logger.GetLogger(ctx)
+
+	log.V(2).Info("Processing request")
+
+	log.V(4).Info("Creating new metadata client")
 	client, err := metadata.NewClient(ctx)
 	if err != nil {
+		log.Error(err, "Failed to create new metadata client")
 		return Metadata{}, fmt.Errorf("new metadata client: %w", err)
 	}
 
+	log.V(4).Info("Retrieving instance data from metadata service")
 	data, err := client.GetInstance(ctx)
 	if err != nil {
+		log.Error(err, "Failed to get instance data from metadata service")
 		return Metadata{}, fmt.Errorf("get instance data: %w", err)
 	}
 
-	return Metadata{
+	log.V(4).Info("Successfully retrieved metadata", 
+		"instanceID", data.ID,
+		"instanceLabel", data.Label,
+		"region", data.Region,
+		"memory", data.Specs.Memory)
+
+	metadata := Metadata{
 		ID:     data.ID,
 		Label:  data.Label,
 		Region: data.Region,
 		Memory: memoryToBytes(data.Specs.Memory),
-	}, nil
+	}
+
+	log.V(2).Info("Successfully completed")
+	return metadata, nil
 }
 
 // memoryToBytes converts the given amount of memory in MB, to bytes.
@@ -69,19 +87,28 @@ var errNilClient = errors.New("nil client")
 // GetMetadataFromAPI attempts to retrieve metadata about the current
 // node/instance directly from the Linode API.
 func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata, error) {
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
+	defer done()
+
+	log.V(2).Info("Processing request")
+
 	if client == nil {
 		return Metadata{}, errNilClient
 	}
 
+	log.V(4).Info("Checking LinodeIDPath", "path", LinodeIDPath)
 	if _, err := os.Stat(LinodeIDPath); err != nil {
 		return Metadata{}, fmt.Errorf("stat %s: %w", LinodeIDPath, err)
 	}
+
+	log.V(4).Info("Opening LinodeIDPath", "path", LinodeIDPath)
 	f, err := os.Open(LinodeIDPath)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("open: %w", err)
 	}
 	defer f.Close()
 
+	log.V(4).Info("Reading LinodeID from file")
 	// Read in the file, but use a LimitReader to make sure we are not
 	// reading in junk.
 	data, err := io.ReadAll(io.LimitReader(f, 1<<10))
@@ -89,11 +116,13 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 		return Metadata{}, fmt.Errorf("read all: %w", err)
 	}
 
+	log.V(4).Info("Parsing LinodeID")
 	linodeID, err := strconv.Atoi(string(data))
 	if err != nil {
 		return Metadata{}, fmt.Errorf("atoi: %w", err)
 	}
 
+	log.V(4).Info("Retrieving instance data from API", "linodeID", linodeID)
 	instance, err := client.GetInstance(ctx, linodeID)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("get instance: %w", err)
@@ -104,10 +133,19 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 		memory = memoryToBytes(instance.Specs.Memory)
 	}
 
-	return Metadata{
+	metadata := Metadata{
 		ID:     linodeID,
 		Label:  instance.Label,
 		Region: instance.Region,
 		Memory: memory,
-	}, nil
+	}
+
+	log.V(4).Info("Successfully retrieved metadata", 
+		"instanceID", metadata.ID,
+		"instanceLabel", metadata.Label,
+		"region", metadata.Region,
+		"memory", metadata.Memory)
+
+	log.V(2).Info("Successfully completed")
+	return metadata, nil
 }

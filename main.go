@@ -110,10 +110,10 @@ func handle(ctx context.Context) error {
 	fileSystem := mountmanager.NewFileSystem()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem)
 
-	metadata, err := driver.GetMetadata(context.Background())
+	metadata, err := driver.GetMetadata(ctx)
 	if err != nil {
 		log.Error(err, "Metadata service not available, falling back to API")
-		if metadata, err = driver.GetMetadataFromAPI(context.Background(), cloudProvider); err != nil {
+		if metadata, err = driver.GetMetadataFromAPI(ctx, cloudProvider); err != nil {
 			return fmt.Errorf("get metadata from api: %w", err)
 		}
 	}
