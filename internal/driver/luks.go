@@ -171,38 +171,6 @@ func (e *Encryption) luksClose(volume string) error {
 	return nil
 }
 
-func (e *Encryption) luksOpen(ctx LuksContext, volume string) error {
-	// check if the luks volume is already open
-	if _, err := e.FileSystem.Stat("/dev/mapper/" + ctx.VolumeName); !e.FileSystem.IsNotExist(err) {
-		klog.V(4).Infof("luks volume is already open %s", volume)
-		return nil
-	}
-
-	cryptsetupCmd, err := e.getCryptsetupCmd()
-	if err != nil {
-		return err
-	}
-	cryptsetupArgs := []string{
-		"--batch-mode",
-		"luksOpen",
-		"--key-file", "-",
-		volume, ctx.VolumeName,
-	}
-	klog.V(4).Info("executing cryptsetup luksOpen command")
-
-	cmd := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...)
-
-	// Set the encryption key as stdin
-	cmd.SetStdin(strings.NewReader(ctx.EncryptionKey))
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
-	}
-	return nil
-}
-
 // check is a given mapping under /dev/mapper is a luks volume
 func (e *Encryption) isLuksMapping(volume string) (bool, string, error) {
 	if strings.HasPrefix(volume, "/dev/mapper/") {
