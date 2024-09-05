@@ -21,6 +21,7 @@ require (
 require (
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect

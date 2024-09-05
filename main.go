@@ -69,17 +69,26 @@ func main() {
 	klog.InitFlags(nil)
 	_ = flag.Set("logtostderr", "true")
 	flag.Parse()
-	if err := handle(); err != nil {
-		klog.Fatal(err)
+
+	// Create a base context with the logger
+	ctx := context.Background()
+	logger := driver.NewLogger(ctx)
+	ctx = context.WithValue(ctx, driver.LoggerKey{}, logger)
+
+	if err := handle(ctx); err != nil {
+		logger.Error(err, "Fatal error")
+		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
-func handle() error {
+func handle(ctx context.Context) error {
+	logger := driver.GetLogger(ctx)
+
 	if vendorVersion == "" {
 		return errors.New("vendorVersion must be set at compile time")
 	}
-	klog.V(4).Infof("Driver vendor version %v", vendorVersion)
+	logger.V(4).Info("Driver vendor version", "version", vendorVersion)
 
 	cfg := loadConfig()
 	if cfg.linodeToken == "" {
@@ -102,7 +111,7 @@ func handle() error {
 
 	metadata, err := driver.GetMetadata(context.Background())
 	if err != nil {
-		klog.ErrorS(err, "Metadata service not available, falling back to API")
+		logger.Error(err, "Metadata service not available, falling back to API")
 		if metadata, err = driver.GetMetadataFromAPI(context.Background(), cloudProvider); err != nil {
 			return fmt.Errorf("get metadata from api: %w", err)
 		}
@@ -121,6 +130,6 @@ func handle() error {
 		return fmt.Errorf("setup driver: %v", err)
 	}
 
-	linodeDriver.Run(cfg.csiEndpoint)
+	linodeDriver.Run(ctx, cfg.csiEndpoint)
 	return nil
 }

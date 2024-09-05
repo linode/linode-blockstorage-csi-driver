@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -27,7 +28,6 @@ import (
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 )
 
@@ -135,10 +135,11 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(c csi.Control
 	return status.Error(codes.InvalidArgument, "Invalid controller service request")
 }
 
-func (linodeDriver *LinodeDriver) Run(endpoint string) {
-	klog.V(4).Infof("Driver: %v", linodeDriver.name)
+func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Driver", "name", linodeDriver.name)
 	if len(linodeDriver.volumeLabelPrefix) > 0 {
-		klog.V(4).Infof("BS Volume Prefix: %v", linodeDriver.volumeLabelPrefix)
+		logger.V(4).Info("BS Volume Prefix", "prefix", linodeDriver.volumeLabelPrefix)
 	}
 
 	linodeDriver.readyMu.Lock()

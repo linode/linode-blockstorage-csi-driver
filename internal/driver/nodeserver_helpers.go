@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,7 +51,10 @@ type Command interface {
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
 // It validates the volume ID, staging target path, and volume capability.
-func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) error {
+func validateNodeStageVolumeRequest(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering validateNodeStageVolumeRequest", "req", req)
+
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
 	}
@@ -60,38 +64,51 @@ func validateNodeStageVolumeRequest(req *csi.NodeStageVolumeRequest) error {
 	if req.GetVolumeCapability() == nil {
 		return errNoVolumeCapability
 	}
-	return nil
 
+	logger.V(4).Info("Exiting validateNodeStageVolumeRequest")
+	return nil
 }
 
 // validateNodeUnstageVolumeRequest validates the node unstage volume request.
 // It validates the volume ID and staging target path.
-func validateNodeUnstageVolumeRequest(req *csi.NodeUnstageVolumeRequest) error {
+func validateNodeUnstageVolumeRequest(ctx context.Context, req *csi.NodeUnstageVolumeRequest) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering validateNodeUnstageVolumeRequest", "req", req)
+
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
 	}
 	if req.GetStagingTargetPath() == "" {
 		return errNoStagingTargetPath
 	}
-	return nil
 
+	logger.V(4).Info("Exiting validateNodeUnstageVolumeRequest")
+	return nil
 }
 
 // validateNodeExpandVolumeRequest validates the node expand volume request.
 // It checks the volume ID and volume path in the provided request.
-func validateNodeExpandVolumeRequest(req *csi.NodeExpandVolumeRequest) error {
+func validateNodeExpandVolumeRequest(ctx context.Context, req *csi.NodeExpandVolumeRequest) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering validateNodeExpandVolumeRequest", "req", req)
+
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
 	}
 	if req.GetVolumePath() == "" {
 		return errNoVolumePath
 	}
+
+	logger.V(4).Info("Exiting validateNodeExpandVolumeRequest")
 	return nil
 }
 
 // validateNodePublishVolumeRequest validates the node publish volume request.
 // It checks the volume ID, staging target path, target path, and volume capability in the provided request.
-func validateNodePublishVolumeRequest(req *csi.NodePublishVolumeRequest) error {
+func validateNodePublishVolumeRequest(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering validateNodePublishVolumeRequest", "req", req)
+
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
 	}
@@ -104,24 +121,34 @@ func validateNodePublishVolumeRequest(req *csi.NodePublishVolumeRequest) error {
 	if req.GetVolumeCapability() == nil {
 		return errNoVolumeCapability
 	}
+
+	logger.V(4).Info("Exiting validateNodePublishVolumeRequest")
 	return nil
 }
 
 // validateNodeUnpublishVolumeRequest validates the node unpublish volume request.
 // It checks the volume ID and target path in the provided request.
-func validateNodeUnpublishVolumeRequest(req *csi.NodeUnpublishVolumeRequest) error {
+func validateNodeUnpublishVolumeRequest(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering validateNodeUnpublishVolumeRequest", "req", req)
+
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
 	}
 	if req.GetTargetPath() == "" {
 		return errNoTargetPath
 	}
+
+	logger.V(4).Info("Exiting validateNodeUnpublishVolumeRequest")
 	return nil
 }
 
 // getFSTypeAndMountOptions retrieves the file system type and mount options from the given volume capability.
 // If the capability is not set, the default file system type and empty mount options will be returned.
-func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, []string) {
+func getFSTypeAndMountOptions(ctx context.Context, volumeCapability *csi.VolumeCapability) (string, []string) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering getFSTypeAndMountOptions", "volumeCapability", volumeCapability)
+
 	// Use default file system type if not specified in the volume capability
 	fsType := defaultFSType
 	// Use mount options from the volume capability if specified
@@ -138,6 +165,7 @@ func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, [
 		}
 	}
 
+	logger.V(4).Info("Exiting getFSTypeAndMountOptions", "fsType", fsType, "mountOptions", mountOptions)
 	return fsType, mountOptions
 }
 
@@ -145,7 +173,10 @@ func getFSTypeAndMountOptions(volumeCapability *csi.VolumeCapability) (string, [
 //
 // It uses the provided LinodeVolumeKey and partition information to generate
 // possible device paths, then verifies which path actually exists on the system.
-func (ns *NodeServer) findDevicePath(key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
+func (ns *NodeServer) findDevicePath(ctx context.Context, key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering findDevicePath", "key", key, "partition", partition)
+
 	// Get the device name and paths from the LinodeVolumeKey and partition.
 	deviceName := key.GetNormalizedLabel()
 	devicePaths := ns.deviceutils.GetDiskByIdPaths(deviceName, partition)
@@ -163,12 +194,17 @@ func (ns *NodeServer) findDevicePath(key linodevolumes.LinodeVolumeKey, partitio
 
 	// If a device path is found, return it.
 	klog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
+
+	logger.V(4).Info("Exiting findDevicePath", "devicePath", devicePath)
 	return devicePath, nil
 }
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
-func (ns *NodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) (bool, error) {
+func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs mountmanager.FileSystem) (bool, error) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering ensureMountPoint", "path", path)
+
 	// Check if the staging target path is a mount point.
 	notMnt, err := ns.mounter.IsLikelyNotMountPoint(path)
 	if err != nil {
@@ -182,6 +218,8 @@ func (ns *NodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) 
 			return true, errInternal("Unknown error when checking mount point (%q): %v", path, err)
 		}
 	}
+
+	logger.V(4).Info("Exiting ensureMountPoint", "notMnt", notMnt)
 	return notMnt, nil
 }
 
@@ -193,7 +231,10 @@ func (ns *NodeServer) ensureMountPoint(path string, fs mountmanager.FileSystem) 
 // The function creates the target directory, creates a file to bind mount the block device to,
 // and mounts the volume using the provided mount options.
 // It returns a CSI NodePublishVolumeResponse and an error if the operation fails.
-func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, mountOptions []string, fs mountmanager.FileSystem) (*csi.NodePublishVolumeResponse, error) {
+func (ns *NodeServer) nodePublishVolumeBlock(ctx context.Context, req *csi.NodePublishVolumeRequest, mountOptions []string, fs mountmanager.FileSystem) (*csi.NodePublishVolumeResponse, error) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering nodePublishVolumeBlock", "req", req, "mountOptions", mountOptions)
+
 	targetPath := req.GetTargetPath()
 	targetPathDir := filepath.Dir(targetPath)
 
@@ -204,14 +245,14 @@ func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, 
 	}
 
 	// Create directory at the directory level of given path
-	klog.V(5).Infof("NodePublishVolume[block]: making targetPathDir %s", targetPathDir)
+	logger.V(4).Info("Making targetPathDir", "targetPathDir", targetPathDir)
 	if err := fs.MkdirAll(targetPathDir, rwPermission); err != nil {
-		klog.Errorf("mkdir failed on disk %s (%v)", targetPathDir, err)
+		logger.Error(err, "mkdir failed", "targetPathDir", targetPathDir)
 		return nil, errInternal("Failed to create directory %q: %v", targetPathDir, err)
 	}
 
 	// Make file to bind mount block device to file
-	klog.V(5).Infof("NodePublishVolume[block]: making target block bind mount device file %s", targetPath)
+	logger.V(4).Info("Making target block bind mount device file", "targetPath", targetPath)
 	file, err := fs.OpenFile(targetPath, os.O_CREATE, ownerGroupReadWritePermissions)
 	if err != nil {
 		if removeErr := fs.Remove(targetPath); removeErr != nil {
@@ -222,13 +263,19 @@ func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, 
 	file.Close()
 
 	// Mount the volume
+	logger.V(4).Info("Mounting volume", "devicePath", devicePath, "targetPath", targetPath, "mountOptions", mountOptions)
 	if err := ns.mounter.Mount(devicePath, targetPath, "", mountOptions); err != nil {
+		logger.Error(err, "Failed to mount volume", "devicePath", devicePath, "targetPath", targetPath)
 		if removeErr := fs.Remove(targetPath); removeErr != nil {
-			return nil, errInternal("Failed remove mount target %q: %v", targetPath, err)
+			return nil, errInternal("Failed to mount %q at %q: %v. Additionally, failed to remove mount target: %v", devicePath, targetPath, err, removeErr)
 		}
-		return nil, errInternal("Could not mount %q at %q: %v", devicePath, targetPath, err)
+		return nil, errInternal("Failed to mount %q at %q: %v", devicePath, targetPath, err)
 	}
+	logger.V(4).Info("Successfully mounted volume", "devicePath", devicePath, "targetPath", targetPath)
 
+	logger.V(4).Info("Successfully published block volume", "devicePath", devicePath, "targetPath", targetPath)
+
+	logger.V(4).Info("Exiting nodePublishVolumeBlock")
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -237,12 +284,15 @@ func (ns *NodeServer) nodePublishVolumeBlock(req *csi.NodePublishVolumeRequest, 
 // It handles both encrypted (LUKS) and non-encrypted volumes. For LUKS volumes,
 // it prepares the encrypted volume before mounting. The function determines
 // the filesystem type and mount options from the volume capability.
-func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeRequest) error {
+func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *csi.NodeStageVolumeRequest) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering mountVolume", "devicePath", devicePath, "req", req)
+
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeCapability := req.GetVolumeCapability()
 
 	// Retrieve the file system type and mount options from the volume capability
-	fsType, mountOptions := getFSTypeAndMountOptions(volumeCapability)
+	fsType, mountOptions := getFSTypeAndMountOptions(ctx, volumeCapability)
 
 	fmtAndMountSource := devicePath
 
@@ -250,19 +300,21 @@ func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeReq
 	luksContext := getLuksContext(req.Secrets, req.VolumeContext, VolumeLifecycleNodeStageVolume)
 	if luksContext.EncryptionEnabled {
 		var err error
-		fmtAndMountSource, err = ns.prepareLUKSVolume(devicePath, luksContext)
+		logger.V(4).Info("preparing luks volume", "devicePath", devicePath)
+		fmtAndMountSource, err = ns.prepareLUKSVolume(ctx, devicePath, luksContext)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Format and mount the drive
-	klog.V(4).Info("formatting and mounting the drive")
+	logger.V(4).Info("formatting and mounting the volume")
 	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
 		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v", 
 				devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}
 
+	logger.V(4).Info("Exiting mountVolume")
 	return nil
 }
 
@@ -271,9 +323,12 @@ func (ns *NodeServer) mountVolume(devicePath string, req *csi.NodeStageVolumeReq
 // It checks if the device at devicePath is already formatted with LUKS encryption.
 // If not, it formats the device using the provided LuksContext.
 // Finally, it prepares the LUKS volume for mounting.
-func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksContext) (string, error) {
+func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, luksContext LuksContext) (string, error) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering prepareLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
+
 	// LUKS encryption enabled, check if the volume needs to be formatted.
-	klog.V(4).Info("LUKS encryption enabled")
+	logger.V(4).Info("LUKS encryption enabled")
 
 	// Validate if the device is formatted with LUKS encryption or if it needs formatting.
 	formatted, err := ns.encrypt.blkidValid(devicePath)
@@ -283,7 +338,7 @@ func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksConte
 
 	// If the device is not, format it.
 	if !formatted {
-		klog.V(4).Info("luks volume now formatting: ", devicePath)
+		logger.V(4).Info("luks volume now formatting: ", devicePath)
 
 		// Validate the LUKS context.
 		if err := luksContext.validate(); err != nil {
@@ -297,43 +352,52 @@ func (ns *NodeServer) prepareLUKSVolume(devicePath string, luksContext LuksConte
 	}
 
 	// Prepare the LUKS volume for mounting.
+	logger.V(4).Info("preparing luks volume for mounting", "devicePath", devicePath)
 	luksSource, err := ns.encrypt.luksPrepareMount(luksContext, devicePath)
 	if err != nil {
 		return "", errInternal("Failed to prepare luks mount (%q): %v", devicePath, err)
 	}
 
+	logger.V(4).Info("Exiting prepareLUKSVolume", "luksSource", luksSource)
 	return luksSource, nil
 }
 
 // closeMountSources closes any LUKS-encrypted mount sources associated with the given path.
 // It retrieves mount sources, checks if each source is a LUKS mapping, and closes it if so.
 // Returns an error if any operation fails during the process.
-func (ns *NodeServer) closeLuksMountSources(path string) error {
-	mountSources, err := ns.getMountSources(path)
+func (ns *NodeServer) closeLuksMountSources(ctx context.Context, path string) error {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering closeLuksMountSources", "path", path)
+
+	mountSources, err := ns.getMountSources(ctx, path)
 	if err != nil {
 		return errInternal("closeMountSources failed to to get mount sources %s: %v", path, err)
 	}
-	klog.V(4).Info("closing mount sources: ", mountSources)
+	logger.V(4).Info("closing mount sources: ", mountSources)
 	for _, source := range mountSources {
 		isLuksMapping, mappingName, err := ns.encrypt.isLuksMapping(source)
 		if err != nil {
 			return errInternal("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err)
 		}
 		if isLuksMapping {
-			klog.V(4).Infof("luksClose %s", mappingName)
+			logger.V(4).Info("luksClose %s", mappingName)
 			if err := ns.encrypt.luksClose(mappingName); err != nil {
 				return errInternal("closeMountSources failed to close luks mount %s: %v", path, err)
 			}
 		}
 	}
 
+	logger.V(4).Info("Exiting closeLuksMountSources")
 	return nil
 }
 
 // getMountSources retrieves the mount sources for a given target path using the 'findmnt' command.
 // It returns a slice of strings containing the mount sources, or an error if the operation fails.
 // If 'findmnt' is not found or returns no results, appropriate errors or an empty slice are returned.
-func (ns *NodeServer) getMountSources(target string) ([]string, error) {
+func (ns *NodeServer) getMountSources(ctx context.Context, target string) ([]string, error) {
+	logger := GetLogger(ctx)
+	logger.V(4).Info("Entering getMountSources", "target", target)
+
 	_, err := ns.mounter.Exec.LookPath("findmnt")
 	if err != nil {
 		if err == exec.ErrNotFound {
@@ -350,5 +414,7 @@ func (ns *NodeServer) getMountSources(target string) ([]string, error) {
 		return nil, fmt.Errorf("checking mounted failed: %v cmd: %q output: %q",
 			err, "findmnt", string(out))
 	}
+
+	logger.V(4).Info("Exiting getMountSources", "sources", out)
 	return strings.Split(string(out), "\n"), nil
 }

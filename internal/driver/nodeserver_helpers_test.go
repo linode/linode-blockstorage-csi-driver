@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"testing"
 
+	"context"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
@@ -105,7 +107,7 @@ func TestValidateNodeStageVolumeRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateNodeStageVolumeRequest(tt.req)
+			got := validateNodeStageVolumeRequest(context.Background(), tt.req)
 			compareGRPCErrors(t, got, tt.err)
 		})
 	}
@@ -144,7 +146,7 @@ func Test_validateNodeUnstageVolumeRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateNodeUnstageVolumeRequest(tt.req)
+			got := validateNodeUnstageVolumeRequest(context.Background(), tt.req)
 			compareGRPCErrors(t, got, tt.err)
 		})
 	}
@@ -183,7 +185,7 @@ func Test_getFSTypeAndMountOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fsType, mountOptions := getFSTypeAndMountOptions(tt.volumeCapability)
+			fsType, mountOptions := getFSTypeAndMountOptions(context.Background(), tt.volumeCapability)
 			if fsType != tt.wantFsType {
 				t.Errorf("getFSTypeAndMountOptions() fsType = %v, want %v", fsType, tt.wantFsType)
 			}
@@ -268,7 +270,7 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 			}
 
 			// Call the function we are testing
-			got, err := ns.findDevicePath(tt.key, "test")
+			got, err := ns.findDevicePath(context.Background(), tt.key, "test")
 			if err != nil {
 				compareGRPCErrors(t, err, tt.wantErr)
 			}
@@ -363,7 +365,7 @@ func TestNodeServer_ensureMountPoint(t *testing.T) {
 					Exec:      nil,
 				},
 			}
-			got, err := ns.ensureMountPoint(tt.stagingTargetPath, mockFileSystem)
+			got, err := ns.ensureMountPoint(context.Background(), tt.stagingTargetPath, mockFileSystem)
 			if err != nil {
 				compareGRPCErrors(t, err, tt.wantErr)
 			}
@@ -647,7 +649,7 @@ func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
 
-			got, err := ns.prepareLUKSVolume(tt.devicePath, tt.luksContext)
+			got, err := ns.prepareLUKSVolume(context.Background(), tt.devicePath, tt.luksContext)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.prepareLUKSVolume() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -787,7 +789,7 @@ func TestNodeServer_mountVolume(t *testing.T) {
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
-			if err := ns.mountVolume(tt.devicePath, tt.req); (err != nil) != tt.wantErr {
+			if err := ns.mountVolume(context.Background(), tt.devicePath, tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -916,7 +918,7 @@ func TestNodeServer_closeLuksMountSources(t *testing.T) {
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
-			if err := ns.closeLuksMountSources(tt.path); (err != nil) != tt.wantErr {
+			if err := ns.closeLuksMountSources(context.Background(), tt.path); (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.closeLuksMountSources() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -956,7 +958,7 @@ func Test_validateNodeExpandVolumeRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateNodeExpandVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+			if err := validateNodeExpandVolumeRequest(context.Background(), tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodeExpandVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -997,7 +999,7 @@ func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateNodeUnpublishVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+			if err := validateNodeUnpublishVolumeRequest(context.Background(), tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodeUnpublishVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1071,7 +1073,7 @@ func Test_validateNodePublishVolumeRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateNodePublishVolumeRequest(tt.req); (err != nil) != tt.wantErr {
+			if err := validateNodePublishVolumeRequest(context.Background(), tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("validateNodePublishVolumeRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1275,7 +1277,7 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 				},
 			}
 
-			got, err := ns.nodePublishVolumeBlock(tt.req, tt.mountOptions, mockFileSystem)
+			got, err := ns.nodePublishVolumeBlock(context.Background(), tt.req, tt.mountOptions, mockFileSystem)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.nodePublishVolumeBlock() error = %v, wantErr %v", err, tt.wantErr)
 				return

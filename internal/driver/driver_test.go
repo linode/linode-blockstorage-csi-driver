@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"os"
@@ -77,7 +78,7 @@ func TestDriverSuite(t *testing.T) {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 
-	go linodeDriver.Run(endpoint)
+	go linodeDriver.Run(context.Background(), endpoint)
 
 	// TODO: fix sanity checks for e2e, disable for ci
 	// cfg := sanity.NewTestConfig()
