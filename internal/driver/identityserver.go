@@ -23,22 +23,23 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"k8s.io/klog/v2"
 )
 
+// IdentityServer implements the CSI Identity service for the Linode Block Storage CSI Driver.
 type IdentityServer struct {
 	driver *LinodeDriver
 
 	csi.UnimplementedIdentityServer
 }
 
+// NewIdentityServer creates and initializes a new IdentityServer.
+// It takes a context and a LinodeDriver as input and returns a pointer to IdentityServer and an error.
 func NewIdentityServer(ctx context.Context, linodeDriver *LinodeDriver) (*IdentityServer, error) {
 	log := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new IdentityServer")
 
 	if linodeDriver == nil {
-		log.Error(nil, "LinodeDriver is nil")
 		return nil, fmt.Errorf("linodeDriver cannot be nil")
 	}
 
@@ -50,22 +51,36 @@ func NewIdentityServer(ctx context.Context, linodeDriver *LinodeDriver) (*Identi
 	return identityServer, nil
 }
 
-// GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
+// GetPluginInfo returns information about the CSI plugin.
+// This method is REQUIRED for the Identity service as per the CSI spec.
+// It returns the name and version of the CSI plugin.
 func (linodeIdentity *IdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	klog.V(5).Infof("Using default GetPluginInfo")
+	log, _, done := logger.GetLogger(ctx).WithMethod("GetPluginInfo")
+	defer done()
+
+	log.V(2).Info("Processing request")
 
 	if linodeIdentity.driver.name == "" {
 		return nil, status.Error(codes.Unavailable, "Driver name not configured")
 	}
 
+	log.V(2).Info("Successfully completed")
 	return &csi.GetPluginInfoResponse{
 		Name:          linodeIdentity.driver.name,
 		VendorVersion: linodeIdentity.driver.vendorVersion,
 	}, nil
 }
 
+// GetPluginCapabilities returns the capabilities of the CSI plugin.
+// This method is REQUIRED for the Identity service as per the CSI spec.
+// It informs the CO of the supported features by this plugin.
 func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	klog.V(5).Infof("Using default GetPluginCapabilities")
+	log, _, done := logger.GetLogger(ctx).WithMethod("GetPluginCapabilities")
+	defer done()
+
+	log.V(2).Info("Processing request")
+
+	log.V(2).Info("Successfully completed")
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -98,11 +113,19 @@ func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context,
 	}, nil
 }
 
+// Probe checks if the plugin is ready to serve requests.
+// This method is REQUIRED for the Identity service as per the CSI spec.
+// It allows the CO to check the readiness of the plugin.
 func (linodeIdentity *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	klog.V(4).Infof("Probe called with args: %#v", req)
+	log, _, done := logger.GetLogger(ctx).WithMethod("Probe")
+	defer done()
+
+	log.V(2).Info("Processing request")
+
 	linodeIdentity.driver.readyMu.Lock()
 	defer linodeIdentity.driver.readyMu.Unlock()
 
+	log.V(2).Info("Successfully completed")
 	return &csi.ProbeResponse{
 		Ready: &wrapperspb.BoolValue{
 			Value: linodeIdentity.driver.ready,
