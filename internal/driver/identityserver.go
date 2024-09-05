@@ -64,7 +64,6 @@ func (linodeIdentity *IdentityServer) GetPluginInfo(ctx context.Context, req *cs
 		return nil, status.Error(codes.Unavailable, "Driver name not configured")
 	}
 
-	log.V(2).Info("Successfully completed")
 	return &csi.GetPluginInfoResponse{
 		Name:          linodeIdentity.driver.name,
 		VendorVersion: linodeIdentity.driver.vendorVersion,
@@ -80,7 +79,6 @@ func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context,
 
 	log.V(2).Info("Processing request")
 
-	log.V(2).Info("Successfully completed")
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -125,7 +123,6 @@ func (linodeIdentity *IdentityServer) Probe(ctx context.Context, req *csi.ProbeR
 	linodeIdentity.driver.readyMu.Lock()
 	defer linodeIdentity.driver.readyMu.Unlock()
 
-	log.V(2).Info("Successfully completed")
 	return &csi.ProbeResponse{
 		Ready: &wrapperspb.BoolValue{
 			Value: linodeIdentity.driver.ready,
