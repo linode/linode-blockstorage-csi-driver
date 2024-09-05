@@ -26,6 +26,7 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
@@ -72,23 +73,23 @@ func main() {
 
 	// Create a base context with the logger
 	ctx := context.Background()
-	logger := driver.NewLogger(ctx)
-	ctx = context.WithValue(ctx, driver.LoggerKey{}, logger)
+	log := logger.NewLogger(ctx)
+	ctx = context.WithValue(ctx, logger.LoggerKey{}, log)
 
 	if err := handle(ctx); err != nil {
-		logger.Error(err, "Fatal error")
+		log.Error(err, "Fatal error")
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
 func handle(ctx context.Context) error {
-	logger := driver.GetLogger(ctx)
+	log := logger.GetLogger(ctx)
 
 	if vendorVersion == "" {
 		return errors.New("vendorVersion must be set at compile time")
 	}
-	logger.V(4).Info("Driver vendor version", "version", vendorVersion)
+	log.V(4).Info("Driver vendor version", "version", vendorVersion)
 
 	cfg := loadConfig()
 	if cfg.linodeToken == "" {
@@ -111,7 +112,7 @@ func handle(ctx context.Context) error {
 
 	metadata, err := driver.GetMetadata(context.Background())
 	if err != nil {
-		logger.Error(err, "Metadata service not available, falling back to API")
+		log.Error(err, "Metadata service not available, falling back to API")
 		if metadata, err = driver.GetMetadataFromAPI(context.Background(), cloudProvider); err != nil {
 			return fmt.Errorf("get metadata from api: %w", err)
 		}

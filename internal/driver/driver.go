@@ -25,6 +25,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -136,10 +137,10 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(c csi.Control
 }
 
 func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
-	logger := GetLogger(ctx)
-	logger.V(4).Info("Driver", "name", linodeDriver.name)
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Driver", "name", linodeDriver.name)
 	if len(linodeDriver.volumeLabelPrefix) > 0 {
-		logger.V(4).Info("BS Volume Prefix", "prefix", linodeDriver.volumeLabelPrefix)
+		log.V(4).Info("BS Volume Prefix", "prefix", linodeDriver.volumeLabelPrefix)
 	}
 
 	linodeDriver.readyMu.Lock()

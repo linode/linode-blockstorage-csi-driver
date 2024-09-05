@@ -3,16 +3,20 @@
 package driver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func nodeGetVolumeStats(req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	log := logger.GetLogger(ctx)
+
 	if req.VolumeId == "" || req.VolumePath == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID or path empty")
 	}
@@ -33,7 +37,7 @@ func nodeGetVolumeStats(req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeS
 		abnormal = true
 	}
 
-	return &csi.NodeGetVolumeStatsResponse{
+	response := &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
 				Available: int64(statfs.Bavail) * int64(statfs.Bsize),
@@ -52,5 +56,8 @@ func nodeGetVolumeStats(req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeS
 			Abnormal: abnormal,
 			Message:  fmt.Sprintf("failed to call statfs on volume, got err: %s", err),
 		},
-	}, nil
+	}
+
+	log.V(2).Info("Successfully retrieved volume stats", "volumeID", req.VolumeId, "volumePath", req.VolumePath, "response", response)
+	return response, nil
 }
