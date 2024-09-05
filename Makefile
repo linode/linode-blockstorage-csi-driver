@@ -59,7 +59,7 @@ WORKER_NODES         ?= 0
 
 .PHONY: build
 build:
-	go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${IMAGE_VERSION}' -extldflags "-static"' ./main.go
+	CGO_ENABLED=1 go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${IMAGE_VERSION}'' ./main.go
 
 .PHONY: docker-build
 docker-build:
