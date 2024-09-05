@@ -45,6 +45,10 @@ jobs:
       LINODE_MACHINE_TYPE: g6-standard-2
       WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '0' }}
     steps:
+      - name: Install cryptsetup
+        run: |
+          apt install libcryptsetup12 libcryptset-dev
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
