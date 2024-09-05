@@ -106,7 +106,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	if err != nil {
 		return fmt.Errorf("new node server: %w", err)
 	}
-	
+
 	linodeDriver.ids, err = NewIdentityServer(linodeDriver)
 	if err != nil {
 		return fmt.Errorf("new identity server: %w", err)

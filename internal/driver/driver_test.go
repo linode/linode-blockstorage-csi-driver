@@ -54,8 +54,8 @@ func TestDriverSuite(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mounter := &mount.SafeFormatAndMount{
-		Interface: mocks.NewMockMounter(mockCtrl), 
-		Exec: mocks.NewMockExecutor(mockCtrl),
+		Interface: mocks.NewMockMounter(mockCtrl),
+		Exec:      mocks.NewMockExecutor(mockCtrl),
 	}
 	deviceUtils := mocks.NewMockDeviceUtils(mockCtrl)
 	fileSystem := mocks.NewMockFileSystem(mockCtrl)
@@ -85,4 +85,3 @@ func TestDriverSuite(t *testing.T) {
 	// cfg.Address = endpoint
 	// sanity.Test(t, cfg)
 }
-

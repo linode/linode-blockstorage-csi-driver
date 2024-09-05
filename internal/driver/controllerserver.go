@@ -230,7 +230,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	klog.V(4).Infoln("[CreateVolume] volume created successfully", map[string]interface{}{
-	    "response": 				resp,
+		"response": resp,
 	})
 	return resp, nil
 }

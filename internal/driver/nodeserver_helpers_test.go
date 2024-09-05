@@ -262,11 +262,11 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 			// Create a new NodeServer with the mocked DeviceUtils
 			// No need to set other fields as the function we are testing doesn't use them
 			ns := &NodeServer{
-				driver:        nil,
-				mounter:       nil,
-				deviceutils:   mockDeviceUtils,
-				client: nil,
-				metadata:      Metadata{},
+				driver:      nil,
+				mounter:     nil,
+				deviceutils: mockDeviceUtils,
+				client:      nil,
+				metadata:    Metadata{},
 			}
 
 			// Call the function we are testing

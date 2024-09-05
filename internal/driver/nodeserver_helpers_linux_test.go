@@ -4,6 +4,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -167,7 +168,7 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
-			if err := ns.mountVolume(tt.devicePath, tt.req); (err != nil) != tt.wantErr {
+			if err := ns.mountVolume(context.Background(), tt.devicePath, tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
