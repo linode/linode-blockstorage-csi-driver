@@ -26,6 +26,7 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
+	k8s.io/kubernetes v1.31.0 // indirect
 )
 
 replace (
