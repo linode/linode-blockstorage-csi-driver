@@ -21,7 +21,7 @@ func NewLogger(ctx context.Context) *Logger {
 	}
 }
 
-// WithMethod returns a new Logger with method and traceID values, 
+// WithMethod returns a new Logger with method and traceID values,
 // a context containing the new Logger, and a function to log method completion.
 func (l *Logger) WithMethod(method string) (*Logger, context.Context, func()) {
 	traceID := uuid.New().String()

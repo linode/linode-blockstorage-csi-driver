@@ -96,7 +96,7 @@ func handle(ctx context.Context) error {
 		return errors.New("linode token required")
 	}
 
-	linodeDriver := driver.GetLinodeDriver()
+	linodeDriver := driver.GetLinodeDriver(ctx)
 
 	// Initialize Linode Driver (Move setup to main?)
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
@@ -119,6 +119,7 @@ func handle(ctx context.Context) error {
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(
+		ctx,
 		cloudProvider,
 		mounter,
 		deviceUtils,
