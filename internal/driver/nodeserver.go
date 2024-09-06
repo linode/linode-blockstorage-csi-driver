@@ -23,20 +23,20 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/linode/linodego"
 	"golang.org/x/net/context"
-	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 )
 
 type NodeServer struct {
-	driver        *LinodeDriver
-	mounter       *mount.SafeFormatAndMount
-	deviceutils   mountmanager.DeviceUtils
-	client        linodeclient.LinodeClient
-	metadata      Metadata
-	encrypt       Encryption
+	driver      *LinodeDriver
+	mounter     *mount.SafeFormatAndMount
+	deviceutils mountmanager.DeviceUtils
+	client      linodeclient.LinodeClient
+	metadata    Metadata
+	encrypt     Encryption
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
 
@@ -60,110 +60,124 @@ func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount
 	}
 
 	return &NodeServer{
-		driver:        linodeDriver,
-		mounter:       mounter,
-		deviceutils:   deviceUtils,
-		client:        client,
-		metadata:      metadata,
-		encrypt:       encrypt,
+		driver:      linodeDriver,
+		mounter:     mounter,
+		deviceutils: deviceUtils,
+		client:      client,
+		metadata:    metadata,
+		encrypt:     encrypt,
 	}, nil
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
+	defer done()
+
+	volumeID := req.GetVolumeId()
+	log.V(2).Info("Processing request", "volumeID", volumeID)
+
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
-	klog.V(4).Infof("NodePublishVolume called with req: %#v", req)
 
 	// Validate the request object
-	if err := validateNodePublishVolumeRequest(req); err != nil {
+	log.V(4).Info("Validating request", "volumeID", volumeID)
+	if err := validateNodePublishVolumeRequest(ctx, req); err != nil {
 		return nil, err
 	}
 
-	// Set mount options:
-	//  - bind mount to the full path to allow duplicate mounts of the same PD.
-	//  - read-only if specified
+	// Set mount options
 	options := []string{"bind"}
 	if req.GetReadonly() {
 		options = append(options, "ro")
+		log.V(4).Info("Volume will be mounted as read-only", "volumeID", volumeID)
 	}
 
 	fs := mountmanager.NewFileSystem()
 	// publish block volume
 	if req.GetVolumeCapability().GetBlock() != nil {
-		return ns.nodePublishVolumeBlock(req, options, fs)
+		log.V(4).Info("Publishing volume as block volume", "volumeID", volumeID)
+		return ns.nodePublishVolumeBlock(ctx, req, options, fs)
 	}
 
-	// Path to where we want to mount the volume inside the pod
 	targetPath := req.GetTargetPath()
-	// Check if target path is a valid mount point.
-	// If not, create it.
-	notMnt, err := ns.ensureMountPoint(targetPath, fs)
+
+	// Check if target path is a valid mount point
+	log.V(4).Info("Ensuring target path is a valid mount point", "volumeID", volumeID, "targetPath", targetPath)
+	notMnt, err := ns.ensureMountPoint(ctx, targetPath, fs)
 	if err != nil {
 		return nil, err
 	}
-	// No errors but target path is not a valid mount point
 	if !notMnt {
+		log.V(4).Info("Target path is already a mount point", "volumeID", volumeID, "targetPath", targetPath)
 		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
-		/*
-			1) Target Path MUST be the vol referenced by vol ID
-			2) VolumeCapability MUST match
-			3) Readonly MUST match
-
-		*/
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	// Path to the volume on the host where the volume is currently staged (mounted)
 	stagingTargetPath := req.GetStagingTargetPath()
+
 	// Mount stagingTargetPath to targetPath
+	log.V(4).Info("Mounting volume", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath, "targetPath", targetPath, "options", options)
 	err = ns.mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 	if err != nil {
-		klog.Errorf("Mount of disk %s failed: %v", targetPath, err)
 		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
 
-	klog.V(4).Infof("NodePublishVolume successfully mounted %s", targetPath)
+	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
+	defer done()
+
+	volumeID := req.GetVolumeId()
+	log.V(2).Info("Processing request", "volumeID", volumeID)
+
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
 	// Validate request object
-	err := validateNodeUnpublishVolumeRequest(req)
+	log.V(4).Info("Validating request", "volumeID", volumeID)
+	err := validateNodeUnpublishVolumeRequest(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmount the target path and delete the remaining directory
+	log.V(4).Info("Unmounting and deleting target path", "volumeID", volumeID, "targetPath", req.GetTargetPath())
 	err = mount.CleanupMountPoint(req.GetTargetPath(), ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
 		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", req.GetTargetPath(), err)
 	}
 
-	klog.V(4).Infof("NodeUnpublishVolume called with args: %v, targetPath %s", req, req.GetTargetPath())
-
 	// If LUKS volume is used, close the LUKS device
-	if err := ns.closeLuksMountSources(req.GetTargetPath()); err != nil {
+	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "targetPath", req.GetTargetPath())
+	if err := ns.closeLuksMountSources(ctx, req.GetTargetPath()); err != nil {
 		return nil, err
 	}
 
+	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
 func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
+	defer done()
+
+	volumeID := req.GetVolumeId()
+	log.V(2).Info("Processing request", "volumeID", volumeID)
+
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
-	klog.V(4).Infof("NodeStageVolume called with req: %#v", req)
 
 	// Before to start, validate the request object (NodeStageVolumeRequest)
-	if err := validateNodeStageVolumeRequest(req); err != nil {
+	log.V(4).Info("Validating request", "volumeID", volumeID)
+	if err := validateNodeStageVolumeRequest(ctx, req); err != nil {
 		return nil, err
 	}
 
 	// Get the LinodeVolumeKey which we need to find the device path
-	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(req.GetVolumeId())
+	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
 	if err != nil {
 		return nil, err
 	}
@@ -175,13 +189,15 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		partition = part
 	}
 
-	devicePath, err := ns.findDevicePath(*LinodeVolumeKey, partition)
+	log.V(4).Info("Finding device path", "volumeID", volumeID)
+	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check if staging target path is a valid mount point.
-	notMnt, err := ns.ensureMountPoint(req.GetStagingTargetPath(), mountmanager.NewFileSystem())
+	log.V(4).Info("Ensuring staging target path is a valid mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
+	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), mountmanager.NewFileSystem())
 	if err != nil {
 		return nil, err
 	}
@@ -189,64 +205,82 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if !notMnt {
 		// TODO(#95): Check who is mounted here. No error if its us
 		/*
-			1) Target Path MUST be the vol referenced by vol ID
-			2) VolumeCapability MUST match
-			3) Readonly MUST match
+		   1) Target Path MUST be the vol referenced by vol ID
+		   2) VolumeCapability MUST match
+		   3) Readonly MUST match
 
 		*/
+		log.V(4).Info("Staging target path is already a mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	// Check if the volume mode is set to 'Block'
 	// Do nothing else with the mount point for stage
 	if blk := req.VolumeCapability.GetBlock(); blk != nil {
+		log.V(4).Info("Volume is a block volume", "volumeID", volumeID)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	// Mount device to stagingTargetPath
 	// If LUKS is enabled, format the device accordingly
-	if err := ns.mountVolume(devicePath, req); err != nil {
+	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", req.GetStagingTargetPath())
+	if err := ns.mountVolume(ctx, devicePath, req); err != nil {
 		return nil, err
 	}
 
+	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
 func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
+	defer done()
+
+	volumeID := req.GetVolumeId()
+	log.V(2).Info("Processing request", "volumeID", volumeID)
+
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
-	klog.V(4).Infof("NodeUnstageVolume called with req: %#v", req)
 
 	// Validate req (NodeUnstageVolumeRequest)
-	err := validateNodeUnstageVolumeRequest(req)
+	log.V(4).Info("Validating request", "volumeID", volumeID)
+	err := validateNodeUnstageVolumeRequest(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
+	log.V(4).Info("Unmounting staging target path", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
 	err = mount.CleanupMountPoint(req.GetStagingTargetPath(), ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
 		return nil, errInternal("NodeUnstageVolume failed to unmount at path %s: %v", req.GetStagingTargetPath(), err)
 	}
 
 	// If LUKS volume is used, close the LUKS device
-	if err := ns.closeLuksMountSources(req.GetStagingTargetPath()); err != nil {
+	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
+	if err := ns.closeLuksMountSources(ctx, req.GetStagingTargetPath()); err != nil {
 		return nil, err
 	}
 
+	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
 func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	klog.V(4).Infof("NodeExpandVolume called with req: %#v", req)
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
+	defer done()
+
+	volumeID := req.GetVolumeId()
+	log.V(2).Info("Processing request", "volumeID", volumeID)
 
 	// Validate req (NodeExpandVolumeRequest)
-	if err := validateNodeExpandVolumeRequest(req); err != nil {
+	log.V(4).Info("Validating request", "volumeID", volumeID)
+	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
 		return nil, err
 	}
 
 	// Check linode to see if a give volume exists by volume ID
 	// Make call to linode api using the linode api client
-	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(req.GetVolumeId())
+	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
 	if err != nil {
 		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
@@ -254,17 +288,23 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	if err != nil {
 		return nil, errInternal("marshal json filter: %v", err)
 	}
+
+	log.V(4).Info("Listing volumes", "volumeID", volumeID)
 	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
 		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
 
+	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeExpandVolumeResponse{
 		CapacityBytes: req.CapacityRange.RequiredBytes,
 	}, nil
 }
 
 func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(4).Infof("NodeGetCapabilities called with req: %#v", req)
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeGetCapabilities")
+	defer done()
+
+	log.V(2).Info("Processing request")
 
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: ns.driver.nscap,
@@ -272,6 +312,11 @@ func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeGetInfo")
+	defer done()
+
+	log.V(2).Info("Processing request", "req", req)
+
 	// Get the number of currently attached instance disks, and subtract it
 	// from the limit of block devices that can be attached to the instance,
 	// which will effectively give us the number of block storage volumes
@@ -280,12 +325,14 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// This is what the spec wants us to report: the actual number of volumes
 	// that can be attached, and not the theoretical maximum number of
 	// devices that can be attached.
+	log.V(4).Info("Listing instance disks", "nodeID", ns.metadata.ID)
 	disks, err := ns.client.ListInstanceDisks(ctx, ns.metadata.ID, nil)
 	if err != nil {
 		return &csi.NodeGetInfoResponse{}, errInternal("list instance disks: %v", err)
 	}
 	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(disks)
 
+	log.V(2).Info("Successfully completed")
 	return &csi.NodeGetInfoResponse{
 		NodeId:            strconv.Itoa(ns.metadata.ID),
 		MaxVolumesPerNode: int64(maxVolumes),
@@ -298,5 +345,10 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 }
 
 func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nodeGetVolumeStats(req)
+	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeGetVolumeStats")
+	defer done()
+
+	log.V(2).Info("Processing request", "req", req)
+
+	return nodeGetVolumeStats(ctx, req)
 }

@@ -80,7 +80,7 @@ func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context,
 					// 	2. Delete and recreate the pod that is using the PVC(or scale replicas accordingly)
 					// 	3. This operation should detach and re-attach the volume to the newly created pod allowing you to use the updated size
 					VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
-						Type: csi.PluginCapability_VolumeExpansion_OFFLINE,
+						Type: csi.PluginCapability_VolumeExpansion_ONLINE,
 					},
 				},
 			},
