@@ -18,11 +18,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go.uber.org/automaxprocs/maxprocs"
+	stdlog "log"
 	"os"
 
 	"github.com/ianschenck/envflag"
 	"github.com/linode/linodego"
-	_ "go.uber.org/automaxprocs"
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
@@ -76,11 +77,16 @@ func main() {
 	ctx := context.Background()
 	log := logger.NewLogger(ctx)
 	ctx = context.WithValue(ctx, logger.LoggerKey{}, log)
+	undo, maxprocsError := maxprocs.Set(maxprocs.Logger(stdlog.Printf))
+	defer undo()
 
-	if err := handle(ctx); err != nil {
+	if maxprocsError != nil {
+		stdlog.Fatalf("failed to set GOMAXPROCS: %v", maxprocsError)
+	} else if err := handle(ctx); err != nil {
 		log.Error(err, "Fatal error")
 		os.Exit(1)
 	}
+
 	os.Exit(0)
 }
 
