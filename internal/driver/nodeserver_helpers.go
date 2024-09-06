@@ -323,6 +323,7 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 // If not, it formats the device using the provided LuksContext.
 // Finally, it prepares the LUKS volume for mounting.
 func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, luksContext LuksContext) (string, error) {
+	var luksSource string
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
 
@@ -345,16 +346,9 @@ func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, 
 		}
 
 		// Format the volume with LUKS encryption.
-		if err := ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
+		if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
 			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 		}
-	}
-
-	// Prepare the LUKS volume for mounting.
-	log.V(4).Info("preparing luks volume for mounting", "devicePath", devicePath)
-	luksSource, err := ns.encrypt.luksPrepareMount(luksContext, devicePath)
-	if err != nil {
-		return "", errInternal("Failed to prepare luks mount (%q): %v", devicePath, err)
 	}
 
 	log.V(4).Info("Exiting prepareLUKSVolume", "luksSource", luksSource)
