@@ -15,6 +15,7 @@ limitations under the License.
 package driver
 
 import (
+	"context"
 	"reflect"
 	"testing"
 )
@@ -50,7 +51,7 @@ func TestNewIdentityServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewIdentityServer(tt.args.linodeDriver)
+			got, err := NewIdentityServer(context.Background(), tt.args.linodeDriver)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewIdentityServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
