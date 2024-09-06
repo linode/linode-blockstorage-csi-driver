@@ -62,13 +62,13 @@ func GetLinodeDriver(ctx context.Context) *LinodeDriver {
 	log, _, done := logger.GetLogger(ctx).WithMethod("GetLinodeDriver")
 	defer done()
 
-	log.V(4).Info("Creating LinodeDriver")
+	log.V(2).Info("Creating LinodeDriver")
 	driver := &LinodeDriver{
 		vcap:  VolumeCapabilityAccessModes(),
 		cscap: ControllerServiceCapabilities(),
 		nscap: NodeServiceCapabilities(),
 	}
-	log.V(4).Info("LinodeDriver created successfully")
+	log.V(2).Info("LinodeDriver created successfully")
 	return driver
 }
 
@@ -86,7 +86,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
 	defer done()
 
-	log.V(4).Info("Setting up LinodeDriver")
+	log.V(2).Info("Setting up LinodeDriver")
 
 	if name == "" {
 		return fmt.Errorf("driver name missing")
@@ -108,7 +108,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	}
 	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
 
-	log.V(3).Info("Setting up RPC Servers")
+	log.V(2).Info("Setting up RPC Servers")
 	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt)
 	if err != nil {
 		return fmt.Errorf("new node server: %w", err)
@@ -125,7 +125,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	}
 	linodeDriver.cs = cs
 
-	log.V(4).Info("LinodeDriver setup completed successfully")
+	log.V(2).Info("LinodeDriver setup completed successfully")
 	return nil
 }
 
@@ -154,7 +154,7 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("Run")
 	defer done()
 
-	log.V(4).Info("Starting LinodeDriver", "name", linodeDriver.name)
+	log.V(2).Info("Starting LinodeDriver", "name", linodeDriver.name)
 	if len(linodeDriver.volumeLabelPrefix) > 0 {
 		log.V(4).Info("BS Volume Prefix", "prefix", linodeDriver.volumeLabelPrefix)
 	}
@@ -163,10 +163,10 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 	linodeDriver.ready = true
 	linodeDriver.readyMu.Unlock()
 
-	log.V(3).Info("Starting non-blocking GRPC server")
+	log.V(2).Info("Starting non-blocking GRPC server")
 	s := NewNonBlockingGRPCServer()
 	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
-	log.V(3).Info("GRPC server started successfully")
+	log.V(2).Info("GRPC server started successfully")
 	s.Wait()
-	log.V(4).Info("LinodeDriver run completed")
+	log.V(2).Info("LinodeDriver run completed")
 }
