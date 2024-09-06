@@ -22,6 +22,7 @@ import (
 
 	"github.com/ianschenck/envflag"
 	"github.com/linode/linodego"
+	_ "go.uber.org/automaxprocs"
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"

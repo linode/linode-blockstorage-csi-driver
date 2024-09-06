@@ -23,6 +23,7 @@ require (
 require (
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
+	go.uber.org/automaxprocs v1.5.3 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
