@@ -345,7 +345,7 @@ func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, 
 		}
 
 		// Format the volume with LUKS encryption.
-		if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
+		if err := ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
 			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 		}
 	}
