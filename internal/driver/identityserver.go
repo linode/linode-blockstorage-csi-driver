@@ -40,6 +40,7 @@ func NewIdentityServer(ctx context.Context, linodeDriver *LinodeDriver) (*Identi
 	log.V(4).Info("Creating new IdentityServer")
 
 	if linodeDriver == nil {
+		log.Error(nil, "LinodeDriver is nil")
 		return nil, fmt.Errorf("linodeDriver cannot be nil")
 	}
 
