@@ -124,10 +124,11 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	cipherString := strings.SplitN(ctx.EncryptionCipher, "-", 2)
 	genericParams := cryptsetup.GenericParams{
-		Cipher:        ctx.EncryptionCipher,
-		CipherMode:    "xts-plain64",
-		VolumeKeySize: keySize,
+		Cipher:        cipherString[0],
+		CipherMode:    cipherString[1],
+		VolumeKeySize: keySize / 8,
 	}
 	device, err := cryptsetup.Init(source)
 	if err != nil {
