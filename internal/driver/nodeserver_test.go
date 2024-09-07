@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -100,7 +101,7 @@ func TestNewNodeServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewNodeServer(tt.args.linodeDriver, tt.args.mounter, tt.args.deviceUtils, tt.args.client, tt.args.metadata, tt.args.encrypt)
+			got, err := NewNodeServer(context.Background(), tt.args.linodeDriver, tt.args.mounter, tt.args.deviceUtils, tt.args.client, tt.args.metadata, tt.args.encrypt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewNodeServer() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -45,28 +45,39 @@ type NodeServer struct {
 
 var _ csi.NodeServer = &NodeServer{}
 
-func NewNodeServer(linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
+func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
+	log := logger.GetLogger(ctx)
+
+	log.V(4).Info("Creating new NodeServer")
+
 	if linodeDriver == nil {
+		log.Error(nil, "LinodeDriver is nil")
 		return nil, fmt.Errorf("linodeDriver is nil")
 	}
 	if mounter == nil {
+		log.Error(nil, "Mounter is nil")
 		return nil, fmt.Errorf("mounter is nil")
 	}
 	if deviceUtils == nil {
+		log.Error(nil, "DeviceUtils is nil")
 		return nil, fmt.Errorf("deviceUtils is nil")
 	}
 	if client == nil {
+		log.Error(nil, "Linode client is nil")
 		return nil, fmt.Errorf("linode client is nil")
 	}
 
-	return &NodeServer{
+	ns := &NodeServer{
 		driver:      linodeDriver,
 		mounter:     mounter,
 		deviceutils: deviceUtils,
 		client:      client,
 		metadata:    metadata,
 		encrypt:     encrypt,
-	}, nil
+	}
+
+	log.V(4).Info("NodeServer created successfully")
+	return ns, nil
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {

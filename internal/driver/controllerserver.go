@@ -17,6 +17,7 @@ import (
 
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -91,19 +92,28 @@ type ControllerServer struct {
 // If driver or client are nil, NewControllerServer returns a non-nil error.
 //
 // [Controller Service RPC]: https://github.com/container-storage-interface/spec/blob/master/spec.md#controller-service-rpc
-func NewControllerServer(driver *LinodeDriver, client linodeclient.LinodeClient, metadata Metadata) (*ControllerServer, error) {
+func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linodeclient.LinodeClient, metadata Metadata) (*ControllerServer, error) {
+	log := logger.GetLogger(ctx)
+
+	log.V(4).Info("Creating new ControllerServer")
+
 	if driver == nil {
+		log.Error(nil, "LinodeDriver is nil")
 		return nil, errNilDriver
 	}
 	if client == nil {
+		log.Error(nil, "Linode client is nil")
 		return nil, errors.New("nil client")
 	}
 
-	return &ControllerServer{
+	cs := &ControllerServer{
 		driver:   driver,
 		client:   client,
 		metadata: metadata,
-	}, nil
+	}
+
+	log.V(4).Info("ControllerServer created successfully")
+	return cs, nil
 }
 
 // CreateVolume will be called by the CO to provision a new volume on behalf of a user (to be consumed

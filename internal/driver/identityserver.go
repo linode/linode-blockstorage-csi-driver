@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,13 +32,22 @@ type IdentityServer struct {
 	csi.UnimplementedIdentityServer
 }
 
-func NewIdentityServer(linodeDriver *LinodeDriver) (*IdentityServer, error) {
+func NewIdentityServer(ctx context.Context, linodeDriver *LinodeDriver) (*IdentityServer, error) {
+	log := logger.GetLogger(ctx)
+
+	log.V(4).Info("Creating new IdentityServer")
+
 	if linodeDriver == nil {
+		log.Error(nil, "LinodeDriver is nil")
 		return nil, fmt.Errorf("linodeDriver cannot be nil")
 	}
-	return &IdentityServer{
+
+	identityServer := &IdentityServer{
 		driver: linodeDriver,
-	}, nil
+	}
+
+	log.V(4).Info("IdentityServer created successfully")
+	return identityServer, nil
 }
 
 // GetPluginInfo(context.Context, *GetPluginInfoRequest) (*GetPluginInfoResponse, error)
