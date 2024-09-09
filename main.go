@@ -18,10 +18,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"go.uber.org/automaxprocs/maxprocs"
 	"os"
 
 	"github.com/ianschenck/envflag"
+	"go.uber.org/automaxprocs/maxprocs"
 	"github.com/linode/linodego"
 	"k8s.io/klog/v2"
 
