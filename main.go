@@ -19,7 +19,6 @@ import (
 	"flag"
 	"fmt"
 	"go.uber.org/automaxprocs/maxprocs"
-	stdlog "log"
 	"os"
 
 	"github.com/ianschenck/envflag"
@@ -77,11 +76,14 @@ func main() {
 	ctx := context.Background()
 	log := logger.NewLogger(ctx)
 	ctx = context.WithValue(ctx, logger.LoggerKey{}, log)
-	undo, maxprocsError := maxprocs.Set(maxprocs.Logger(stdlog.Printf))
-	defer undo()
+	undoMaxprocs, maxprocsError := maxprocs.Set(maxprocs.Logger(func(msg string, keysAndValues ...interface{}) {
+		log.Klogr.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
+	}))
+	defer undoMaxprocs()
 
 	if maxprocsError != nil {
-		stdlog.Fatalf("failed to set GOMAXPROCS: %v", maxprocsError)
+		log.Error(maxprocsError, "Failed to set GOMAXPROCS")
+		os.Exit(1)
 	} else if err := handle(ctx); err != nil {
 		log.Error(err, "Fatal error")
 		os.Exit(1)
