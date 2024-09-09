@@ -8,22 +8,23 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	log := logger.GetLogger(ctx)
 
-	if req.VolumeId == "" || req.VolumePath == "" {
+	if req.GetVolumeId() == "" || req.GetVolumePath() == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID or path empty")
 	}
 
 	var statfs unix.Statfs_t
 	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
-	err := unix.Statfs(req.VolumePath, &statfs)
+	err := unix.Statfs(req.GetVolumePath(), &statfs)
 	if err != nil && !errors.Is(err, unix.EIO) {
 		if errors.Is(err, unix.ENOENT) {
 			return nil, status.Errorf(codes.NotFound, "volume path not found: %v", err.Error())
@@ -58,6 +59,6 @@ func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest)
 		},
 	}
 
-	log.V(2).Info("Successfully retrieved volume stats", "volumeID", req.VolumeId, "volumePath", req.VolumePath, "response", response)
+	log.V(2).Info("Successfully retrieved volume stats", "volumeID", req.GetVolumeId(), "volumePath", req.GetVolumePath(), "response", response)
 	return response, nil
 }

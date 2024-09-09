@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	osexec "os/exec"
@@ -8,15 +9,14 @@ import (
 	"runtime"
 	"testing"
 
-	"context"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
+
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 )
 
 // compareGRPCErrors compares two gRPC errors for equality.
@@ -246,7 +246,6 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Create gomock controller
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -345,7 +344,6 @@ func TestNodeServer_ensureMountPoint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -448,7 +446,6 @@ func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().SetStdin(gomock.Any())
 				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("failed test"))
-
 			},
 			devicePath: "/dev/test",
 			luksContext: LuksContext{
@@ -494,7 +491,6 @@ func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().SetStdin(gomock.Any())
 				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("failed test"))
-
 			},
 			devicePath: "/dev/test",
 			luksContext: LuksContext{
@@ -540,7 +536,6 @@ func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().SetStdin(gomock.Any())
 				c.EXPECT().CombinedOutput().Return([]byte("test"), nil)
-
 			},
 			devicePath: "/dev/test",
 			luksContext: LuksContext{
@@ -630,7 +625,6 @@ func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -758,7 +752,6 @@ func TestNodeServer_mountVolume(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Skip this test on Linux. Linux supported alternative test case can be found in nodeserver_helpers_linux_test.go
 			if runtime.GOOS == "linux" {
 				t.Skipf("Skipping test on Linux")
@@ -892,7 +885,6 @@ func TestNodeServer_closeLuksMountSources(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 

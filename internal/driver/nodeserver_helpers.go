@@ -23,12 +23,13 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
+
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 const (
@@ -157,12 +158,12 @@ func getFSTypeAndMountOptions(ctx context.Context, volumeCapability *csi.VolumeC
 
 	if mnt := volumeCapability.GetMount(); mnt != nil {
 		// Use file system type from volume capability if specified
-		if mnt.FsType != "" {
-			fsType = mnt.FsType
+		if mnt.GetFsType() != "" {
+			fsType = mnt.GetFsType()
 		}
 		// Use mount options from volume capability if specified
 		if mnt.MountFlags != nil {
-			mountOptions = mnt.MountFlags
+			mountOptions = mnt.GetMountFlags()
 		}
 	}
 
@@ -240,7 +241,7 @@ func (ns *NodeServer) nodePublishVolumeBlock(ctx context.Context, req *csi.NodeP
 	targetPathDir := filepath.Dir(targetPath)
 
 	// Get the device path from the request
-	devicePath := req.PublishContext["devicePath"]
+	devicePath := req.GetPublishContext()["devicePath"]
 	if devicePath == "" {
 		return nil, errInternal("devicePath cannot be found")
 	}
@@ -296,7 +297,7 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 	fmtAndMountSource := devicePath
 
 	// Check if LUKS encryption is enabled and prepare the LUKS volume if needed
-	luksContext := getLuksContext(req.Secrets, req.VolumeContext, VolumeLifecycleNodeStageVolume)
+	luksContext := getLuksContext(req.GetSecrets(), req.GetVolumeContext(), VolumeLifecycleNodeStageVolume)
 	if luksContext.EncryptionEnabled {
 		var err error
 		log.V(4).Info("preparing luks volume", "devicePath", devicePath)

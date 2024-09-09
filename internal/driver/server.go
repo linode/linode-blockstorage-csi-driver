@@ -20,10 +20,9 @@ import (
 	"os"
 	"sync"
 
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
-
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 )
 
 // Defines Non blocking GRPC server interfaces
@@ -112,5 +111,4 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	if err := server.Serve(listener); err != nil {
 		klog.Fatalf("Failed to serve: %v", err)
 	}
-
 }

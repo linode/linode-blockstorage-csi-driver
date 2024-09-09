@@ -55,7 +55,6 @@ func (f *FakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			for _, vol := range f.Volumes {
-
 				if filters["label"] != "" && filters["label"] != vol.Label {
 					continue
 				}
@@ -104,7 +103,6 @@ func (f *FakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			rr, _ := json.Marshal(resp)
 			_, _ = w.Write(rr)
 			return
-
 		}
 
 	case "POST":
@@ -138,7 +136,6 @@ func (f *FakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			vol.LinodeID = &v.LinodeID
 			f.Volumes[parts[2]] = vol
-
 		} else if tp == "detach" {
 			parts := strings.Split(r.URL.Path, "/")
 			if len(parts) != 4 {
@@ -183,7 +180,6 @@ func (f *FakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			f.Volumes[strconv.Itoa(id)] = vol
-
 		}
 
 		resp, err := json.Marshal(vol)

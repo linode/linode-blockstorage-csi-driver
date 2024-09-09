@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 type LuksContext struct {
@@ -243,7 +243,6 @@ func (e *Encryption) isLuksMapping(volume string) (bool, string, error) {
 				return false, mappingName, nil
 			}
 		}
-
 	}
 	return false, "", nil
 }

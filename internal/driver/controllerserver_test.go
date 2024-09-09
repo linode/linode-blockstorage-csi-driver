@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linodego"
+
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
-	"github.com/linode/linodego"
 )
 
 func TestListVolumes(t *testing.T) {
@@ -101,7 +102,7 @@ func TestListVolumes(t *testing.T) {
 				var linodeVolume *linodego.Volume
 				for _, v := range tt.volumes {
 					key := linodevolumes.CreateLinodeVolumeKey(v.ID, v.Label)
-					if volume.VolumeId == key.GetVolumeKey() {
+					if volume.GetVolumeId() == key.GetVolumeKey() {
 						v := v
 						linodeVolume = &v
 						break
@@ -111,11 +112,11 @@ func TestListVolumes(t *testing.T) {
 					t.Fatalf("no matching linode volume for %#v", volume)
 				}
 
-				if want, got := int64(linodeVolume.Size<<30), volume.CapacityBytes; want != got {
+				if want, got := int64(linodeVolume.Size<<30), volume.GetCapacityBytes(); want != got {
 					t.Errorf("mismatched volume size: want=%d got=%d", want, got)
 				}
 				for _, topology := range volume.GetAccessibleTopology() {
-					region, ok := topology.Segments[VolumeTopologyRegion]
+					region, ok := topology.GetSegments()[VolumeTopologyRegion]
 					if !ok {
 						t.Error("region not set in volume topology")
 					}
@@ -129,7 +130,7 @@ func TestListVolumes(t *testing.T) {
 					t.Error("nil status")
 					continue
 				}
-				if status.VolumeCondition.Abnormal {
+				if status.GetVolumeCondition().GetAbnormal() {
 					t.Error("abnormal volume condition")
 				}
 

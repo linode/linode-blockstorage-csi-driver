@@ -23,13 +23,13 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
+
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 // Name is the name of the driver provided by this package.
@@ -141,7 +141,7 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.C
 	}
 
 	for _, cap := range linodeDriver.cscap {
-		if c == cap.GetRpc().Type {
+		if c == cap.GetRpc().GetType() {
 			log.V(4).Info("Controller service request validated successfully")
 			return nil
 		}

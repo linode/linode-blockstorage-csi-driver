@@ -21,13 +21,14 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linodego"
+	"golang.org/x/net/context"
+	"k8s.io/mount-utils"
+
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-	"github.com/linode/linodego"
-	"golang.org/x/net/context"
-	"k8s.io/mount-utils"
 )
 
 type NodeServer struct {
@@ -227,7 +228,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// Check if the volume mode is set to 'Block'
 	// Do nothing else with the mount point for stage
-	if blk := req.VolumeCapability.GetBlock(); blk != nil {
+	if blk := req.GetVolumeCapability().GetBlock(); blk != nil {
 		log.V(4).Info("Volume is a block volume", "volumeID", volumeID)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
@@ -307,7 +308,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeExpandVolumeResponse{
-		CapacityBytes: req.CapacityRange.RequiredBytes,
+		CapacityBytes: req.GetCapacityRange().GetRequiredBytes(),
 	}, nil
 }
 

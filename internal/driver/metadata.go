@@ -9,8 +9,9 @@ import (
 	"strconv"
 
 	metadata "github.com/linode/go-metadata"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linodego"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // Metadata contains metadata about the node/instance the CSI node plugin
@@ -45,7 +46,7 @@ func GetMetadata(ctx context.Context) (Metadata, error) {
 		return Metadata{}, fmt.Errorf("get instance data: %w", err)
 	}
 
-	log.V(4).Info("Successfully retrieved metadata", 
+	log.V(4).Info("Successfully retrieved metadata",
 		"instanceID", data.ID,
 		"instanceLabel", data.Label,
 		"region", data.Region,
@@ -140,7 +141,7 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 		Memory: memory,
 	}
 
-	log.V(4).Info("Successfully retrieved metadata", 
+	log.V(4).Info("Successfully retrieved metadata",
 		"instanceID", metadata.ID,
 		"instanceLabel", metadata.Label,
 		"region", metadata.Region,

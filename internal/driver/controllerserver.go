@@ -158,12 +158,12 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	log.V(4).Info("CreateVolume details", "storage_size_giga_bytes", targetSizeGB, "volume_name", volumeName)
 
 	volumeContext := make(map[string]string)
-	if req.Parameters[LuksEncryptedAttribute] == "true" {
+	if req.GetParameters()[LuksEncryptedAttribute] == "true" {
 		// if luks encryption is enabled add a volume context
 		volumeContext[LuksEncryptedAttribute] = "true"
 		volumeContext[PublishInfoVolumeName] = volumeName
-		volumeContext[LuksCipherAttribute] = req.Parameters[LuksCipherAttribute]
-		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
+		volumeContext[LuksCipherAttribute] = req.GetParameters()[LuksCipherAttribute]
+		volumeContext[LuksKeySizeAttribute] = req.GetParameters()[LuksKeySizeAttribute]
 	}
 
 	// Attempt to get info about the source volume for
@@ -182,7 +182,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		ctx,
 		volumeName,
 		targetSizeGB,
-		req.Parameters[VolumeTags],
+		req.GetParameters()[VolumeTags],
 		sourceVolumeInfo,
 	)
 	if err != nil {
@@ -497,7 +497,6 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errInternal("get volume: %v", err)
 	}
 
-
 	resp := &csi.ValidateVolumeCapabilitiesResponse{}
 	if validVolumeCapabilities(volumeCapabilities) {
 		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
@@ -531,7 +530,6 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		listOpts.Page = int(startingPage)
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
-
 
 	// List all volumes
 	log.V(4).Info("Listing volumes", "list_opts", listOpts)
@@ -606,7 +604,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
-	
+
 	log.V(2).Info("Processing request", "req", req)
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)

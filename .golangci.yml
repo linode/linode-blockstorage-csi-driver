@@ -16,7 +16,7 @@ linters-settings:
       - default
       - blank
       - dot
-      - prefix(github.com/linode)
+      - prefix(github.com/linode/linode-blockstorage-csi-driver)
 
   govet:
     check-shadowing: false
@@ -28,7 +28,7 @@ linters-settings:
     simplify: true
 
   goimports:
-    local-prefixes: github.com/linode/
+    local-prefixes: github.com/linode/linode-blockstorage-csi-driver
 
   maligned:
     suggest-new: true
@@ -73,6 +73,7 @@ linters:
     - bodyclose
     - containedctx
     - contextcheck
+    - copyloopvar
     - decorder
     - dogsled
     - dupl
@@ -82,9 +83,7 @@ linters:
     - errname
     - errorlint
     - errcheck
-    - exportloopref
     - exhaustive
-    - exportloopref
     - forbidigo
     - forcetypeassert
     - gci
@@ -102,7 +101,6 @@ linters:
     - maintidx
     - makezero
     - misspell
-    - mnd
     - nestif
     - nilerr
     - nilnil
@@ -129,11 +127,23 @@ linters:
 
 issues:
   exclude-rules:
-    - path: _test\.go
+    # Exclude some linters from running on tests files.
+    - path: _test(ing)?\.go
       linters:
+        - gocyclo
         - maintidx
+        - errcheck
         - dupl
-        - exportloopref
+        - gosec
+        - copyloopvar
+        - unparam
+        - varnamelen
+
+    # Ease some gocritic warnings on test files.
+    - path: _test\.go
+      text: "(unnamedResult|exitAfterDefer)"
+      linters:
+        - gocritic
 
     - text: "G101:"
       linters:
