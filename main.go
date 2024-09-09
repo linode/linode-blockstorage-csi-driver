@@ -84,7 +84,9 @@ func main() {
 	if maxprocsError != nil {
 		log.Error(maxprocsError, "Failed to set GOMAXPROCS")
 		os.Exit(1)
-	} else if err := handle(ctx); err != nil {
+	}
+
+	if err := handle(ctx); err != nil {
 		log.Error(err, "Fatal error")
 		os.Exit(1)
 	}
