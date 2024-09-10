@@ -12,6 +12,7 @@ metadata:
   name: pod-pvc-luks-mov-volume
   labels:
     all:
+    volumemove:
 spec:
   bindings:
     - name: lukskey
@@ -110,10 +111,10 @@ spec:
       try:
         - patch:
             resource:
-              apiVersion: v1
+              apiVersion: apps/v1
               kind: StatefulSet
               metadata:
-              name: test-statefulset
+                name: test-statefulset
               spec:
                 template:
                   spec:
@@ -124,6 +125,16 @@ spec:
                           - matchExpressions:
                             - key: node-role.kubernetes.io/control-plane
                               operator: DoesNotExist
+    - name: Rollout restart the statefulset
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE
+            check:
+              ($error): ~
     - name: Check if Pod is ready and Volume is mounted (On worker node)
       try:
         - assert:
@@ -176,7 +187,7 @@ spec:
       try:
         - patch:
             resource:
-              apiVersion: v1
+              apiVersion: apps/v1
               kind: StatefulSet
               metadata:
                 name: test-statefulset
@@ -194,6 +205,16 @@ spec:
                     - key: "node-role.kubernetes.io/control-plane"
                       operator: "Exists"
                       effect: "NoSchedule"
+    - name: Rollout restart the statefulset
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE
+            check:
+              ($error): ~
     - name: Check if Pod is ready and Volume is mounted (after moving back to control plane node)
       try:
         - assert:
@@ -246,7 +267,7 @@ spec:
       try:
         - delete:
             ref:
-              apiVersion: v1
+              apiVersion: apps/v1
               kind: StatefulSet
     - name: Check if the volume is detached on Node resource and in Linode (using API)
       try:

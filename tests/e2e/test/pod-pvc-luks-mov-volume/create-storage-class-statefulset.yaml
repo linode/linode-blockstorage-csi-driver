@@ -38,7 +38,7 @@ spec:
       labels:
         app: example
     spec:
-      ffinity:
+      affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
