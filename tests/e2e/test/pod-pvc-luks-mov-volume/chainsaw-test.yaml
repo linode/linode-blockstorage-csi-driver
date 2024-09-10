@@ -1,0 +1,279 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+
+# This test confirms that moving a LUKS volume around different nodes will not cause any issues.
+# The test involves creating a StatefulSet, checking if the Pod is first scheduled on the control plane node, and verifying that the Volume is mounted.
+# Then, the Pod is moved to a worker node, and it checks that the Volume remains mounted and the Pod is still ready.
+# After that, the Volume is moved back to the control plane node, and it verifies again that the Pod is ready, the Volume is mounted, and the Volume remains a LUKS volume.
+# Finally, it cleans up the StatefulSet, detaches the Volume from the node and Linode, deletes the PVC, and verifies that the Volume has been deleted.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: pod-pvc-luks-mov-volume
+  labels:
+    all:
+spec:
+  bindings:
+    - name: lukskey
+      value: (env('LUKS_KEY'))
+    - name: nodes
+      # number of nodes in cluster
+      value: ((env('WORKER_NODES') | to_number(@)) + (env('CONTROLPLANE_NODES') | to_number(@)))
+  steps:
+    - name: Check if CSI Driver is deployed
+      try:
+        - assert:
+            file: assert-csi-driver-resources.yaml
+    - name: Create storage class and statefulset (Schedule on control plane node)
+      try:
+        - apply:
+            file: create-storage-class-statefulset.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+    - name: Check if Pod is ready and Volume is mounted (Schedule on control plane node)
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if the pod is scheduled on control plane node
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}' | grep -q 'control-plane' && echo "true" || echo "false"
+            check:
+              ($error): ~
+              (contains($stdout, 'true')): true
+    - name: Check if volume is created
+      try:
+        - script:
+            env:
+              - name: TARGET_API
+                value: api.linode.com
+              - name: TARGET_API_VERSION
+                value: v4beta
+              - name: URI
+                value: volumes
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              set -e
+              curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "X-Filter: $FILTER" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4beta/volumes"
+            check:
+              ($error): ~
+              (json_parse($stdout)):
+                results: 1
+    - name: Create a file inside the pod and check it was created (on control plane node)
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "cd data && touch testfile" && \
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "ls data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+    - name: Check if the volume is a LUKS volume (on control plane node)
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "blkid | grep crypto_LUKS"
+            check:
+              ($error): ~
+              (contains($stdout, 'TYPE="crypto_LUKS"')): true
+
+    # This section updates the StatefulSet to schedule the Pod on a worker node and verifies that the pod is ready,
+    # the volume is mounted, and that the volume remains a LUKS volume after the move.
+    - name: Schedule the Pod on a worker node
+      try:
+        - patch:
+            resource:
+              apiVersion: v1
+              kind: StatefulSet
+              metadata:
+              name: test-statefulset
+              spec:
+                template:
+                  spec:
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                          - matchExpressions:
+                            - key: node-role.kubernetes.io/control-plane
+                              operator: DoesNotExist
+    - name: Check if Pod is ready and Volume is mounted (On worker node)
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if the pod is scheduled on worker node
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}' | grep -q 'control-plane' && echo "true" || echo "false"
+            check:
+              ($error): ~
+              (contains($stdout, 'false')): true
+    - name: Check file still exists (worker node)
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "ls data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+    - name: Check if the volume is a LUKS volume (worker node)
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "blkid | grep crypto_LUKS"
+            check:
+              ($error): ~
+              (contains($stdout, 'TYPE="crypto_LUKS"')): true
+
+              
+    # This section moves the volume back to the control plane node and verifies that the pod is ready,
+    # the volume is mounted, and that the volume remains a LUKS volume after the move.
+    - name: Move the volume back to control plane node
+      try:
+        - patch:
+            resource:
+              apiVersion: v1
+              kind: StatefulSet
+              metadata:
+                name: test-statefulset
+              spec:
+                template:
+                  spec:
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                          - matchExpressions:
+                            - key: node-role.kubernetes.io/control-plane
+                              operator: Exists
+                    tolerations:
+                    - key: "node-role.kubernetes.io/control-plane"
+                      operator: "Exists"
+                      effect: "NoSchedule"
+    - name: Check if Pod is ready and Volume is mounted (after moving back to control plane node)
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if the pod is scheduled on control plane node
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}' | grep -q 'control-plane' && echo "true" || echo "false"
+            check:
+              ($error): ~
+              (contains($stdout, 'true')): true
+    - name: Check file still exists (after moving back to control plane node)
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "ls data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+    - name: Check if the volume is a LUKS volume (after moving back to control plane node)
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE test-statefulset-0 -- sh -c "blkid | grep crypto_LUKS"
+            check:
+              ($error): ~
+              (contains($stdout, 'TYPE="crypto_LUKS"')): true
+
+    # This section handles the cleanup process after the test, which includes deleting the StatefulSet,
+    # checking if the associated volume is detached from the node and Linode, deleting the PersistentVolumeClaim (PVC),
+    # and verifying that the volume has been successfully deleted.
+    - name: Delete the statefulset
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: StatefulSet
+    - name: Check if the volume is detached on Node resource and in Linode (using API)
+      try:
+        - script:
+            env:
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              ../check-volume-detached.sh $FILTER
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume was successfully detached')): true
+              (contains($stdout, 'Volume detached in Linode')): true
+    - name: Delete PVC
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+    - name: Check if the Volume was deleted
+      try:
+        - script:
+            env:
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              ../check-volume-deleted.sh $FILTER
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume deleted in Linode')): true

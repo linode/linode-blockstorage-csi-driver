@@ -1,0 +1,72 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  name: (join('-', ['linode-block-storage-luks', $namespace]))
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Delete
+parameters:
+  linodebs.csi.linode.com/luks-encrypted: "true"
+  linodebs.csi.linode.com/luks-cipher: "aes-xts-plain64"
+  linodebs.csi.linode.com/luks-key-size: "512"
+  csi.storage.k8s.io/node-stage-secret-namespace: ($namespace)
+  csi.storage.k8s.io/node-stage-secret-name: csi-encrypt-example-luks-key
+  linodebs.csi.linode.com/volumeTags: (to_string($namespace))
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: csi-encrypt-example-luks-key
+stringData:
+  luksKey: ($lukskey)
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-statefulset
+spec:
+  serviceName: "example"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      ffinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: example
+        image: nginx
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["SYS_ADMIN"]
+          allowPrivilegeEscalation: true
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: (join('-', ['linode-block-storage-luks', $namespace]))
+      resources:
+        requests:
+          storage: 10Gi
+
