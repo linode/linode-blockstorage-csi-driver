@@ -5,7 +5,6 @@ ARG REV
 RUN mkdir -p /linode
 WORKDIR /linode
 
-COPY . .
 RUN apk add \
     blkid \
     cryptsetup \
@@ -19,7 +18,10 @@ RUN apk add \
     musl-dev \
     xfsprogs
 
+COPY go.mod go.sum ./
 RUN go mod tidy
+
+COPY . .
 
 RUN CGO_ENABLED=1 go build -a -ldflags '-X main.vendorVersion='${REV}'' -o /bin/linode-blockstorage-csi-driver /linode
 RUN CGO_ENABLED=1 go install go.uber.org/mock/mockgen@latest
