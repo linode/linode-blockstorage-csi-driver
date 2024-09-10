@@ -119,6 +119,9 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 }
 
 func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) {
+	args := []string{""}
+	s, err := e.Exec.Command("lsblk", args...).CombinedOutput()
+	klog.V(2).Info("Command output ", s)
 	luks2 := cryptsetup.LUKS2{SectorSize: 512}
 	keySize, err := strconv.Atoi(ctx.EncryptionKeySize)
 	if err != nil {
@@ -137,6 +140,10 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 	err = device.Format(luks2, genericParams)
 	if err != nil {
 		return "", err
+	}
+	if device.Dump() == 0 {
+		klog.V(4).Info("The volume is already LUKS formatted ", ctx.VolumeName)
+		return "/dev/mapper/" + ctx.VolumeName, nil
 	}
 	err = device.KeyslotAddByVolumeKey(0, "", "")
 	if err != nil {
@@ -209,39 +216,4 @@ func (e *Encryption) getCryptsetupCmd() (string, error) {
 		return "", err
 	}
 	return cryptsetupCmd, nil
-}
-
-func (e *Encryption) blkidValid(source string) (bool, error) {
-	if source == "" {
-		return false, errors.New("invalid source")
-	}
-
-	blkidCmd := "blkid"
-	_, err := e.Exec.LookPath(blkidCmd)
-	if err != nil {
-		if err == exec.ErrNotFound {
-			return false, fmt.Errorf("%q executable invalid", blkidCmd)
-		}
-		return false, err
-	}
-
-	blkidArgs := []string{source}
-
-	exitCode := 0
-	cmd := e.Exec.Command(blkidCmd, blkidArgs...)
-	err = cmd.Run()
-	if err != nil {
-		exitError, ok := err.(utilexec.ExitError)
-		if !ok {
-			return false, fmt.Errorf("checking blkdid failed: %w cmd: %q, args: %q", err, blkidCmd, blkidArgs)
-		}
-		// ws := exitError.Sys().(syscall.WaitStatus)
-		exitCode = exitError.ExitStatus()
-		if exitCode == 2 {
-			return false, nil
-		}
-		return false, errors.New("checking blkdid failed")
-	}
-
-	return true, nil
 }

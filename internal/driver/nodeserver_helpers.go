@@ -324,31 +324,23 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 // Finally, it prepares the LUKS volume for mounting.
 func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, luksContext LuksContext) (string, error) {
 	var luksSource string
+	var err error
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
 
 	// LUKS encryption enabled, check if the volume needs to be formatted.
 	log.V(4).Info("LUKS encryption enabled")
 
-	// Validate if the device is formatted with LUKS encryption or if it needs formatting.
-	formatted, err := ns.encrypt.blkidValid(devicePath)
-	if err != nil {
-		return "", errInternal("Failed to validate blkid (%q): %v", devicePath, err)
+	log.V(4).Info("luks volume now formatting: ", devicePath)
+
+	// Validate the LUKS context.
+	if err = luksContext.validate(); err != nil {
+		return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
 	}
 
-	// If the device is not, format it.
-	if !formatted {
-		log.V(4).Info("luks volume now formatting: ", devicePath)
-
-		// Validate the LUKS context.
-		if err := luksContext.validate(); err != nil {
-			return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
-		}
-
-		// Format the volume with LUKS encryption.
-		if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
-			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
-		}
+	// Format the volume with LUKS encryption.
+	if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
+		return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 	}
 
 	log.V(4).Info("Exiting prepareLUKSVolume", "luksSource", luksSource)

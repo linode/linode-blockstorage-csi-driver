@@ -74,33 +74,14 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 				VolumeId: "test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
-					LuksCipherAttribute:    "test",
-					LuksKeySizeAttribute:   "test",
+					LuksCipherAttribute:    "aes-xts-plain64",
+					LuksKeySizeAttribute:   "512",
 					PublishInfoVolumeName:  "test",
 				},
 				Secrets: map[string]string{LuksKeyAttribute: "test"},
 			},
 			expectMounterCalls: func(m *mocks.MockMounter) {
 				m.EXPECT().MountSensitive("/dev/mapper/test", "", "ext4", []string{"defaults"}, emptyStringArray).Return(nil)
-			},
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath("blkid").Return("/bin/blkid", nil)
-				m.EXPECT().Command("blkid", "/dev/test").Return(c)
-				c.EXPECT().Run().Return(nil)
-
-				// LuksOpen
-				m.EXPECT().LookPath("cryptsetup").Return("/bin/cryptsetup", nil)
-				m.EXPECT().Command("cryptsetup", "--batch-mode", "luksOpen", "--key-file", "-", "/dev/test", "test").Return(c)
-				c.EXPECT().SetStdin(gomock.Any())
-				c.EXPECT().CombinedOutput().Return([]byte("Command Successful"), nil)
-
-				// Mount_linux: Check disk format. Disk is not formatted.
-				m.EXPECT().Command("blkid", "-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/mapper/test").Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte(""), exec.CodeExitError{Code: 2, Err: fmt.Errorf("not formatted")})
-
-				// Mount_linux: Format disk
-				m.EXPECT().Command("mkfs.ext4", "-F", "-m0", "/dev/mapper/test").Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("Formatted successfully"), nil)
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(true)
@@ -115,22 +96,11 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 				VolumeId: "test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
-					LuksCipherAttribute:    "test",
-					LuksKeySizeAttribute:   "test",
+					LuksCipherAttribute:    "aes-xts-plain64",
+					LuksKeySizeAttribute:   "512",
 					PublishInfoVolumeName:  "test",
 				},
 				Secrets: map[string]string{LuksKeyAttribute: "test"},
-			},
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath("blkid").Return("/bin/blkid", nil)
-				m.EXPECT().Command("blkid", "/dev/test").Return(c)
-				c.EXPECT().Run().Return(nil)
-
-				// LuksOpen
-				m.EXPECT().LookPath("cryptsetup").Return("/bin/cryptsetup", nil)
-				m.EXPECT().Command("cryptsetup", "--batch-mode", "luksOpen", "--key-file", "-", "/dev/test", "test").Return(c)
-				c.EXPECT().SetStdin(gomock.Any())
-				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("Unable to LuksOpen"))
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(true)
