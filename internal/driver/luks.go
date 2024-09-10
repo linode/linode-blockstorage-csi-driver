@@ -27,10 +27,9 @@ import (
 	"os/exec"
 	"strings"
 
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
-
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 type LuksContext struct {
@@ -222,30 +221,26 @@ func (e *Encryption) luksOpen(ctx LuksContext, volume string) error {
 }
 
 // check is a given mapping under /dev/mapper is a luks volume
-func (e *Encryption) isLuksMapping(volume string) (bool, string, error) {
-	if strings.HasPrefix(volume, "/dev/mapper/") {
-		mappingName := volume[len("/dev/mapper/"):]
-		cryptsetupCmd, err := e.getCryptsetupCmd()
-		if err != nil {
-			return false, mappingName, err
-		}
-		cryptsetupArgs := []string{"status", mappingName}
-
-		out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-		if err != nil {
-			return false, mappingName, nil
-		}
-		for _, statusLine := range strings.Split(string(out), "\n") {
-			if strings.Contains(statusLine, "type:") {
-				if strings.Contains(strings.ToLower(statusLine), "luks") {
-					return true, mappingName, nil
-				}
-				return false, mappingName, nil
-			}
-		}
-
+func (e *Encryption) isLuksMapping(volume string) (bool, error) {
+	cryptsetupCmd, err := e.getCryptsetupCmd()
+	if err != nil {
+		return false, err
 	}
-	return false, "", nil
+	cryptsetupArgs := []string{"status", volume}
+
+	out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
+	if err != nil {
+		return false, nil
+	}
+	for _, statusLine := range strings.Split(string(out), "\n") {
+		if strings.Contains(statusLine, "type:") {
+			if strings.Contains(strings.ToLower(statusLine), "luks") {
+				return true, nil
+			}
+			return false, nil
+		}
+	}
+	return false, nil
 }
 
 func (e *Encryption) getCryptsetupCmd() (string, error) {
