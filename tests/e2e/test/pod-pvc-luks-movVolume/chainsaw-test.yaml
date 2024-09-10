@@ -3,12 +3,13 @@ apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
   creationTimestamp: null
-  name: pod-pvc-expand-storage-size
+  name: pod-pvc-luks-movVolume
   labels:
-    all: 
-    quick: 
+    all:
 spec:
   bindings:
+    - name: lukskey
+      value: (env('LUKS_KEY'))
     - name: nodes
       # number of nodes in cluster
       value: ((env('WORKER_NODES') | to_number(@)) + (env('CONTROLPLANE_NODES') | to_number(@)))
@@ -39,7 +40,7 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
-    - name: Check if volume is create and size is 10 Gi
+    - name: Check if volume is created
       try:
         - script:
             env:
@@ -62,15 +63,6 @@ spec:
               ($error): ~
               (json_parse($stdout)):
                 results: 1
-                data:
-                  - size: 10
-        - assert:
-            resource:
-              apiVersion: v1
-              kind: PersistentVolume
-              spec:
-                capacity:
-                  storage: 10Gi
     - name: Create a file inside the pod and check it was created
       try:
         - script:
@@ -83,50 +75,17 @@ spec:
             check:
               ($error): ~
               (contains($stdout, 'testfile')): true
-    - name: Update PVC to expand volume size to 20Gi
-      try:
-        - patch:
-            file: update-pvc.yaml
-      catch:
-        - describe:
-            apiVersion: v1
-            kind: PersistentVolumeClaim
-        - describe:
-            apiVersion: v1
-            kind: PersistentVolume
-    - name: Check if volume size was changed on Linode
-      try:
-        - script:
-            env:
-              - name: FILTER
-                value: (to_string({"tags":($namespace)}))
-              - name: VOLUME_SIZE
-                value: "20"
-            content: |
-              ../check-volume-size.sh $FILTER $VOLUME_SIZE
-            check:
-              ($error): ~
-              (contains($stdout, 'Volume size was changed successfully')): true
-    - name: Check if PV reflect storage expansion
-      try:
-        - assert:
-            resource:
-              apiVersion: v1
-              kind: PersistentVolume
-              spec:
-                capacity:
-                  storage: 20Gi
-    - name: Check if the file still exists
+    - name: Check if the volume is a LUKS volume
       try:
         - script:
             env:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "ls data"
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "blkid | grep crypto_LUKS"
             check:
               ($error): ~
-              (contains($stdout, 'testfile')): true
+              (contains($stdout, 'TYPE="crypto_LUKS"')): true
     - name: Delete the Pod
       try:
         - delete:

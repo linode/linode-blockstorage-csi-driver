@@ -68,6 +68,8 @@ jobs:
         run: devbox run mgmt-and-capl-cluster
 
       - name: Run E2E Tests
+        env:
+          E2E_SELECTOR: ${{ github.ref == 'refs/heads/main' && 'all' || 'quick' }}
         run: devbox run e2e-test
 
       - name: Run CSI-Sanity Tests
