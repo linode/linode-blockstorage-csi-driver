@@ -22,6 +22,7 @@ import (
 
 	"github.com/ianschenck/envflag"
 	"github.com/linode/linodego"
+	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
@@ -75,11 +76,20 @@ func main() {
 	ctx := context.Background()
 	log := logger.NewLogger(ctx)
 	ctx = context.WithValue(ctx, logger.LoggerKey{}, log)
+	undoMaxprocs, maxprocsError := maxprocs.Set(maxprocs.Logger(func(msg string, keysAndValues ...interface{}) {
+		log.Klogr.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
+	}))
+	defer undoMaxprocs()
+
+	if maxprocsError != nil {
+		log.Error(maxprocsError, "Failed to set GOMAXPROCS")
+	}
 
 	if err := handle(ctx); err != nil {
 		log.Error(err, "Fatal error")
 		os.Exit(1)
 	}
+
 	os.Exit(0)
 }
 
