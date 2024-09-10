@@ -10,6 +10,7 @@ endif
 IMAGE_TAG          ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG  := golangci/golangci-lint:v1.59-alpine
 RELEASE_DIR        ?= release
+DOCKERFILE         ?= Dockerfile
 
 #####################################################################
 # OS / ARCH
@@ -67,7 +68,7 @@ build:
 
 .PHONY: docker-build
 docker-build:
-	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./Dockerfile .
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./$(DOCKERFILE) .
 
 .PHONY: docker-push
 docker-push:
@@ -125,10 +126,6 @@ generate-mock:
 	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) mockgen -source=internal/driver/nodeserver_helpers.go -destination=mocks/mock_nodeserver.go -package=mocks
 	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) mockgen -source=pkg/mount-manager/device-utils.go -destination=mocks/mock_deviceutils.go -package=mocks
 	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) mockgen -source=pkg/mount-manager/fs-utils.go -destination=mocks/mock_fsutils.go -package=mocks
-
-.PHONY: docker-dev-build
-docker-dev-build:
-	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./Dockerfile.dev .
 
 .PHONY: test
 test: vet verify generate-mock
