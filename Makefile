@@ -2,7 +2,11 @@ PLATFORM           ?= linux/amd64
 REGISTRY_NAME      ?= index.docker.io
 IMAGE_NAME         ?= linode/linode-blockstorage-csi-driver
 REV                := $(shell git describe --long --tags --dirty 2> /dev/null || echo "dev")
+ifdef DEV_TAG_EXTENSION
+IMAGE_VERSION      ?= $(REV)-$(DEV_TAG_EXTENSION)
+else
 IMAGE_VERSION      ?= $(REV)
+endif
 IMAGE_TAG          ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG  := golangci/golangci-lint:v1.59-alpine
 RELEASE_DIR        ?= release
@@ -24,19 +28,19 @@ endif
 #####################################################################
 .PHONY: fmt
 fmt:
-	go fmt ./...
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) go fmt ./...
 
 .PHONY: vet
 vet: fmt
-	go vet ./...
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) go vet ./...
 
 .PHONY: lint
 lint: vet
-	docker run --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
+	docker run --platform=$(PLATFORM) --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
 
 .PHONY: verify
 verify:
-	go mod verify
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) go mod verify
 
 .PHONY: clean
 clean:
@@ -118,13 +122,17 @@ cleanup-cluster:
 
 .PHONY: generate-mock
 generate-mock:
-	mockgen -source=internal/driver/nodeserver_helpers.go -destination=mocks/mock_nodeserver.go -package=mocks
-	mockgen -source=pkg/mount-manager/device-utils.go -destination=mocks/mock_deviceutils.go -package=mocks
-	mockgen -source=pkg/mount-manager/fs-utils.go -destination=mocks/mock_fsutils.go -package=mocks
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) mockgen -source=internal/driver/nodeserver_helpers.go -destination=mocks/mock_nodeserver.go -package=mocks
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) mockgen -source=pkg/mount-manager/device-utils.go -destination=mocks/mock_deviceutils.go -package=mocks
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) mockgen -source=pkg/mount-manager/fs-utils.go -destination=mocks/mock_fsutils.go -package=mocks
+
+.PHONY: docker-dev-build
+docker-dev-build:
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./Dockerfile.dev .
 
 .PHONY: test
 test: vet verify generate-mock
-	go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS)
+	docker run --platform=$(PLATFORM) -it $(IMAGE_TAG) go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS)
 
 .PHONY: elevated-test
 elevated-test:
