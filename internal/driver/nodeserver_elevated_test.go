@@ -15,7 +15,9 @@ import (
 )
 
 var (
-	defaultNodeServer = NodeServer{mounter: mountmanager.NewSafeMounter()}
+	mounter = mountmanager.NewSafeMounter()
+	encrypt = NewLuksEncryption(mounter.Exec, mountmanager.NewFileSystem())
+	defaultNodeServer = NodeServer{mounter: mounter, encrypt: encrypt}
 
 	defaultTeardownFunc = func(t *testing.T, mount string) {
 		_, err := os.Stat(mount)
