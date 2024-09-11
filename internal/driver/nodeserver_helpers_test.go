@@ -796,97 +796,73 @@ func TestNodeServer_mountVolume(t *testing.T) {
 	}
 }
 
-func TestNodeServer_closeLuksMountSources(t *testing.T) {
+func TestNodeServer_closeLuksMountSource(t *testing.T) {
 	tests := []struct {
 		name               string
 		expectMounterCalls func(m *mocks.MockMounter)
 		expectExecCalls    func(m *mocks.MockExecutor, c *mocks.MockCommand)
 		expectFsCalls      func(m *mocks.MockFileSystem)
-		path               string
+		volumeID           string
 		wantErr            bool
 	}{
 		{
-			name: "Success - close mount source",
+			name: "Success - Able to close LUKS volume",
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
-				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("test"), nil)
-			},
-			path:    "/test",
-			wantErr: false,
-		},
-		{
-			name: "Error - unable to close mount source. Executable not found",
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("", osexec.ErrNotFound)
-			},
-			path:    "/test",
-			wantErr: true,
-		},
-		{
-			name: "Error - unable to close mount source. unexpected error",
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("", fmt.Errorf("Unexpected error"))
-			},
-			path:    "/test",
-			wantErr: true,
-		},
-		{
-			name: "Error - unable to close mount source. Command to check mounts failed",
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
-				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("test"), fmt.Errorf("Unexpected error"))
-			},
-			path:    "/test",
-			wantErr: true,
-		},
-		{
-			name: "Success - close LUKS mount source",
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
-				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("/dev/mapper/test"), nil)
-
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
+				// check if the luks volume is already open
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/cryptsetup", nil)
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().CombinedOutput().Return([]byte("type: luks"), nil)
 
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
+				// close the luks volume
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/cryptsetup", nil)
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("test"), nil)
+				c.EXPECT().CombinedOutput().Return([]byte("success"), nil)
 			},
-			path:    "/dev/mapper/test",
+			volumeID:    "3232-pvc1234",
 			wantErr: false,
 		},
 		{
-			name: "Error - failed to close LUKS mount source",
+			name: "Success - If volume is not a LUKS volume",
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/cryptsetup", nil)
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("/dev/mapper/test"), nil)
-
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
+				c.EXPECT().CombinedOutput().Return([]byte("type: none"), nil)
+			},
+			volumeID:    "3232-pvc1234",
+			wantErr: false,
+		},
+		{
+			name: "Error - Unable to close LUKS volume",
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// check if the luks volume is already open
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/cryptsetup", nil)
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().CombinedOutput().Return([]byte("type: luks"), nil)
 
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
+				// close the luks volume
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/cryptsetup", nil)
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("Unexpected error"))
+				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("Unable to close LUKS volume"))
 			},
-			path:    "/dev/mapper/test",
+			volumeID:    "3232-pvc1234",
 			wantErr: true,
 		},
 		{
-			name: "Error - failed to determine if mount is a luks mapping",
+			name: "Error - Invalid volume ID",
+			volumeID:    "3232-pvc-test-1234",
+			wantErr: true,
+		},
+		{
+			name: "Error - Invalid volume ID",
+			volumeID:    "3232-test1234",
+			wantErr: true,
+		},
+		{
+			name: "Error - unable to find cryptsetup",
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil)
-				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("/dev/mapper/test"), nil)
-
 				m.EXPECT().LookPath(gomock.Any()).Return("", osexec.ErrNotFound)
 			},
-			path:    "/dev/mapper/test",
+			volumeID:    "3232-pvc1234",
 			wantErr: true,
 		},
 	}
@@ -918,7 +894,7 @@ func TestNodeServer_closeLuksMountSources(t *testing.T) {
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
-			if err := ns.closeLuksMountSources(context.Background(), tt.path); (err != nil) != tt.wantErr {
+			if err := ns.closeLuksMountSource(context.Background(), tt.volumeID); (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.closeLuksMountSources() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
