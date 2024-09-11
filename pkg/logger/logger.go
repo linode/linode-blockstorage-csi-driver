@@ -11,13 +11,13 @@ import (
 type LoggerKey struct{}
 
 type Logger struct {
-	klogr logr.Logger
+	Klogr logr.Logger
 }
 
 // NewLogger creates a new Logger instance with a klogr logger.
 func NewLogger(ctx context.Context) *Logger {
 	return &Logger{
-		klogr: klog.NewKlogr(),
+		Klogr: klog.NewKlogr(),
 	}
 }
 
@@ -26,7 +26,7 @@ func NewLogger(ctx context.Context) *Logger {
 func (l *Logger) WithMethod(method string) (*Logger, context.Context, func()) {
 	traceID := uuid.New().String()
 	newLogger := &Logger{
-		klogr: klog.NewKlogr().WithValues("method", method, "traceID", traceID),
+		Klogr: klog.NewKlogr().WithValues("method", method, "traceID", traceID),
 	}
 	ctx := context.WithValue(context.Background(), LoggerKey{}, newLogger)
 
@@ -39,12 +39,12 @@ func (l *Logger) WithMethod(method string) (*Logger, context.Context, func()) {
 
 // V returns a logr.Logger with the specified verbosity level.
 func (l *Logger) V(level int) logr.Logger {
-	return l.klogr.V(level)
+	return l.Klogr.V(level)
 }
 
 // Error logs an error message with the specified keys and values.
 func (l *Logger) Error(err error, msg string, keysAndValues ...interface{}) {
-	l.klogr.Error(err, msg, keysAndValues...)
+	l.Klogr.Error(err, msg, keysAndValues...)
 }
 
 // GetLogger retrieves the Logger from the context, or creates a new one if not present.
