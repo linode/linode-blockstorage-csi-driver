@@ -73,7 +73,7 @@ func TestNodeUnstageUnpublishVolume(t *testing.T) {
 			prepareFunc: defaultPrepareFunc,
 			call: func(target string) error {
 				req := &csi.NodeUnstageVolumeRequest{
-					VolumeId:          "test",
+					VolumeId:          "3232-pvc1234",
 					StagingTargetPath: target,
 				}
 
@@ -86,7 +86,7 @@ func TestNodeUnstageUnpublishVolume(t *testing.T) {
 			prepareFunc: defaultPrepareFunc,
 			call: func(target string) error {
 				req := &csi.NodeUnpublishVolumeRequest{
-					VolumeId:   "test",
+					VolumeId:   "3232-pvc1234",
 					TargetPath: target,
 				}
 

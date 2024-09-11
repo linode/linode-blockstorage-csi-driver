@@ -220,7 +220,9 @@ func (e *Encryption) luksOpen(ctx LuksContext, volume string) error {
 	return nil
 }
 
-// check is a given mapping under /dev/mapper is a luks volume
+// isLuksMapping checks if the specified volume ID is a LUKS volume 
+// by executing the 'cryptsetup status' command. It returns true if 
+// the volume is LUKS, false otherwise, along with any error encountered.
 func (e *Encryption) isLuksMapping(volume string) (bool, error) {
 	cryptsetupCmd, err := e.getCryptsetupCmd()
 	if err != nil {
