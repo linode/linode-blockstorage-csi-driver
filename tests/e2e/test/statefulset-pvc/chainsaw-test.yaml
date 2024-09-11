@@ -4,6 +4,9 @@ kind: Test
 metadata:
   creationTimestamp: null
   name: statefulset-pvc
+  labels:
+    all: 
+    quick: 
 spec:
   bindings:
     - name: nodes

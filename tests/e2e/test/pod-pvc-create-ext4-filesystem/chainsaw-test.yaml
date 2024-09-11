@@ -4,6 +4,9 @@ kind: Test
 metadata:
   creationTimestamp: null
   name: pod-pvc-create-ext4-filesystem
+  labels:
+    all: 
+    quick: 
 spec:
   bindings:
     - name: nodes

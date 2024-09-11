@@ -4,6 +4,9 @@ kind: Test
 metadata:
   creationTimestamp: null
   name: pod-pvc-create-xfs-filesystem
+  labels:
+    all: 
+    quick: 
 spec:
   bindings:
     - name: nodes
