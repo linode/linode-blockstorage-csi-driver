@@ -406,11 +406,6 @@ func (ns *NodeServer) getMountSource(ctx context.Context, input string) (string,
 		return "", fmt.Errorf("invalid input format: %s", input)
 	}
 
-	// Check if the second part starts with "pvc"
-	if !strings.HasPrefix(parts[1], "pvc") {
-		return "", fmt.Errorf("invalid input: second part must start with 'pvc'")
-	}
-
 	result := parts[1]
 	log.V(4).Info("Exiting getMountSources", "result", result)
 	return result, nil
