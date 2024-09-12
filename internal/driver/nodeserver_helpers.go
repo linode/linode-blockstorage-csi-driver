@@ -354,7 +354,7 @@ func (ns *NodeServer) closeLuksMountSource(ctx context.Context, volumeID string)
 
 	volumeName, err := ns.getMountSource(ctx, volumeID)
 	if err != nil {
-		return fmt.Errorf("Could not get volumename in pvcxxxxxxxxx format from given volumeID", "volumeID", volumeID)
+		return fmt.Errorf("Could not get volumename in pvcxxxxxxxxx format from given volumeID: %s", volumeID)
 	}
 	log.V(4).Info("Closing LUKS volume at", "volume", volumeName)
 	if err := ns.encrypt.luksClose(ctx, volumeName); err != nil {
