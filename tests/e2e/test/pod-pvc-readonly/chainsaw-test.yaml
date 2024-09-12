@@ -4,6 +4,9 @@ kind: Test
 metadata:
   creationTimestamp: null
   name: pod-pvc-readonly
+  labels:
+    all: 
+    quick: 
 spec:
   bindings:
     - name: nodes

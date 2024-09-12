@@ -84,6 +84,12 @@ func errInternal(format string, args ...any) error {
 	return status.Errorf(codes.Internal, format, args...)
 }
 
+// errNotFound returns a gRPC error with a NOT_FOUND status code.
+// It formats the error message using the provided format and arguments.
+func errNotFound(format string, args ...any) error {
+	return status.Errorf(codes.NotFound, format, args...)
+}
+
 // errAlreadyExists returns a gRPC error for an already existing resource.
 //
 // Parameters: format (string), args (...any)

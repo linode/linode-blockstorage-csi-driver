@@ -133,7 +133,7 @@ elevated-test:
 .PHONY: e2e-test
 e2e-test:
 	openssl rand -out luks.key 64
-	CONTROLPLANE_NODES=$(CONTROLPLANE_NODES) WORKER_NODES=$(WORKER_NODES) KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./tests/e2e --parallel 2
+	CONTROLPLANE_NODES=$(CONTROLPLANE_NODES) WORKER_NODES=$(WORKER_NODES) KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./tests/e2e --parallel 2 --selector $(E2E_SELECTOR)
 
 .PHONY: csi-sanity-test
 csi-sanity-test:
