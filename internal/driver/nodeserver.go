@@ -161,11 +161,11 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", req.GetTargetPath(), err)
 	}
 
-	// If LUKS volume is used, close the LUKS device
-	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "targetPath", req.GetTargetPath())
-	if err := ns.closeLuksMountSources(ctx, req.GetTargetPath()); err != nil {
-		return nil, err
-	}
+	// // If LUKS volume is used, close the LUKS device
+	// log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "targetPath", req.GetTargetPath())
+	// if err := ns.closeLuksMountSource(ctx, req.GetVolumeId()); err != nil {
+	// 	return nil, err
+	// }
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
@@ -268,7 +268,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	// If LUKS volume is used, close the LUKS device
 	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
-	if err := ns.closeLuksMountSources(ctx, req.GetStagingTargetPath()); err != nil {
+	if err := ns.closeLuksMountSource(ctx, req.GetVolumeId()); err != nil {
 		return nil, err
 	}
 

@@ -2,7 +2,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: csi-example-pod-luks
+  name: csi-example-pod-luks-2
 spec:
   containers:
     - name: csi-example-container
@@ -18,7 +18,7 @@ spec:
   volumes:
     - name: csi-example-volume-luks
       persistentVolumeClaim:
-        claimName: csi-example-pvc-luks
+        claimName: csi-example-pvc-luks-2
 ---
 allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
@@ -26,7 +26,7 @@ kind: StorageClass
 metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
-  name: linode-block-storage-luks-luks
+  name: linode-block-storage-luks-luks-2
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Delete
@@ -48,11 +48,11 @@ stringData:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: csi-example-pvc-luks
+  name: csi-example-pvc-luks-2
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
-  storageClassName: linode-block-storage-luks-luks
+  storageClassName: linode-block-storage-luks-luks-2

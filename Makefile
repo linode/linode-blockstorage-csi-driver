@@ -72,7 +72,6 @@ docker-build:
 
 .PHONY: docker-push
 docker-push:
-	echo "[reminder] Did you run `make docker-build`?"
 	docker push $(IMAGE_TAG)
 
 .PHONY: local-docker-setup
@@ -96,9 +95,10 @@ capl-cluster:
 
 	# Install CSI driver and wait for it to be ready
 	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
-	hack/generate-yaml.sh $(IMAGE_VERSION) $(IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
+	hack/generate-yaml.sh $(IMAGE_VERSION) $(IMAGE_NAME) > templates.yaml
+	# kubectl apply -f templates.yaml
+	# KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
+	# KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
 .PHONY: mgmt-cluster
 mgmt-cluster:

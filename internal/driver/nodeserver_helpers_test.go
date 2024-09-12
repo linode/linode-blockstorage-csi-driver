@@ -918,8 +918,8 @@ func TestNodeServer_closeLuksMountSources(t *testing.T) {
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem),
 			}
-			if err := ns.closeLuksMountSources(context.Background(), tt.path); (err != nil) != tt.wantErr {
-				t.Errorf("NodeServer.closeLuksMountSources() error = %v, wantErr %v", err, tt.wantErr)
+			if err := ns.closeLuksMountSource(context.Background(), ""); (err != nil) != tt.wantErr {
+				t.Errorf("NodeServer.closeLuksMountSource() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

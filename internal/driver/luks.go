@@ -22,9 +22,8 @@ limitations under the License.
 package driver
 
 import (
+	"context"
 	"errors"
-	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -119,9 +118,6 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 }
 
 func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) {
-	args := []string{""}
-	s, err := e.Exec.Command("lsblk", args...).CombinedOutput()
-	klog.V(2).Info("Command output ", s)
 	luks2 := cryptsetup.LUKS2{SectorSize: 512}
 	keySize, err := strconv.Atoi(ctx.EncryptionKeySize)
 	if err != nil {
@@ -137,13 +133,15 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	err = device.Format(luks2, genericParams)
-	if err != nil {
-		return "", err
-	}
+	klog.V(4).Info("Checking to see if the volume is already LUKS formatted ", ctx.VolumeName)
 	if device.Dump() == 0 {
 		klog.V(4).Info("The volume is already LUKS formatted ", ctx.VolumeName)
 		return "/dev/mapper/" + ctx.VolumeName, nil
+	}
+	klog.V(4).Info("The volume is not yet LUKS formatted ", ctx.VolumeName)
+	err = device.Format(luks2, genericParams)
+	if err != nil {
+		return "", err
 	}
 	err = device.KeyslotAddByVolumeKey(0, "", "")
 	if err != nil {
@@ -162,58 +160,26 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 	return "/dev/mapper/" + ctx.VolumeName, nil
 }
 
-func (e *Encryption) luksClose(volume string) error {
-	cryptsetupCmd, err := e.getCryptsetupCmd()
+func (e *Encryption) luksClose(ctx context.Context, volumeName string) error {
+	// Initialize the device by name
+	klog.V(4).Info("Initalizing device to perform luks close ", volumeName)
+	device, err := cryptsetup.InitByName(volumeName)
 	if err != nil {
 		return err
 	}
-	cryptsetupArgs := []string{"--batch-mode", "close", volume}
+	klog.V(4).Info("Initalized device to perform luks close ", volumeName)
 
-	klog.V(4).Info("executing cryptsetup close command")
-
-	out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("removing luks mapping failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
+	// Releasing/Freeing the device
+	klog.V(4).Info("Releasing/Freeing the device ", volumeName)
+	if !device.Free() {
+		return errors.New("could not release/free the luks device")
 	}
+	klog.V(4).Info("Released/Freed the device ", volumeName)
+
+	klog.V(4).Info("Deactivating and closing the volume ", volumeName)
+	if err := device.Deactivate(volumeName); err != nil {
+		return err
+	}
+	klog.V(4).Info("Released/Freed and Deactivated/Closed the volume ", volumeName)
 	return nil
-}
-
-// check is a given mapping under /dev/mapper is a luks volume
-func (e *Encryption) isLuksMapping(volume string) (bool, string, error) {
-	if strings.HasPrefix(volume, "/dev/mapper/") {
-		mappingName := volume[len("/dev/mapper/"):]
-		cryptsetupCmd, err := e.getCryptsetupCmd()
-		if err != nil {
-			return false, mappingName, err
-		}
-		cryptsetupArgs := []string{"status", mappingName}
-
-		out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-		if err != nil {
-			return false, mappingName, nil
-		}
-		for _, statusLine := range strings.Split(string(out), "\n") {
-			if strings.Contains(statusLine, "type:") {
-				if strings.Contains(strings.ToLower(statusLine), "luks") {
-					return true, mappingName, nil
-				}
-				return false, mappingName, nil
-			}
-		}
-
-	}
-	return false, "", nil
-}
-
-func (e *Encryption) getCryptsetupCmd() (string, error) {
-	cryptsetupCmd := "cryptsetup"
-	_, err := e.Exec.LookPath(cryptsetupCmd)
-	if err != nil {
-		if err == exec.ErrNotFound {
-			return "", fmt.Errorf("%q executable not found in $PATH", cryptsetupCmd)
-		}
-		return "", err
-	}
-	return cryptsetupCmd, nil
 }

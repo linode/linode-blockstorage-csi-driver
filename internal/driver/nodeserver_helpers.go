@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -347,59 +346,43 @@ func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, 
 	return luksSource, nil
 }
 
-// closeMountSources closes any LUKS-encrypted mount sources associated with the given path.
-// It retrieves mount sources, checks if each source is a LUKS mapping, and closes it if so.
+// closeLuksMountSource closes a LUKS-encrypted mount source for a given volume ID.
+// It retrieves the mount source, checks if it's a LUKS volume, and closes it if so.
 // Returns an error if any operation fails during the process.
-func (ns *NodeServer) closeLuksMountSources(ctx context.Context, path string) error {
+func (ns *NodeServer) closeLuksMountSource(ctx context.Context, volumeID string) error {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering closeLuksMountSources", "path", path)
 
-	mountSources, err := ns.getMountSources(ctx, path)
+	volumeName, err := ns.getMountSource(ctx, volumeID)
 	if err != nil {
-		return errInternal("closeMountSources failed to to get mount sources %s: %v", path, err)
+		return fmt.Errorf("Could not get volumename in pvcxxxxxxxxx format from given volumeID", "volumeID", volumeID)
 	}
-	log.V(4).Info("closing mount sources: ", mountSources)
-	for _, source := range mountSources {
-		isLuksMapping, mappingName, err := ns.encrypt.isLuksMapping(source)
-		if err != nil {
-			return errInternal("closeMountSources failed determine if mount is a luks mapping %s: %v", path, err)
-		}
-		if isLuksMapping {
-			log.V(4).Info("luksClose %s", mappingName)
-			if err := ns.encrypt.luksClose(mappingName); err != nil {
-				return errInternal("closeMountSources failed to close luks mount %s: %v", path, err)
-			}
-		}
+	log.V(4).Info("Closing LUKS volume at", "volume", volumeName)
+	if err := ns.encrypt.luksClose(ctx, volumeName); err != nil {
+		return errInternal("closeLuksMountSource failed to close luks mount %s: %v", volumeName, err)
 	}
-
-	log.V(4).Info("Exiting closeLuksMountSources")
+	log.V(4).Info("Successfully closed LUKS volume", "volume", volumeName)
 	return nil
 }
 
-// getMountSources retrieves the mount sources for a given target path using the 'findmnt' command.
-// It returns a slice of strings containing the mount sources, or an error if the operation fails.
-// If 'findmnt' is not found or returns no results, appropriate errors or an empty slice are returned.
-func (ns *NodeServer) getMountSources(ctx context.Context, target string) ([]string, error) {
+// getMountSource extracts the PVC name from a given input string.
+// The input is expected to be in the format "number-pvcname", e.g., "8934-pvc232323".
+// It returns the PVC name (the part starting with "pvc") or an error if the input format is invalid.
+func (ns *NodeServer) getMountSource(ctx context.Context, input string) (string, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering getMountSources", "target", target)
+	log.V(4).Info("Entering getMountSources", "input", input)
 
-	_, err := ns.mounter.Exec.LookPath("findmnt")
-	if err != nil {
-		if err == exec.ErrNotFound {
-			return nil, fmt.Errorf("%q executable not found in $PATH", "findmnt")
-		}
-		return nil, err
-	}
-	out, err := ns.mounter.Exec.Command("sh", "-c", fmt.Sprintf("findmnt -o SOURCE -n -M %s", target)).CombinedOutput() // https://pkg.go.dev/k8s.io/utils/mount#GetDeviceNameFromMount
-	if err != nil {
-		// findmnt exits with non zero exit status if it couldn't find anything
-		if strings.TrimSpace(string(out)) == "" {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("checking mounted failed: %v cmd: %q output: %q",
-			err, "findmnt", string(out))
+	// Split the input string by "-". example: '8934-pvc232323'
+	parts := strings.Split(input, "-")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid input format: %s", input)
 	}
 
-	log.V(4).Info("Exiting getMountSources", "sources", out)
-	return strings.Split(string(out), "\n"), nil
+	// Check if the second part starts with "pvc"
+	if !strings.HasPrefix(parts[1], "pvc") {
+		return "", fmt.Errorf("invalid input: second part must start with 'pvc'")
+	}
+
+	result := parts[1]
+	log.V(4).Info("Exiting getMountSources", "result", result)
+	return result, nil
 }
