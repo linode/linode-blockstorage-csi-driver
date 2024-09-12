@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euf -o pipefail
 
 # Define the CSI endpoint for the sanity tests
 CSI_ENDPOINT="dns:///127.0.0.1:10000"

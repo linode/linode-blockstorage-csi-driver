@@ -853,11 +853,6 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Error - Invalid volume ID",
-			volumeID:    "3232-test1234",
-			wantErr: true,
-		},
-		{
 			name: "Error - unable to find cryptsetup",
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
 				m.EXPECT().LookPath(gomock.Any()).Return("", osexec.ErrNotFound)

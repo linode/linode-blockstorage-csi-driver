@@ -285,8 +285,11 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	// Check linode to see if a give volume exists by volume ID
 	// Make call to linode api using the linode api client
 	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
+	log.V(4).Info("Processed LinodeVolumeKey", "LinodeVolumeKey", LinodeVolumeKey)
 	if err != nil {
-		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
+		// Node volume expansion is not supported yet. To meet the spec, we need to implement this.
+		// For now, we'll return a not found error.
+		return nil, errNotFound("volume not found: %v", err)
 	}
 	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
 	if err != nil {
