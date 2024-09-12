@@ -165,6 +165,12 @@ func getFSTypeAndMountOptions(ctx context.Context, volumeCapability *csi.VolumeC
 		}
 	}
 
+	// Add specific mount options for XFS
+	if fsType == "xfs" {
+		mountOptions = append(mountOptions, "nouuid")
+		// Note: "rw" is typically the default and doesn't need to be specified
+	}
+
 	log.V(4).Info("Exiting getFSTypeAndMountOptions", "fsType", fsType, "mountOptions", mountOptions)
 	return fsType, mountOptions
 }
