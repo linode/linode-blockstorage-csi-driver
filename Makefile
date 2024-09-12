@@ -1,7 +1,7 @@
 PLATFORM           ?= linux/amd64
 REGISTRY_NAME      ?= index.docker.io
 IMAGE_NAME         ?= linode/linode-blockstorage-csi-driver
-REV                := $(shell git describe --long --tags --dirty 2> /dev/null || echo "dev")
+REV                := $(shell git branch --show-current 2> /dev/null || echo "dev")
 IMAGE_VERSION      ?= $(REV)
 IMAGE_TAG          ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG  := golangci/golangci-lint:v1.59-alpine
