@@ -12,8 +12,6 @@ import (
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linodego"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -185,7 +183,7 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 
 	// Raise an error if more than one volume with the same label exists
 	if len(volumes) > 1 {
-		return nil, status.Errorf(codes.AlreadyExists, "volume %q already exists", label)
+		return nil, errAlreadyExists("volume %q already exists", label)
 	}
 
 	// Return the existing volume if found
