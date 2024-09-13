@@ -470,6 +470,5 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 		}
 	}
 
-	log.V(4).Info("prepareCreateVolumeResponse()", "response", resp)
 	return resp
 }
