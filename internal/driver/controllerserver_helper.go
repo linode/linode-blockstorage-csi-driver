@@ -127,7 +127,8 @@ func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *l
 // It returns a LinodeVolumeKey if a valid source volume is found, or an error if the source is invalid.
 func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*linodevolumes.LinodeVolumeKey, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Attempting to get content source volume")
+	log.V(4).Info("Entering attemptGetContentSourceVolume", "contentSource", contentSource)
+	defer log.V(4).Info("Exiting attemptGetContentSourceVolume")
 
 	if contentSource == nil {
 		return nil, nil // Return nil if no content source is provided
@@ -160,7 +161,8 @@ func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, c
 		return nil, errRegionMismatch(volumeData.Region, cs.metadata.Region)
 	}
 
-	return volumeInfo, nil // Return the parsed volume information
+	log.V(4).Info("Content source volume", "volumeData", volumeData)
+	return volumeInfo, nil
 }
 
 // attemptCreateLinodeVolume creates a Linode volume while ensuring idempotency.
@@ -333,8 +335,8 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 // and that the capabilities are valid. Returns an error if any validation fails.
 func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req *csi.CreateVolumeRequest) error {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateCreateVolumeRequest", "req", req)
-	defer log.V(4).Info("Exiting validateCreateVolumeRequest")
+	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
+	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
 
 	// Check if the volume name is empty; if so, return an error indicating no volume name was provided.
 	if len(req.GetName()) == 0 {
@@ -361,8 +363,8 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // and generates a normalized volume name. Returns the volume name and size in GB.
 func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (string, int, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering prepareVolumeParams", "req", req)
-	defer log.V(4).Info("Exiting prepareVolumeParams")
+	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
+	defer log.V(4).Info("Exiting prepareVolumeParams()")
 
 	// Retrieve the capacity range from the request to determine the size limits for the volume.
 	capRange := req.GetCapacityRange()
@@ -377,6 +379,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 	targetSizeGB := bytesToGB(size)
 
+	log.V(4).Info("Volume parameters prepared", "volumeName", volumeName, "targetSizeGB", targetSizeGB)
 	return volumeName, targetSizeGB, nil
 }
 
@@ -384,8 +387,8 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
 func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest) map[string]string {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering createVolumeContext", "req", req)
-	defer log.V(4).Info("Exiting createVolumeContext")
+	log.V(4).Info("Entering createVolumeContext()", "req", req)
+	defer log.V(4).Info("Exiting createVolumeContext()")
 
 	volumeContext := make(map[string]string)
 
@@ -396,6 +399,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
 	}
 
+	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext
 }
 
@@ -403,8 +407,8 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 // It logs the process and handles any errors that occur during creation or waiting.
 func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, sourceInfo *linodevolumes.LinodeVolumeKey) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering createAndWaitForVolume", "name", name, "sizeGB", sizeGB, "tags", tags)
-	defer log.V(4).Info("Exiting createAndWaitForVolume")
+	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", tags)
+	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
 	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, sourceInfo)
 	if err != nil {
@@ -437,8 +441,8 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 // It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
 func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int, context map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering prepareCreateVolumeResponse", "vol", vol)
-	defer log.V(4).Info("Exiting prepareCreateVolumeResponse")
+	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
+	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
 
 	key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
 	resp := &csi.CreateVolumeResponse{
@@ -466,5 +470,6 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 		}
 	}
 
+	log.V(4).Info("prepareCreateVolumeResponse()", "response", resp)
 	return resp
 }

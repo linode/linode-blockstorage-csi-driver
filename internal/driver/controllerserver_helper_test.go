@@ -328,7 +328,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: "test-volume",
 				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: 15 * 1024 * 1024 * 1024, // 15 GiB
+					RequiredBytes: 15 << 30, // 15 GiB
 				},
 			},
 			expectedName:   "csi-linode-pv-testvolume",
@@ -340,7 +340,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: "test-volume-limit",
 				CapacityRange: &csi.CapacityRange{
-					LimitBytes: 20 * 1024 * 1024 * 1024, // 20 GiB
+					LimitBytes: 20 << 30, // 20 GiB
 				},
 			},
 			expectedName:   "csi-linode-pv-testvolumelimit",
@@ -352,7 +352,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: "small-volume",
 				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: 5 * 1024 * 1024 * 1024, // 5 GiB
+					RequiredBytes: 5 << 30, // 5 GiB
 				},
 			},
 			expectedName:   "csi-linode-pv-smallvolume",
@@ -373,7 +373,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: "negative-volume",
 				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: -10 * 1024 * 1024 * 1024,
+					RequiredBytes: -10 << 30,
 				},
 			},
 			expectedName:   "",
