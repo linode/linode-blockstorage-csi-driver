@@ -61,124 +61,41 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
 	defer done()
 
-	name := req.GetName()
 	log.V(2).Info("Processing request", "req", req)
 
-	if len(name) == 0 {
-		return &csi.CreateVolumeResponse{}, errNoVolumeName
+	// Validate the incoming request to ensure it meets the necessary criteria.
+	// This includes checking for required fields and valid volume capabilities.
+	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
+		return nil, err
 	}
 
-	// validate volume capabilities
-	volCapabilities := req.GetVolumeCapabilities()
-	if len(volCapabilities) == 0 {
-		return &csi.CreateVolumeResponse{}, errNoVolumeCapabilities
-	}
-	if !validVolumeCapabilities(volCapabilities) {
-		return &csi.CreateVolumeResponse{}, errInvalidVolumeCapability(volCapabilities)
-	}
-
-	capRange := req.GetCapacityRange()
-	size, err := getRequestCapacitySize(capRange)
+	// Prepare the volume parameters such as name and size from the request.
+	// This step may involve calculations or adjustments based on the request's content.
+	volName, size, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
-		return &csi.CreateVolumeResponse{}, err
+		return nil, err
 	}
 
-	// to avoid mangled requests for existing volumes with hyphen,
-	// we only strip them out on creation when k8s invented the name
-	// this is still problematic because we strip "-" from volume-name-prefixes
-	// that specifically requested "-".
-	// Don't strip this when volume labels support sufficient length
-	condensedName := strings.Replace(name, "-", "", -1)
+	// Create volume context
+	volContext := cs.createVolumeContext(ctx, req)
 
-	preKey := linodevolumes.CreateLinodeVolumeKey(0, condensedName)
-
-	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
-	targetSizeGB := bytesToGB(size)
-
-	log.V(4).Info("CreateVolume details", "storage_size_giga_bytes", targetSizeGB, "volume_name", volumeName)
-
-	volumeContext := make(map[string]string)
-	if req.Parameters[LuksEncryptedAttribute] == "true" {
-		// if luks encryption is enabled add a volume context
-		volumeContext[LuksEncryptedAttribute] = "true"
-		volumeContext[PublishInfoVolumeName] = volumeName
-		volumeContext[LuksCipherAttribute] = req.Parameters[LuksCipherAttribute]
-		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
-	}
-
-	// Attempt to get info about the source volume for
-	// volume cloning if the datasource is provided in the PVC.
-	// sourceVolumeInfo will be null if no content source is defined.
-	contentSource := req.GetVolumeContentSource()
-	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
+	// Attempt to retrieve information about a source volume if the request includes a content source.
+	// This is important for scenarios where the volume is being cloned from an existing one.
+	sourceVolInfo, err := cs.attemptGetContentSourceVolume(ctx, req.GetVolumeContentSource())
 	if err != nil {
-		return &csi.CreateVolumeResponse{}, err
+		return nil, err
 	}
 
-	// Attempt to create the volume while respecting idempotency.
-	// If the content source is defined, the source volume will be cloned to create a new volume.
-	log.V(4).Info("Calling API to create volume", "volumeName", volumeName)
-	vol, err := cs.attemptCreateLinodeVolume(
-		ctx,
-		volumeName,
-		targetSizeGB,
-		req.Parameters[VolumeTags],
-		sourceVolumeInfo,
-	)
+	// Create the volume
+	vol, err := cs.createAndWaitForVolume(ctx, volName, size, req.Parameters[VolumeTags], sourceVolInfo)
 	if err != nil {
-		return &csi.CreateVolumeResponse{}, err
+		return nil, err
 	}
 
-	// If the existing volume size differs from the requested size, we throw an error.
-	if vol.Size != targetSizeGB {
-		if sourceVolumeInfo == nil {
-			return nil, errAlreadyExists("volume %d already exists of size %d", vol.ID, vol.Size)
-		}
-	}
+	// Prepare and return response
+	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, req.GetVolumeContentSource())
 
-	statusPollTimeout := waitTimeout()
-
-	// If we're cloning the volume we should extend the timeout
-	if sourceVolumeInfo != nil {
-		statusPollTimeout = cloneTimeout()
-	}
-
-	log.V(4).Info("Waiting for volume to be active", "volumeID", vol.ID)
-	if _, err := cs.client.WaitForVolumeStatus(
-		ctx, vol.ID, linodego.VolumeActive, statusPollTimeout); err != nil {
-		return &csi.CreateVolumeResponse{}, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
-	}
-
-	log.V(4).Info("Volume is active", "volumeID", vol.ID)
-
-	key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
-	resp := &csi.CreateVolumeResponse{
-		Volume: &csi.Volume{
-			VolumeId:      key.GetVolumeKey(),
-			CapacityBytes: size,
-			AccessibleTopology: []*csi.Topology{
-				{
-					Segments: map[string]string{
-						VolumeTopologyRegion: vol.Region,
-					},
-				},
-			},
-			VolumeContext: volumeContext,
-		},
-	}
-
-	// Append the content source to the response
-	if sourceVolumeInfo != nil {
-		resp.Volume.ContentSource = &csi.VolumeContentSource{
-			Type: &csi.VolumeContentSource_Volume{
-				Volume: &csi.VolumeContentSource_VolumeSource{
-					VolumeId: contentSource.GetVolume().GetVolumeId(),
-				},
-			},
-		}
-	}
-
-	log.V(2).Info("Volume created successfully", "response", resp)
+	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
 }
 

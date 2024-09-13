@@ -326,3 +326,145 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 	// All capabilities are valid; return true
 	return true
 }
+
+
+// validateCreateVolumeRequest checks if the provided CreateVolumeRequest is valid.
+// It ensures that the volume name is not empty, that volume capabilities are provided,
+// and that the capabilities are valid. Returns an error if any validation fails.
+func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req *csi.CreateVolumeRequest) error {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering validateCreateVolumeRequest", "req", req)
+	defer log.V(4).Info("Exiting validateCreateVolumeRequest")
+
+	// Check if the volume name is empty; if so, return an error indicating no volume name was provided.
+	if len(req.GetName()) == 0 {
+		return errNoVolumeName
+	}
+
+	// Retrieve the volume capabilities from the request.
+	volCaps := req.GetVolumeCapabilities()
+	// Check if no volume capabilities are provided; if so, return an error.
+	if len(volCaps) == 0 {
+		return errNoVolumeCapabilities
+	}
+	// Validate the provided volume capabilities; if they are invalid, return an error.
+	if !validVolumeCapabilities(volCaps) {
+		return errInvalidVolumeCapability(volCaps)
+	}
+
+	// If all checks pass, return nil indicating the request is valid.
+	return nil
+}
+
+// prepareVolumeParams prepares the volume parameters for creation.
+// It extracts the capacity range from the request, calculates the size,
+// and generates a normalized volume name. Returns the volume name and size in GB.
+func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (string, int, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering prepareVolumeParams", "req", req)
+	defer log.V(4).Info("Exiting prepareVolumeParams")
+
+	// Retrieve the capacity range from the request to determine the size limits for the volume.
+	capRange := req.GetCapacityRange()
+	// Get the requested size in bytes, handling any potential errors.
+	size, err := getRequestCapacitySize(capRange)
+	if err != nil {
+		return "", 0, err
+	}
+
+	condensedName := strings.Replace(req.GetName(), "-", "", -1)
+	preKey := linodevolumes.CreateLinodeVolumeKey(0, condensedName)
+	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+	targetSizeGB := bytesToGB(size)
+
+	return volumeName, targetSizeGB, nil
+}
+
+// createVolumeContext creates a context map for the volume based on the request parameters.
+// If the volume is encrypted, it adds relevant encryption attributes to the context.
+func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest) map[string]string {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering createVolumeContext", "req", req)
+	defer log.V(4).Info("Exiting createVolumeContext")
+
+	volumeContext := make(map[string]string)
+
+	if req.Parameters[LuksEncryptedAttribute] == "true" {
+		volumeContext[LuksEncryptedAttribute] = "true"
+		volumeContext[PublishInfoVolumeName] = req.GetName()
+		volumeContext[LuksCipherAttribute] = req.Parameters[LuksCipherAttribute]
+		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
+	}
+
+	return volumeContext
+}
+
+// createAndWaitForVolume attempts to create a new volume and waits for it to become active.
+// It logs the process and handles any errors that occur during creation or waiting.
+func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, sourceInfo *linodevolumes.LinodeVolumeKey) (*linodego.Volume, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering createAndWaitForVolume", "name", name, "sizeGB", sizeGB, "tags", tags)
+	defer log.V(4).Info("Exiting createAndWaitForVolume")
+
+	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, sourceInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the created volume's size matches the requested size.
+	// if not, and sourceInfo is nil, it indicates that the volume was not created from a source.
+	if vol.Size != sizeGB && sourceInfo == nil {
+		return nil, errAlreadyExists("volume %d already exists with size %d", vol.ID, vol.Size)
+	}
+
+	// Set the timeout for polling the volume status based on whether it's a clone or not.
+	statusPollTimeout := waitTimeout()
+	if sourceInfo != nil {
+		statusPollTimeout = cloneTimeout()
+	}
+
+	log.V(4).Info("Waiting for volume to be active", "volumeID", vol.ID)
+	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, statusPollTimeout)
+	if err != nil {
+		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
+	}
+
+	log.V(4).Info("Volume is active", "volumeID", vol.ID)
+	return vol, nil
+}
+
+// prepareCreateVolumeResponse constructs a CreateVolumeResponse from the created volume details.
+// It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
+func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int, context map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering prepareCreateVolumeResponse", "vol", vol)
+	defer log.V(4).Info("Exiting prepareCreateVolumeResponse")
+
+	key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
+	resp := &csi.CreateVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      key.GetVolumeKey(),
+			CapacityBytes: int64(size),
+			AccessibleTopology: []*csi.Topology{
+				{
+					Segments: map[string]string{
+						VolumeTopologyRegion: vol.Region,
+					},
+				},
+			},
+			VolumeContext: context,
+		},
+	}
+
+	if sourceInfo != nil {
+		resp.Volume.ContentSource = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: contentSource.GetVolume().GetVolumeId(),
+				},
+			},
+		}
+	}
+
+	return resp
+}
