@@ -87,37 +87,40 @@ func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Ins
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Checking if volume can be attached", "instance_id", instance.ID)
 
+	// Get the maximum number of volume attachments allowed for the instance
 	limit, err := s.maxVolumeAttachments(ctx, instance)
 	if err != nil {
 		return false, err
 	}
 
+	// List the volumes currently attached to the instance
 	volumes, err := s.client.ListInstanceVolumes(ctx, instance.ID, nil)
 	if err != nil {
 		return false, errInternal("list instance volumes: %v", err)
 	}
 
+	// Return true if the number of attached volumes is less than the limit
 	return len(volumes) < limit, nil
 }
 
-// maxVolumeAttachments returns the maximum number of volumes that can be
-// attached to a single Linode instance, minus any currently-attached instance
-// disks.
+// maxVolumeAttachments calculates the maximum number of volumes that can be attached to a Linode instance,
+// taking into account the instance's memory and currently attached disks.
 func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Calculating max volume attachments")
 
+	// Check if the instance or its specs are nil
 	if instance == nil || instance.Specs == nil {
 		return 0, errNilInstance
 	}
 
+	// Retrieve the list of disks currently attached to the instance
 	disks, err := s.client.ListInstanceDisks(ctx, instance.ID, nil)
 	if err != nil {
 		return 0, errInternal("list instance disks: %v", err)
 	}
 
-	// The reported amount of memory for an instance is in MB.
-	// Convert it to bytes.
+	// Convert the reported memory from MB to bytes
 	memBytes := uint(instance.Specs.Memory) << 20
 	return maxVolumeAttachments(memBytes) - len(disks), nil
 }
@@ -129,33 +132,37 @@ func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, c
 	log.V(4).Info("Attempting to get content source volume")
 
 	if contentSource == nil {
-		return nil, nil
+		return nil, nil // Return nil if no content source is provided
 	}
 
+	// Check if the content source type is a volume
 	if _, ok := contentSource.GetType().(*csi.VolumeContentSource_Volume); !ok {
 		return nil, errUnsupportedVolumeContentSource
 	}
 
 	sourceVolume := contentSource.GetVolume()
 	if sourceVolume == nil {
-		return nil, errNoSourceVolume
+		return nil, errNoSourceVolume // Return error if no source volume is specified
 	}
 
+	// Parse the volume ID from the content source
 	volumeInfo, err := linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
 	if err != nil {
 		return nil, errInternal("parse volume info from content source: %v", err)
 	}
 
+	// Retrieve the volume data using the parsed volume ID
 	volumeData, err := cs.client.GetVolume(ctx, volumeInfo.VolumeID)
 	if err != nil {
 		return nil, errInternal("get volume %d: %v", volumeInfo.VolumeID, err)
 	}
 
+	// Check if the volume's region matches the server's metadata region
 	if volumeData.Region != cs.metadata.Region {
 		return nil, errRegionMismatch(volumeData.Region, cs.metadata.Region)
 	}
 
-	return volumeInfo, nil
+	return volumeInfo, nil // Return the parsed volume information
 }
 
 // attemptCreateLinodeVolume creates a Linode volume while ensuring idempotency.
@@ -165,7 +172,7 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
-	// List existing volumes
+	// List existing volumes with the specified label
 	jsonFilter, err := json.Marshal(map[string]string{"label": label})
 	if err != nil {
 		return nil, errInternal("marshal json filter: %v", err)
@@ -176,16 +183,17 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 		return nil, errInternal("list volumes: %v", err)
 	}
 
-	// This shouldn't happen, but raise an error just in case
+	// Raise an error if more than one volume with the same label exists
 	if len(volumes) > 1 {
 		return nil, status.Errorf(codes.AlreadyExists, "volume %q already exists", label)
 	}
 
-	// Volume already exists
+	// Return the existing volume if found
 	if len(volumes) == 1 {
 		return &volumes[0], nil
 	}
 
+	// Clone the source volume if provided, otherwise create a new volume
 	if sourceVolume != nil {
 		return cs.cloneLinodeVolume(ctx, label, sourceVolume.VolumeID)
 	}
@@ -199,16 +207,19 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
+	// Prepare the volume creation request with region, label, and size.
 	volumeReq := linodego.VolumeCreateOptions{
 		Region: cs.metadata.Region,
 		Label:  label,
 		Size:   sizeGB,
 	}
 
+	// If tags are provided, split them into a slice for the request.
 	if tags != "" {
 		volumeReq.Tags = strings.Split(tags, ",")
 	}
 
+	// Attempt to create the volume using the client and handle any errors.
 	result, err := cs.client.CreateVolume(ctx, volumeReq)
 	if err != nil {
 		return nil, errInternal("create volume: %v", err)
@@ -281,19 +292,25 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 // It ensures that each capability is non-nil and that the access mode is set to
 // SINGLE_NODE_WRITER.
 func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
+	// Iterate through each capability in the provided slice
 	for _, cap := range caps {
+		// Check if the capability is nil; if so, return false
 		if cap == nil {
 			return false
 		}
+		// Retrieve the access mode for the capability
 		accMode := cap.GetAccessMode()
 
+		// Check if the access mode is nil; if so, return false
 		if accMode == nil {
 			return false
 		}
 
+		// Ensure the access mode is SINGLE_NODE_WRITER; if not, return false
 		if accMode.GetMode() != csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER {
 			return false
 		}
 	}
+	// All capabilities are valid; return true
 	return true
 }
