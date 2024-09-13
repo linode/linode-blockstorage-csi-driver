@@ -56,7 +56,7 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 
 // CreateVolume provisions a new volume on behalf of a user, which can be used as a block device or mounted filesystem. 
 // This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes. 
-// For more details, refer to the @CSI Driver Spec documentation.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
 	defer done()
@@ -186,6 +186,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 // meaning that calling it multiple times with the same volume ID will have
 // the same effect as calling it once. If the volume does not exist, the
 // function will return a success response without any error.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
 	defer done()
@@ -223,6 +224,7 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // It ensures the volume is not already attached to another node 
 // and that the node can accommodate the attachment. Returns 
 // the device path if successful.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerPublishVolume")
 	defer done()
@@ -332,6 +334,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 // meaning it can be called multiple times without adverse effects.
 // If the volume is not found or is already detached, it will
 // return a successful response without error.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerUnpublishVolume")
 	defer done()
@@ -414,7 +417,8 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 // ListVolumes returns a list of all volumes known to the provider,
 // including their IDs, sizes, and accessibility information. It
 // supports pagination through the starting token and maximum entries
-// parameters as specified in the @CSI Driver Spec.
+// parameters as specified in the CSI Driver Spec.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ListVolumes")
 	defer done()
@@ -496,6 +500,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 // ControllerGetCapabilities retrieves the capabilities supported by the 
 // controller service implemented by this Plugin. It returns a response 
 // containing the capabilities available for the CSI driver.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerGetCapabilities")
 	defer done()
@@ -514,6 +519,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 // It checks if the requested size is valid, ensures the volume exists,
 // and performs the resize operation. If the volume is successfully resized,
 // it returns the new capacity and indicates that no node expansion is required.
+// For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
