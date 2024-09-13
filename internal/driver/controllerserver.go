@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
@@ -148,100 +147,48 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	log.V(2).Info("Processing request", "req", req)
 
-	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerPublishVolume", req)
-	if statusErr != nil {
-		return &csi.ControllerPublishVolumeResponse{}, statusErr
+	// Validate the request and get Linode ID and Volume ID
+	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
+	if err != nil {
+		return nil, err
 	}
 
-	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerPublishVolume", req)
-	if statusErr != nil {
-		return &csi.ControllerPublishVolumeResponse{}, statusErr
+	// Check if the volume exists and is valid
+	_, err = cs.getAndValidateVolume(ctx, volumeID, linodeID)
+	if err != nil {
+		return nil, err
 	}
 
-	cap := req.GetVolumeCapability()
-	if cap == nil {
-		return &csi.ControllerPublishVolumeResponse{}, errNoVolumeCapability
-	}
-	if !validVolumeCapabilities([]*csi.VolumeCapability{cap}) {
-		return &csi.ControllerPublishVolumeResponse{}, errInvalidVolumeCapability([]*csi.VolumeCapability{cap})
+	// Retrieve and validate the instance associated with the Linode ID
+	instance, err := cs.getInstance(ctx, linodeID)
+	if err != nil {
+		return nil, err
 	}
 
-	volume, err := cs.client.GetVolume(ctx, volumeID)
-	if linodego.IsNotFound(err) {
-		return &csi.ControllerPublishVolumeResponse{}, errVolumeNotFound(volumeID)
-	} else if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
-	}
-	if volume.LinodeID != nil {
-		if *volume.LinodeID == linodeID {
-			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
-			pvInfo := map[string]string{
-				devicePathKey: volume.FilesystemPath,
-			}
-			return &csi.ControllerPublishVolumeResponse{
-				PublishContext: pvInfo,
-			}, nil
-		}
-		return &csi.ControllerPublishVolumeResponse{}, errVolumeAttached(volumeID, linodeID)
+	// Check if the instance can accommodate the volume attachment
+	if err := cs.checkAttachmentCapacity(ctx, instance); err != nil {
+		return nil, err
 	}
 
-	instance, err := cs.client.GetInstance(ctx, linodeID)
-	if linodego.IsNotFound(err) {
-		return &csi.ControllerPublishVolumeResponse{}, errInstanceNotFound(linodeID)
-	} else if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, errInternal("get linode instance %d: %v", linodeID, err)
-	}
-
-	log.V(4).Info("Checking if volume can be attached", "volume_id", volumeID, "node_id", linodeID)
-	// Check to see if there is room to attach this volume to the instance.
-	if canAttach, err := cs.canAttach(ctx, instance); err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
-	} else if !canAttach {
-		// If we can, try and add a little more information to the error message
-		// for the caller.
-		limit, err := cs.maxVolumeAttachments(ctx, instance)
-		if errors.Is(err, errNilInstance) {
-			return &csi.ControllerPublishVolumeResponse{}, errInternal("cannot calculate max volume attachments for a nil instance")
-		} else if err != nil {
-			return &csi.ControllerPublishVolumeResponse{}, errMaxAttachments
-		}
-		return &csi.ControllerPublishVolumeResponse{}, errMaxVolumeAttachments(limit)
-	}
-
-	// Whether or not the volume attachment should be persisted across
-	// boots.
-	//
-	// Setting this to true will limit the maximum number of attached
-	// volumes to 8 (eight), minus any instance disks, since volume
-	// attachments get persisted by adding them to the instance's boot
-	// config.
-	persist := false
-
-	log.V(4).Info("Executing attach volume", "volume_id", volumeID, "node_id", linodeID)
-	if _, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
-		LinodeID:           linodeID,
-		PersistAcrossBoots: &persist,
-	}); err != nil {
-		code := codes.Internal
-		if apiErr, ok := err.(*linodego.Error); ok && strings.Contains(apiErr.Message, "is already attached") {
-			code = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
-		}
-		return &csi.ControllerPublishVolumeResponse{}, status.Errorf(code, "attach volume: %v", err)
+	// Attach the volume to the specified instance
+	if err := cs.attachVolume(ctx, volumeID, linodeID); err != nil {
+		return nil, err
 	}
 
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
-	volume, err = cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
+	// Wait for the volume to be successfully attached to the instance
+	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, errInternal("wait for volume to attach: %v", err)
+		return nil, err
 	}
 
 	log.V(2).Info("Volume attached successfully", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
 
-	pvInfo := map[string]string{
-		devicePathKey: volume.FilesystemPath,
-	}
+	// Return the response with the device path of the attached volume
 	return &csi.ControllerPublishVolumeResponse{
-		PublishContext: pvInfo,
+		PublishContext: map[string]string{
+			devicePathKey: volume.FilesystemPath,
+		},
 	}, nil
 }
 

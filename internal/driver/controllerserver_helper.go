@@ -12,6 +12,8 @@ import (
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linodego"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -471,4 +473,145 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 	}
 
 	return resp
+}
+
+// validateControllerPublishVolumeRequest validates the incoming ControllerPublishVolumeRequest.
+// It extracts the Linode ID and Volume ID from the request and checks if the
+// volume capability is provided and valid. If any validation fails, it returns
+// an appropriate error.
+func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (int, int, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering validateControllerPublishVolumeRequest()", "req", req)
+	defer log.V(4).Info("Exiting validateControllerPublishVolumeRequest()")
+
+	// extract the linode ID from the request
+	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerPublishVolume", req)
+	if statusErr != nil {
+		return 0, 0, statusErr
+	}
+
+	// extract the volume ID from the request
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerPublishVolume", req)
+	if statusErr != nil {
+		return 0, 0, statusErr
+	}
+
+	// retrieve the volume capability from the request
+	cap := req.GetVolumeCapability()
+	// return an error if no volume capability is provided
+	if cap == nil {
+		return 0, 0, errNoVolumeCapability
+	}
+	// return an error if the volume capability is invalid
+	if !validVolumeCapabilities([]*csi.VolumeCapability{cap}) {
+		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{cap})
+	}
+
+	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
+	return linodeID, volumeID, nil
+}
+
+// getAndValidateVolume retrieves the volume by its ID and checks if it is
+// attached to the specified Linode instance. If the volume is found and
+// already attached to the instance, it logs this information and returns the
+// volume. If the volume is not found or attached to a different instance, it
+// returns an appropriate error.
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, linodeID int) (*linodego.Volume, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", linodeID)
+	defer log.V(4).Info("Exiting getAndValidateVolume()")
+
+	volume, err := cs.client.GetVolume(ctx, volumeID)
+	if linodego.IsNotFound(err) {
+		return nil, errVolumeNotFound(volumeID)
+	} else if err != nil {
+		// If any other error occurs, return an internal error.
+		return nil, errInternal("get volume %d: %v", volumeID, err)
+	}
+	// Check if the volume is attached to a Linode instance.
+	if volume.LinodeID != nil {
+		// If the volume is attached to the requested Linode instance, log this information and return the volume.
+		if *volume.LinodeID == linodeID {
+			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
+			return volume, nil
+		}
+		// If the volume is attached to a different instance, return an error indicating the volume is already attached.
+		return nil, errVolumeAttached(volumeID, linodeID)
+	}
+
+	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", linodeID)
+	return volume, nil
+}
+
+// getInstance retrieves the Linode instance by its ID. If the
+// instance is not found, it returns an error indicating that the instance
+// does not exist. If any other error occurs during retrieval, it returns
+// an internal error.
+func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*linodego.Instance, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering getInstance()", "linodeID", linodeID)
+	defer log.V(4).Info("Exiting getInstance()")
+
+	instance, err := cs.client.GetInstance(ctx, linodeID)
+	if linodego.IsNotFound(err) {
+		return nil, errInstanceNotFound(linodeID)
+	} else if err != nil {
+		// If any other error occurs, return an internal error.
+		return nil, errInternal("get linode instance %d: %v", linodeID, err)
+	}
+
+	log.V(4).Info("Instance retrieved", "instance", instance)
+	return instance, nil
+}
+
+// checkAttachmentCapacity checks if the specified instance can accommodate
+// additional volume attachments. It retrieves the maximum number of allowed
+// attachments and compares it with the currently attached volumes. If the
+// limit is exceeded, it returns an error indicating the maximum volume
+// attachments allowed.
+func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instance *linodego.Instance) error {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering checkAttachmentCapacity()", "linodeID", instance.ID)
+	defer log.V(4).Info("Exiting checkAttachmentCapacity()")
+
+	canAttach, err := cs.canAttach(ctx, instance)
+	if err != nil {
+		return err
+	}
+	if !canAttach {
+		// If the instance cannot accommodate more attachments, retrieve the maximum allowed attachments.
+		limit, err := cs.maxVolumeAttachments(ctx, instance)
+		if errors.Is(err, errNilInstance) {
+			return errInternal("cannot calculate max volume attachments for a nil instance")
+		} else if err != nil {
+			return errMaxAttachments // Return an error indicating the maximum attachments limit has been reached.
+		}
+		return errMaxVolumeAttachments(limit) // Return an error indicating the maximum volume attachments allowed.
+	}
+	return nil // Return nil if the instance can accommodate more attachments.
+}
+
+// attachVolume attaches the specified volume to the given Linode instance.
+// It logs the action and handles any errors that may occur during the
+// attachment process. If the volume is already attached, it allows for a
+// retry by returning an Unavailable error.
+func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID int) error {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering attachVolume()", "volume_id", volumeID, "node_id", linodeID)
+	defer log.V(4).Info("Exiting attachVolume()")
+
+	persist := false
+	_, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+		LinodeID:           linodeID,
+		PersistAcrossBoots: &persist,
+	})
+	if err != nil {
+		code := codes.Internal // Default error code is Internal.
+		// Check if the error indicates that the volume is already attached.
+		if apiErr, ok := err.(*linodego.Error); ok && strings.Contains(apiErr.Message, "is already attached") {
+			code = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
+		}
+		return status.Errorf(code, "attach volume: %v", err)
+	}
+	return nil // Return nil if the volume is successfully attached.
 }
