@@ -18,7 +18,7 @@ func TestPrepareCreateVolumeResponse(t *testing.T) {
 	testCases := []struct {
 		name          string
 		vol           *linodego.Volume
-		size          int
+		size          int64
 		context       map[string]string
 		sourceInfo    *linodevolumes.LinodeVolumeKey
 		contentSource *csi.VolumeContentSource
@@ -321,6 +321,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 		req            *csi.CreateVolumeRequest
 		expectedName   string
 		expectedSizeGB int
+		expectedSize   int64
 		expectedError  error
 	}{
 		{
@@ -333,6 +334,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			},
 			expectedName:   "csi-linode-pv-testvolume",
 			expectedSizeGB: 15,
+			expectedSize:   15 << 30,
 			expectedError:  nil,
 		},
 		{
@@ -345,6 +347,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			},
 			expectedName:   "csi-linode-pv-testvolumelimit",
 			expectedSizeGB: 20,
+			expectedSize:   20 << 30,
 			expectedError:  nil,
 		},
 		{
@@ -357,6 +360,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			},
 			expectedName:   "csi-linode-pv-smallvolume",
 			expectedSizeGB: 10, // Minimum size
+			expectedSize:   10 << 30,
 			expectedError:  nil,
 		},
 		{
@@ -366,6 +370,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			},
 			expectedName:   "csi-linode-pv-defaultvolume",
 			expectedSizeGB: 10, // Minimum size
+			expectedSize:   10 << 30,
 			expectedError:  nil,
 		},
 		{
@@ -378,6 +383,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			},
 			expectedName:   "",
 			expectedSizeGB: 0,
+			expectedSize:   0,
 			expectedError:  errors.New("RequiredBytes and LimitBytes must not be negative"),
 		},
 	}
@@ -391,7 +397,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			volumeName, sizeGB, err := cs.prepareVolumeParams(ctx, tt.req)
+			volumeName, sizeGB, size, err := cs.prepareVolumeParams(ctx, tt.req)
 
 			if !reflect.DeepEqual(tt.expectedError, err) {
 				if tt.expectedError != nil {
@@ -407,6 +413,10 @@ func TestPrepareVolumeParams(t *testing.T) {
 
 			if !reflect.DeepEqual(sizeGB, tt.expectedSizeGB) {
 				t.Errorf("Expected size in GB: %d, but got: %d", tt.expectedSizeGB, sizeGB)
+			}
+
+			if !reflect.DeepEqual(size, tt.expectedSize) {
+				t.Errorf("Expected size in bytes: %d, but got: %d", tt.expectedSize, size)
 			}
 		})
 	}
