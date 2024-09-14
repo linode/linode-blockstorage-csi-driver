@@ -12,6 +12,9 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
+      - name: Install cryptsetup
+        run: |
+          sudo apt install libcryptsetup12 libcryptsetup-dev
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -46,6 +49,9 @@ jobs:
       WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '0' }}
       E2E_SELECTOR: ${{ github.ref == 'refs/heads/main' && 'all' || 'quick' }}
     steps:
+      - name: Install cryptsetup
+        run: |
+          sudo apt install libcryptsetup12 libcryptsetup-dev
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

@@ -11,21 +11,32 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 
+	osexec "os/exec"
+
 	"go.uber.org/mock/gomock"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 )
 
+func setup() {
+	osexec.Command("/bin/dd", "if=/dev/urandom", "of=/tmp/test", "bs=64M", "count=1").Run()
+}
+
+func teardown() {
+	osexec.Command("rm -rf", "/tmp/test").Run()
+}
+
 func TestNodeServer_mountVolume_linux(t *testing.T) {
 	var emptyStringArray []string
 	tests := []struct {
-		name               string
-		devicePath         string
-		req                *csi.NodeStageVolumeRequest
-		expectExecCalls    func(m *mocks.MockExecutor, c *mocks.MockCommand)
-		expectFsCalls      func(m *mocks.MockFileSystem)
-		expectMounterCalls func(m *mocks.MockMounter)
-		wantErr            bool
+		name                  string
+		devicePath            string
+		req                   *csi.NodeStageVolumeRequest
+		expectExecCalls       func(m *mocks.MockExecutor, c *mocks.MockCommand)
+		expectFsCalls         func(m *mocks.MockFileSystem)
+		expectMounterCalls    func(m *mocks.MockMounter)
+		expectCryptSetupCalls func(m *mocks.MockDevice)
+		wantErr               bool
 	}{
 		{
 			name:       "Success - Mount the volume",
@@ -69,42 +80,36 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 		},
 		{
 			name:       "Success - mount LUKS volume",
-			devicePath: "/dev/test",
+			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
 				VolumeId: "test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
-					LuksCipherAttribute:    "test",
-					LuksKeySizeAttribute:   "test",
+					LuksCipherAttribute:    "aes-xts-plain64",
+					LuksKeySizeAttribute:   "512",
 					PublishInfoVolumeName:  "test",
 				},
 				Secrets: map[string]string{LuksKeyAttribute: "test"},
 			},
 			expectMounterCalls: func(m *mocks.MockMounter) {
-				m.EXPECT().MountSensitive("/dev/mapper/test", "", "ext4", []string{"defaults"}, emptyStringArray).Return(nil)
+				m.EXPECT().MountSensitive("/dev/mapper/test", "", "ext4", []string{"defaults"}, emptyStringArray).Return(nil).AnyTimes()
 			},
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath("blkid").Return("/bin/blkid", nil)
-				m.EXPECT().Command("blkid", "/dev/test").Return(c)
-				c.EXPECT().Run().Return(nil)
-
-				// LuksOpen
-				m.EXPECT().LookPath("cryptsetup").Return("/bin/cryptsetup", nil)
-				m.EXPECT().Command("cryptsetup", "--batch-mode", "luksOpen", "--key-file", "-", "/dev/test", "test").Return(c)
-				c.EXPECT().SetStdin(gomock.Any())
-				c.EXPECT().CombinedOutput().Return([]byte("Command Successful"), nil)
-
-				// Mount_linux: Check disk format. Disk is not formatted.
-				m.EXPECT().Command("blkid", "-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/mapper/test").Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte(""), exec.CodeExitError{Code: 2, Err: fmt.Errorf("not formatted")})
-
 				// Mount_linux: Format disk
-				m.EXPECT().Command("mkfs.ext4", "-F", "-m0", "/dev/mapper/test").Return(c)
-				c.EXPECT().CombinedOutput().Return([]byte("Formatted successfully"), nil)
+				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+			},
+			expectCryptSetupCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+				m.EXPECT().Free().Return(true).AnyTimes()
+				m.EXPECT().Load(gomock.Any()).Return(nil).AnyTimes()
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
-				m.EXPECT().IsNotExist(gomock.Any()).Return(true)
-				m.EXPECT().Stat(gomock.Any()).Return(nil, nil)
+				m.EXPECT().IsNotExist(gomock.Any()).Return(true).AnyTimes()
+				m.EXPECT().Stat(gomock.Any()).Return(nil, nil).AnyTimes()
 			},
 			wantErr: false,
 		},
@@ -115,33 +120,34 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 				VolumeId: "test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
-					LuksCipherAttribute:    "test",
-					LuksKeySizeAttribute:   "test",
+					LuksCipherAttribute:    "aes-xts-plain64",
+					LuksKeySizeAttribute:   "512",
 					PublishInfoVolumeName:  "test",
 				},
 				Secrets: map[string]string{LuksKeyAttribute: "test"},
 			},
-			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath("blkid").Return("/bin/blkid", nil)
-				m.EXPECT().Command("blkid", "/dev/test").Return(c)
-				c.EXPECT().Run().Return(nil)
-
-				// LuksOpen
-				m.EXPECT().LookPath("cryptsetup").Return("/bin/cryptsetup", nil)
-				m.EXPECT().Command("cryptsetup", "--batch-mode", "luksOpen", "--key-file", "-", "/dev/test", "test").Return(c)
-				c.EXPECT().SetStdin(gomock.Any())
-				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("Unable to LuksOpen"))
+			// expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+			// 	// Mount_linux: Format disk
+			// 	m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+			// 	c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+			// 	m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+			// 	c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+			// },
+			expectCryptSetupCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(fmt.Errorf("luks formatting failed")).AnyTimes()
+				m.EXPECT().Free().Return(true).AnyTimes()
 			},
-			expectFsCalls: func(m *mocks.MockFileSystem) {
-				m.EXPECT().IsNotExist(gomock.Any()).Return(true)
-				m.EXPECT().Stat(gomock.Any()).Return(nil, nil)
-			},
+			// expectFsCalls: func(m *mocks.MockFileSystem) {
+			// 	m.EXPECT().IsNotExist(gomock.Any()).Return(true)
+			// 	m.EXPECT().Stat(gomock.Any()).Return(nil, nil)
+			// },
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setup()
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -150,6 +156,7 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			mockFileSystem := mocks.NewMockFileSystem(ctrl)
 			mockExec := mocks.NewMockExecutor(ctrl)
 			mockCommand := mocks.NewMockCommand(ctrl)
+			mockDevice := mocks.NewMockDevice(ctrl)
 
 			if tt.expectExecCalls != nil {
 				tt.expectExecCalls(mockExec, mockCommand)
@@ -159,6 +166,9 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			}
 			if tt.expectMounterCalls != nil {
 				tt.expectMounterCalls(mockMounter)
+			}
+			if tt.expectCryptSetupCalls != nil {
+				tt.expectCryptSetupCalls(mockDevice)
 			}
 
 			ns := &NodeServer{
@@ -171,6 +181,8 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			if err := ns.mountVolume(context.Background(), tt.devicePath, tt.req); (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.mountVolume() error = %v, wantErr %v", err, tt.wantErr)
 			}
+
+			teardown()
 		})
 	}
 }

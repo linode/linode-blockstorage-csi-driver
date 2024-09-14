@@ -314,8 +314,8 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 	// Format and mount the drive
 	log.V(4).Info("formatting and mounting the volume")
 	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
-		return errInternal("Failed to format and mount device from (%q) to (%q) with fstype (%q) and options (%q): %v",
-			devicePath, stagingTargetPath, fsType, mountOptions, err)
+		return errInternal("Failed to format and mount device from (%q)---(%q) to (%q) with fstype (%q) and options (%q): %v",
+			fmtAndMountSource, devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}
 
 	log.V(4).Info("Exiting mountVolume")
@@ -328,39 +328,24 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 // If not, it formats the device using the provided LuksContext.
 // Finally, it prepares the LUKS volume for mounting.
 func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, luksContext LuksContext) (string, error) {
+	var luksSource string
+	var err error
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
 
 	// LUKS encryption enabled, check if the volume needs to be formatted.
 	log.V(4).Info("LUKS encryption enabled")
 
-	// Validate if the device is formatted with LUKS encryption or if it needs formatting.
-	formatted, err := ns.encrypt.blkidValid(devicePath)
-	if err != nil {
-		return "", errInternal("Failed to validate blkid (%q): %v", devicePath, err)
-	}
-	log.V(4).Info("Disk format check", "devicePath", devicePath, "formatted", formatted)
+	log.V(4).Info("luks volume now formatting: ", devicePath)
 
-	// If the device is not, format it.
-	if !formatted {
-		log.V(4).Info("luks volume now formatting: ", "devicePath", devicePath)
-
-		// Validate the LUKS context.
-		if err := luksContext.validate(); err != nil {
-			return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
-		}
-
-		// Format the volume with LUKS encryption.
-		if err := ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
-			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
-		}
+	// Validate the LUKS context.
+	if err = luksContext.validate(); err != nil {
+		return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
 	}
 
-	// Prepare the LUKS volume for mounting.
-	log.V(4).Info("preparing luks volume for mounting", "devicePath", devicePath)
-	luksSource, err := ns.encrypt.luksPrepareMount(luksContext, devicePath)
-	if err != nil {
-		return "", errInternal("Failed to prepare luks mount (%q): %v", devicePath, err)
+	// Format the volume with LUKS encryption.
+	if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
+		return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 	}
 
 	log.V(4).Info("Exiting prepareLUKSVolume", "luksSource", luksSource)
@@ -372,32 +357,18 @@ func (ns *NodeServer) prepareLUKSVolume(ctx context.Context, devicePath string, 
 // Returns an error if any operation fails during the process.
 func (ns *NodeServer) closeLuksMountSource(ctx context.Context, volumeID string) error {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering closeLuksMountSource", "volumeID", volumeID)
 
-	mountSource, err := ns.getMountSource(ctx, volumeID)
+	volumeName, err := ns.getMountSource(ctx, volumeID)
 	if err != nil {
-		return errInternal("closeLuksMountSource failed to get mount source %s: %v", volumeID, err)
+		return fmt.Errorf("Could not get volumename in pvcxxxxxxxxx format from given volumeID: %s", volumeID)
 	}
-
-	log.V(4).Info("Processing mount source", "source", mountSource)
-	isLuksMapping, err := ns.encrypt.isLuksMapping(mountSource)
-	if err != nil {
-		return errInternal("closeLuksMountSource failed determine if mount is a luks mapping %s: %v", mountSource, err)
+	log.V(4).Info("Closing LUKS volume at", "volume", volumeName)
+	if err := ns.encrypt.luksClose(ctx, volumeName); err != nil {
+		return errInternal("closeLuksMountSource failed to close luks mount %s: %v", volumeName, err)
 	}
-	log.V(4).Info("LUKS mapping check result", "isLuksMapping", isLuksMapping)
-
-	if isLuksMapping {
-		log.V(4).Info("Closing LUKS volume", "PVC", mountSource)
-		if err := ns.encrypt.luksClose(mountSource); err != nil {
-			return errInternal("closeLuksMountSource failed to close luks mount %s: %v", mountSource, err)
-		}
-		log.V(4).Info("Successfully closed LUKS volume", "PVC", mountSource)
-	}
-
-	log.V(4).Info("Exiting closeLuksMountSource")
+	log.V(4).Info("Successfully closed LUKS volume", "volume", volumeName)
 	return nil
 }
-
 
 // getMountSource extracts the PVC name from a given input string.
 // The input is expected to be in the format "number-pvcname", e.g., "8934-pvc232323".
