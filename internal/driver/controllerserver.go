@@ -65,14 +65,14 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Validate the incoming request to ensure it meets the necessary criteria.
 	// This includes checking for required fields and valid volume capabilities.
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
-		return nil, err
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Prepare the volume parameters such as name and SizeGB from the request.
 	// This step may involve calculations or adjustments based on the request's content.
 	volName, sizeGB, size, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
-		return nil, err
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Create volume context
@@ -82,13 +82,13 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// This is important for scenarios where the volume is being cloned from an existing one.
 	sourceVolInfo, err := cs.attemptGetContentSourceVolume(ctx, req.GetVolumeContentSource())
 	if err != nil {
-		return nil, err
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Create the volume
 	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.Parameters[VolumeTags], sourceVolInfo)
 	if err != nil {
-		return nil, err
+		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Prepare and return response
