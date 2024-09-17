@@ -12,6 +12,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
 	cryptsetup "github.com/martinjungblut/go-cryptsetup"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -135,4 +136,57 @@ func (m *MockDevice) Load(arg0 cryptsetup.DeviceType) error {
 func (mr *MockDeviceMockRecorder) Load(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockDevice)(nil).Load), arg0)
+}
+
+// MockCryptSetupClient is a mock of CryptSetupClient interface.
+type MockCryptSetupClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockCryptSetupClientMockRecorder
+}
+
+// MockCryptSetupClientMockRecorder is the mock recorder for MockCryptSetupClient.
+type MockCryptSetupClientMockRecorder struct {
+	mock *MockCryptSetupClient
+}
+
+// NewMockCryptSetupClient creates a new mock instance.
+func NewMockCryptSetupClient(ctrl *gomock.Controller) *MockCryptSetupClient {
+	mock := &MockCryptSetupClient{ctrl: ctrl}
+	mock.recorder = &MockCryptSetupClientMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCryptSetupClient) EXPECT() *MockCryptSetupClientMockRecorder {
+	return m.recorder
+}
+
+// Init mocks base method.
+func (m *MockCryptSetupClient) Init(arg0 string) (cryptsetupclient.Device, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Init", arg0)
+	ret0, _ := ret[0].(cryptsetupclient.Device)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Init indicates an expected call of Init.
+func (mr *MockCryptSetupClientMockRecorder) Init(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockCryptSetupClient)(nil).Init), arg0)
+}
+
+// InitByName mocks base method.
+func (m *MockCryptSetupClient) InitByName(arg0 string) (cryptsetupclient.Device, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InitByName", arg0)
+	ret0, _ := ret[0].(cryptsetupclient.Device)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InitByName indicates an expected call of InitByName.
+func (mr *MockCryptSetupClientMockRecorder) InitByName(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitByName", reflect.TypeOf((*MockCryptSetupClient)(nil).InitByName), arg0)
 }

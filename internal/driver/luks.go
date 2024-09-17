@@ -31,11 +31,58 @@ import (
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 
-	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
 	cryptsetup "github.com/martinjungblut/go-cryptsetup"
 
+	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
+
+// CryptSetup manages encrypted devices.
+type CryptSetup struct {
+	_ cryptsetupclient.CryptSetupClient
+}
+
+// Init opens a crypt device by device path.
+func (c CryptSetup) Init(devicePath string) (cryptsetupclient.Device, error) {
+	device, err := cryptsetup.Init(devicePath)
+	if err != nil {
+		return nil, fmt.Errorf("init cryptsetup by device path %q: %w", devicePath, err)
+	}
+	return device, nil
+}
+
+// InitByName opens an active crypt device using its mapped name.
+func (c CryptSetup) InitByName(name string) (cryptsetupclient.Device, error) {
+	device, err := cryptsetup.InitByName(name)
+	if err != nil {
+		return nil, fmt.Errorf("init cryptsetup by name %q: %w", name, err)
+	}
+	return device, nil
+}
+
+type LuksDevice struct {
+	device cryptsetupclient.Device
+}
+
+func NewLuksDevice(crypt cryptsetupclient.CryptSetupClient, path string) (LuksDevice, error) {
+	dev, err := crypt.Init(path)
+	if err != nil {
+		return LuksDevice{}, err
+	}
+	return LuksDevice{device: dev}, nil
+}
+
+func NewLuksDeviceByName(crypt cryptsetupclient.CryptSetupClient, name string) (LuksDevice, error) {
+	dev, err := crypt.InitByName(name)
+	if err != nil {
+		return LuksDevice{}, err
+	}
+	return LuksDevice{device: dev}, nil
+}
+
+func NewCryptSetup() CryptSetup {
+	return CryptSetup{}
+}
 
 type LuksContext struct {
 	EncryptionEnabled bool
@@ -88,12 +135,14 @@ func (ctx *LuksContext) validate() error {
 type Encryption struct {
 	Exec       Executor
 	FileSystem mountmanager.FileSystem
+	CryptSetup cryptsetupclient.CryptSetupClient
 }
 
-func NewLuksEncryption(executor utilexec.Interface, fileSystem mountmanager.FileSystem) Encryption {
+func NewLuksEncryption(executor utilexec.Interface, fileSystem mountmanager.FileSystem, cryptSetup cryptsetupclient.CryptSetupClient) Encryption {
 	return Encryption{
 		Exec:       executor,
 		FileSystem: fileSystem,
+		CryptSetup: cryptSetup,
 	}
 }
 
@@ -124,7 +173,7 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 	luks2 := cryptsetup.LUKS2{SectorSize: 512}
 	keySize, err := strconv.Atoi(ctx.EncryptionKeySize)
 	if err != nil {
-		return "", fmt.Errorf("line 127: %w", err)
+		return "", fmt.Errorf("keysize str to int coversion: %w", err)
 	}
 	cipherString := strings.SplitN(ctx.EncryptionCipher, "-", 2)
 	genericParams := cryptsetup.GenericParams{
@@ -132,27 +181,33 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 		CipherMode:    cipherString[1],
 		VolumeKeySize: keySize / 8,
 	}
-	device, err := cryptsetupclient.NewInitDevice(source)
+	klog.V(4).Info("Initalizing device to perform luks format ", source)
+
+	newLuksDevice, err := NewLuksDevice(e.CryptSetup, source)
 	if err != nil {
-		return "", fmt.Errorf("line 137: %w", err)
+		return "", fmt.Errorf("initializing luks device to format: %w", err)
 	}
-	err = device.Format(luks2, genericParams)
+	klog.V(4).Info("Formatting luks device ", newLuksDevice.device)
+	err = newLuksDevice.device.Format(luks2, genericParams)
 	if err != nil {
-		return "", fmt.Errorf("line 141: %w", err)
+		return "", fmt.Errorf("formatting luks device: %w", err)
 	}
-	err = device.KeyslotAddByVolumeKey(0, "", "")
+	klog.V(4).Info("Add keyslot to luks device ", newLuksDevice.device)
+	err = newLuksDevice.device.KeyslotAddByVolumeKey(0, "", "")
 	if err != nil {
-		return "", fmt.Errorf("line 145: %w", err)
+		return "", fmt.Errorf("adding luks keyslot: %w", err)
 	}
-	defer device.Free()
-	err = device.Load(nil)
+	defer newLuksDevice.device.Free()
+	klog.V(4).Info("Loading luks device ", newLuksDevice.device)
+	err = newLuksDevice.device.Load(nil)
 	if err != nil {
-		return "", fmt.Errorf("line 150: %w", err)
+		return "", fmt.Errorf("loading luks device: %w", err)
 	}
-	// err = device.ActivateByPassphrase(ctx.VolumeName, 0, "", 0)
-	// if err != nil {
-	// 	return "", fmt.Errorf("line 154: %w", err)
-	// }
+	klog.V(4).Info("Activating luks device ", "device", newLuksDevice.device, "VolumeName", ctx.VolumeName)
+	err = newLuksDevice.device.ActivateByPassphrase(ctx.VolumeName, 0, "", 0)
+	if err != nil {
+		return "", fmt.Errorf("activating %s luks device %s by passphrase: %w", newLuksDevice.device, ctx.VolumeName, err)
+	}
 	klog.V(4).Info("The volume has been LUKS formatted ", ctx.VolumeName)
 	return "/dev/mapper/" + ctx.VolumeName, nil
 }
@@ -160,22 +215,23 @@ func (e *Encryption) luksFormat(ctx LuksContext, source string) (string, error) 
 func (e *Encryption) luksClose(ctx context.Context, volumeName string) error {
 	// Initialize the device by name
 	klog.V(4).Info("Initalizing device to perform luks close ", volumeName)
-	device, err := cryptsetupclient.NewInitByNameDevice(volumeName)
+	newLuksDeviceByName, err := NewLuksDeviceByName(e.CryptSetup, volumeName)
 	if err != nil {
-		return err
+		klog.V(4).Info("device is no longer active ", volumeName)
+		return nil
 	}
 	klog.V(4).Info("Initalized device to perform luks close ", volumeName)
 
 	// Releasing/Freeing the device
 	klog.V(4).Info("Releasing/Freeing the device ", volumeName)
-	if !device.Free() {
+	if !newLuksDeviceByName.device.Free() {
 		return errors.New("could not release/free the luks device")
 	}
 	klog.V(4).Info("Released/Freed the device ", volumeName)
 
 	klog.V(4).Info("Deactivating and closing the volume ", volumeName)
-	if err := device.Deactivate(volumeName); err != nil {
-		return err
+	if err := newLuksDeviceByName.device.Deactivate(volumeName); err != nil {
+		return fmt.Errorf("deactivating %s luks device: %w", volumeName, err)
 	}
 	klog.V(4).Info("Released/Freed and Deactivated/Closed the volume ", volumeName)
 	return nil

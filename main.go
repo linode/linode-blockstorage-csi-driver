@@ -118,7 +118,8 @@ func handle(ctx context.Context) error {
 	mounter := mountmanager.NewSafeMounter()
 	deviceUtils := mountmanager.NewDeviceUtils()
 	fileSystem := mountmanager.NewFileSystem()
-	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem)
+	cryptSetup := driver.NewCryptSetup()
+	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
 	metadata, err := driver.GetMetadata(ctx)
 	if err != nil {

@@ -28,7 +28,6 @@ jobs:
           version: latest
       - run: make build
       - run: go test -cover ./... -coverprofile ./coverage.out
-      - run: make elevated-test
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:

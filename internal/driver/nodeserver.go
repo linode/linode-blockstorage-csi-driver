@@ -263,7 +263,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	// If LUKS volume is used, close the LUKS device
 	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
 	if err := ns.closeLuksMountSource(ctx, req.GetVolumeId()); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("closing luks to unstage volume %s: %w", req.GetVolumeId(), err)
 	}
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID)

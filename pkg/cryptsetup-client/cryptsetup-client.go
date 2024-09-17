@@ -12,18 +12,7 @@ type Device interface {
 	Deactivate(string) error
 }
 
-func NewInitDevice(path string) (Device, error) {
-	d, err := cryptsetup.Init(path)
-	if err != nil {
-		return nil, err
-	}
-	return d, nil
-}
-
-func NewInitByNameDevice(path string) (Device, error) {
-	d, err := cryptsetup.InitByName(path)
-	if err != nil {
-		return nil, err
-	}
-	return d, nil
+type CryptSetupClient interface {
+	Init(string) (Device, error)
+	InitByName(string) (Device, error)
 }
