@@ -150,36 +150,36 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Validate the request and get Linode ID and Volume ID
 	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
 	if err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
 	// Check if the volume exists and is valid
 	_, err = cs.getAndValidateVolume(ctx, volumeID, linodeID)
 	if err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
 	// Retrieve and validate the instance associated with the Linode ID
 	instance, err := cs.getInstance(ctx, linodeID)
 	if err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
 	// Check if the instance can accommodate the volume attachment
 	if err := cs.checkAttachmentCapacity(ctx, instance); err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
 	// Attach the volume to the specified instance
 	if err := cs.attachVolume(ctx, volumeID, linodeID); err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
 	// Wait for the volume to be successfully attached to the instance
 	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
-		return nil, err
+		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
 	log.V(2).Info("Volume attached successfully", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)

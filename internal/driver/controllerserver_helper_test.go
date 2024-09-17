@@ -555,9 +555,9 @@ func TestValidateControllerPublishVolumeRequest(t *testing.T) {
 			expectedErr:    nil,
 		},
 		{
-			name: "Invalid node ID",
+			name: "missing node ID",
 			req: &csi.ControllerPublishVolumeRequest{
-				NodeId:   "invalid",
+				NodeId:   "",
 				VolumeId: "67890-test-volume",
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
@@ -567,7 +567,7 @@ func TestValidateControllerPublishVolumeRequest(t *testing.T) {
 			},
 			expectedNodeID: 0,
 			expectedVolID:  0,
-			expectedErr:    status.Error(codes.InvalidArgument, "ControllerPublishVolume Node ID 'invalid' is not valid: must contain only numeric characters"),
+			expectedErr:    status.Error(codes.InvalidArgument, "ControllerPublishVolume Node ID must be provided"),
 		},
 		{
 			name: "missing volume ID",
