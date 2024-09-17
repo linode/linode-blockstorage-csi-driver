@@ -56,11 +56,47 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
 				m.EXPECT().Load(gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().ActivateByPassphrase("test", gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			},
+			expectFsCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().IsNotExist(gomock.Any()).Return(true).AnyTimes()
+				m.EXPECT().Stat(gomock.Any()).Return(nil, nil).AnyTimes()
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Success - already formatted",
+			devicePath: "/tmp/test",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId: "test",
+				VolumeContext: map[string]string{
+					LuksEncryptedAttribute: "true",
+					LuksCipherAttribute:    "aes-xts-plain64",
+					LuksKeySizeAttribute:   "512",
+					PublishInfoVolumeName:  "test",
+				},
+				Secrets: map[string]string{LuksKeyAttribute: "test"},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().MountSensitive("/dev/mapper/test", "", "ext4", []string{"defaults"}, emptyStringArray).Return(nil).AnyTimes()
+			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+			},
+			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
+				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
+			},
+			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Dump().Return(0).AnyTimes()
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(true).AnyTimes()
@@ -103,6 +139,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(fmt.Errorf("luks formatting failed")).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
 			},
@@ -125,6 +162,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("luks adding keyslot failed")).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
@@ -148,6 +186,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
@@ -172,6 +211,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
+				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
@@ -309,7 +349,7 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 	}
 }
 
-func TestNodeServer_prepareLUKSVolume(t *testing.T) {
+func TestNodeServer_formatLUKSVolume(t *testing.T) {
 	tests := []struct {
 		name                   string
 		expectFsCalls          func(m *mocks.MockFileSystem)
@@ -370,13 +410,13 @@ func TestNodeServer_prepareLUKSVolume(t *testing.T) {
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem, mockCryptSetupClient),
 			}
 
-			got, err := ns.prepareLUKSVolume(context.Background(), tt.devicePath, tt.luksContext)
+			got, err := ns.formatLUKSVolume(context.Background(), tt.devicePath, tt.luksContext)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NodeServer.prepareLUKSVolume() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NodeServer.formatLUKSVolume() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("NodeServer.prepareLUKSVolume() = %v, want %v", got, tt.want)
+				t.Errorf("NodeServer.formatLUKSVolume() = %v, want %v", got, tt.want)
 			}
 
 			// TearDown()
