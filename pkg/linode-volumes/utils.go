@@ -61,9 +61,17 @@ func NodeIdAsInt(caller string, w withNode) (int, error) {
 		return 0, status.Errorf(codes.InvalidArgument, "%sNode ID must be provided", caller)
 	}
 
+	// Check if strNodeID contains only numeric characters
+	for _, char := range strNodeID {
+		if char < '0' || char > '9' {
+			return 0, status.Errorf(codes.InvalidArgument, "%sNode ID '%s' is not valid: must contain only numeric characters", caller, strNodeID)
+		}
+	}
+
 	nodeID, err := strconv.Atoi(strNodeID)
 	if err != nil {
-		nodeID = hashStringToInt(strNodeID)
+		// This should never happen due to the above check, but we'll keep it for safety
+		return 0, status.Errorf(codes.Internal, "%sFailed to convert Node ID '%s' to integer: %v", caller, strNodeID, err)
 	}
 
 	return nodeID, nil

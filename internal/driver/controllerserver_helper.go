@@ -83,18 +83,18 @@ const (
 //
 // Whether or not another volume can be attached is based on how many instance
 // disks and block storage volumes are currently attached to the instance.
-func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
+func (cs *ControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Checking if volume can be attached", "instance_id", instance.ID)
 
 	// Get the maximum number of volume attachments allowed for the instance
-	limit, err := s.maxVolumeAttachments(ctx, instance)
+	limit, err := cs.maxVolumeAttachments(ctx, instance)
 	if err != nil {
 		return false, err
 	}
 
 	// List the volumes currently attached to the instance
-	volumes, err := s.client.ListInstanceVolumes(ctx, instance.ID, nil)
+	volumes, err := cs.client.ListInstanceVolumes(ctx, instance.ID, nil)
 	if err != nil {
 		return false, errInternal("list instance volumes: %v", err)
 	}
@@ -105,7 +105,7 @@ func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Ins
 
 // maxVolumeAttachments calculates the maximum number of volumes that can be attached to a Linode instance,
 // taking into account the instance's memory and currently attached disks.
-func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
+func (cs *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Calculating max volume attachments")
 
@@ -115,7 +115,7 @@ func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *l
 	}
 
 	// Retrieve the list of disks currently attached to the instance
-	disks, err := s.client.ListInstanceDisks(ctx, instance.ID, nil)
+	disks, err := cs.client.ListInstanceDisks(ctx, instance.ID, nil)
 	if err != nil {
 		return 0, errInternal("list instance disks: %v", err)
 	}
