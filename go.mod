@@ -8,12 +8,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
 	github.com/linode/go-metadata v0.2.0
-<<<<<<< adeodhar.dev
-	github.com/linode/linodego v1.35.0
-	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
-=======
 	github.com/linode/linodego v1.40.0
->>>>>>> main
+	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
 	go.uber.org/automaxprocs v1.5.3
 	go.uber.org/mock v0.4.0
 	golang.org/x/net v0.29.0
@@ -29,11 +25,7 @@ require (
 require (
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
-<<<<<<< adeodhar.dev
-	golang.org/x/text v0.16.0 // indirect
-=======
 	golang.org/x/text v0.18.0 // indirect
->>>>>>> main
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
