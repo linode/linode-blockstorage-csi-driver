@@ -12,7 +12,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3
 	go.uber.org/mock v0.4.0
 	golang.org/x/net v0.28.0
-	golang.org/x/sys v0.23.0
+	golang.org/x/sys v0.25.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	k8s.io/apimachinery v0.19.2
