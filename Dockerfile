@@ -15,7 +15,7 @@ RUN go mod download
 
 RUN go build -a -ldflags '-X main.vendorVersion='${REV}' -extldflags "-static"' -o /bin/linode-blockstorage-csi-driver /linode
 
-FROM alpine:3.18.4
+FROM alpine:3.20.3
 LABEL maintainers="Linode"
 LABEL description="Linode CSI Driver"
 
