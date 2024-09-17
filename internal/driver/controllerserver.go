@@ -159,10 +159,8 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	if err != nil {
 		return &csi.ControllerPublishVolumeResponse{}, err
 	}
-
 	// If devicePath is not empty, the volume is already attached
 	if devicePath != "" {
-		log.V(2).Info("Volume already attached", "volume_id", volumeID, "node_id", linodeID, "device_path", devicePath)
 		return &csi.ControllerPublishVolumeResponse{
 			PublishContext: map[string]string{
 				devicePathKey: devicePath,
