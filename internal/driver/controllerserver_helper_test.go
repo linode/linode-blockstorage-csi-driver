@@ -658,7 +658,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 		volumeID       int
 		linodeID       int
 		setupMocks     func()
-		expectedVolume *linodego.Volume
+		expectedResult string
 		expectedError  error
 	}{
 		{
@@ -667,15 +667,13 @@ func TestGetAndValidateVolume(t *testing.T) {
 			linodeID: 456,
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
-					ID:       123,
-					LinodeID: &[]int{456}[0],
+					ID:             123,
+					LinodeID:       &[]int{456}[0],
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
 				}, nil)
 			},
-			expectedVolume: &linodego.Volume{
-				ID:       123,
-				LinodeID: &[]int{456}[0],
-			},
-			expectedError: nil,
+			expectedResult: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
+			expectedError:  nil,
 		},
 		{
 			name:     "Volume found but not attached",
@@ -687,11 +685,8 @@ func TestGetAndValidateVolume(t *testing.T) {
 					LinodeID: nil,
 				}, nil)
 			},
-			expectedVolume: &linodego.Volume{
-				ID:       123,
-				LinodeID: nil,
-			},
-			expectedError: nil,
+			expectedResult: "",
+			expectedError:  nil,
 		},
 		{
 			name:     "Volume found but attached to different instance",
@@ -700,10 +695,10 @@ func TestGetAndValidateVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:       123,
-					LinodeID: &[]int{232}[0],
+					LinodeID: &[]int{789}[0],
 				}, nil)
 			},
-			expectedVolume: nil,
+			expectedResult: "",
 			expectedError:  errVolumeAttached(123, 456),
 		},
 		{
@@ -716,7 +711,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 					Message: "Not Found",
 				})
 			},
-			expectedVolume: nil,
+			expectedResult: "",
 			expectedError:  errVolumeNotFound(123),
 		},
 		{
@@ -726,7 +721,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, errors.New("API error"))
 			},
-			expectedVolume: nil,
+			expectedResult: "",
 			expectedError:  errInternal("get volume 123: API error"),
 		},
 	}
@@ -735,14 +730,14 @@ func TestGetAndValidateVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			volume, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linodeID)
+			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linodeID)
 
 			if !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(tc.expectedVolume, volume) {
-				t.Errorf("expected volume %+v, got %+v", tc.expectedVolume, volume)
+			if tc.expectedResult != result {
+				t.Errorf("expected result %s, got %s", tc.expectedResult, result)
 			}
 		})
 	}
