@@ -513,34 +513,31 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 
 // getAndValidateVolume retrieves the volume by its ID and checks if it is
 // attached to the specified Linode instance. If the volume is found and
-// already attached to the instance, it logs this information and returns the
-// volume. If the volume is not found or attached to a different instance, it
+// already attached to the instance, it returns its device path.
+// If the volume is not found or attached to a different instance, it
 // returns an appropriate error.
-func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, linodeID int) (*linodego.Volume, error) {
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, linodeID int) (string, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", linodeID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
-		return nil, errVolumeNotFound(volumeID)
+		return "", errVolumeNotFound(volumeID)
 	} else if err != nil {
-		// If any other error occurs, return an internal error.
-		return nil, errInternal("get volume %d: %v", volumeID, err)
+		return "", errInternal("get volume %d: %v", volumeID, err)
 	}
-	// Check if the volume is attached to a Linode instance.
+
 	if volume.LinodeID != nil {
-		// If the volume is attached to the requested Linode instance, log this information and return the volume.
 		if *volume.LinodeID == linodeID {
 			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
-			return volume, nil
+			return volume.FilesystemPath, nil
 		}
-		// If the volume is attached to a different instance, return an error indicating the volume is already attached.
-		return nil, errVolumeAttached(volumeID, linodeID)
+		return "", errVolumeAttached(volumeID, linodeID)
 	}
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", linodeID)
-	return volume, nil
+	return "", nil
 }
 
 // getInstance retrieves the Linode instance by its ID. If the

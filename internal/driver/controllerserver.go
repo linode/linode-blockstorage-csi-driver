@@ -153,10 +153,21 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return &csi.ControllerPublishVolumeResponse{}, err
 	}
 
-	// Check if the volume exists and is valid
-	_, err = cs.getAndValidateVolume(ctx, volumeID, linodeID)
+	// Check if the volume exists and is valid.
+	// If the volume is already attached to the specified instance, it returns its device path.
+	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, linodeID)
 	if err != nil {
 		return &csi.ControllerPublishVolumeResponse{}, err
+	}
+
+	// If devicePath is not empty, the volume is already attached
+	if devicePath != "" {
+		log.V(2).Info("Volume already attached", "volume_id", volumeID, "node_id", linodeID, "device_path", devicePath)
+		return &csi.ControllerPublishVolumeResponse{
+			PublishContext: map[string]string{
+				devicePathKey: devicePath,
+			},
+		}, nil
 	}
 
 	// Retrieve and validate the instance associated with the Linode ID
