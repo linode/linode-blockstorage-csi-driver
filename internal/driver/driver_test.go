@@ -3,16 +3,12 @@ package driver
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	drivertest "github.com/linode/linode-blockstorage-csi-driver/pkg/driver-test"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"k8s.io/mount-utils"
-
-	"github.com/linode/linodego"
 
 	"go.uber.org/mock/gomock"
 )
@@ -31,25 +27,6 @@ func TestDriverSuite(t *testing.T) {
 
 	bsPrefix := "test-"
 
-	// mock Linode Server, not working yet ...
-	fake := &drivertest.FakeAPI{
-		T:       t,
-		Volumes: map[string]linodego.Volume{},
-		Instance: &linodego.Instance{
-			Label:      "linode123",
-			Region:     "us-east",
-			Image:      "linode/debian9",
-			Type:       "g6-standard-2",
-			Group:      "Linode-Group",
-			ID:         123,
-			Status:     "running",
-			Hypervisor: "kvm",
-		},
-	}
-
-	ts := httptest.NewServer(fake)
-	defer ts.Close()
-
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -62,7 +39,7 @@ func TestDriverSuite(t *testing.T) {
 	cryptSetup := mocks.NewMockCryptSetupClient(mockCtrl)
 	encrypt := NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
-	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), ts.URL)
+	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), "")
 	if err != nil {
 		t.Fatalf("Failed to setup Linode client: %s", err)
 	}
@@ -70,8 +47,8 @@ func TestDriverSuite(t *testing.T) {
 	// TODO fake metadata
 	md := Metadata{
 		ID:     123,
-		Label:  fake.Instance.Label,
-		Region: fake.Instance.Region,
+		Label:  "linode123",
+		Region: "us-east",
 		Memory: 4 << 30, // 4GiB
 	}
 	linodeDriver := GetLinodeDriver(context.Background())
