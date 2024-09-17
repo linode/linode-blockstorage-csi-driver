@@ -68,9 +68,9 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, err
 	}
 
-	// Prepare the volume parameters such as name and size from the request.
+	// Prepare the volume parameters such as name and SizeGB from the request.
 	// This step may involve calculations or adjustments based on the request's content.
-	volName, size, err := cs.prepareVolumeParams(ctx, req)
+	volName, sizeGB, size, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, size, req.Parameters[VolumeTags], sourceVolInfo)
+	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.Parameters[VolumeTags], sourceVolInfo)
 	if err != nil {
 		return nil, err
 	}

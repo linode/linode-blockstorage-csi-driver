@@ -363,7 +363,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // prepareVolumeParams prepares the volume parameters for creation.
 // It extracts the capacity range from the request, calculates the size,
 // and generates a normalized volume name. Returns the volume name and size in GB.
-func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (string, int, error) {
+func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (string, int, int64, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
@@ -373,7 +373,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	// Get the requested size in bytes, handling any potential errors.
 	size, err := getRequestCapacitySize(capRange)
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 
 	condensedName := strings.Replace(req.GetName(), "-", "", -1)
@@ -382,7 +382,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	targetSizeGB := bytesToGB(size)
 
 	log.V(4).Info("Volume parameters prepared", "volumeName", volumeName, "targetSizeGB", targetSizeGB)
-	return volumeName, targetSizeGB, nil
+	return volumeName, targetSizeGB, size, nil
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
@@ -441,7 +441,7 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 
 // prepareCreateVolumeResponse constructs a CreateVolumeResponse from the created volume details.
 // It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
-func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int, context map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
+func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int64, context map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
 	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
@@ -450,7 +450,7 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			VolumeId:      key.GetVolumeKey(),
-			CapacityBytes: int64(size),
+			CapacityBytes: size,
 			AccessibleTopology: []*csi.Topology{
 				{
 					Segments: map[string]string{
