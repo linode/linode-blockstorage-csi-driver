@@ -18,12 +18,12 @@
   - [Creating a PersistentVolumeClaim](docs/usage.md#creating-a-persistentvolumeclaim)
   - [Encrypted Drives using LUKS](docs/encrypted-drives.md)
   - [Adding Tags to Created Volumes](docs/volume-tags.md)
-- [Development Setup](docs/developer-setup.md)
-  - [Prerequisites](docs/developer-setup.md#-prerequisites)
-  - [Setting Up the Local Development Environment](docs/developer-setup.md#-setting-up-the-local-development-environment)
-  - [Building the Project](docs/developer-setup.md#️-building-the-project)
-  - [Running Unit Tests](docs/developer-setup.md#️-running-unit-tests)
-  - [Creating a Development Cluster](docs/developer-setup.md#️-creating-a-development-cluster)
+- [Development Setup](docs/development-setup.md)
+  - [Prerequisites](docs/development-setup.md#-prerequisites)
+  - [Setting Up the Local Development Environment](docs/development-setup.md#-setting-up-the-local-development-environment)
+  - [Building the Project](docs/development-setup.md#️-building-the-project)
+  - [Running Unit Tests](docs/development-setup.md#️-running-unit-tests)
+  - [Creating a Development Cluster](docs/development-setup.md#️-creating-a-development-cluster)
   - [Running E2E Tests](docs/testing.md)
   - [Contributing](docs/contributing.md)
 - [License](#license)
@@ -43,6 +43,7 @@ For more information about Kubernetes CSI, refer to the [Kubernetes CSI](https:/
   - Requests for Persistent Volumes with a require_size less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10Gi) in accordance with the CSI specification.
   - The upper-limit size constraint (`limit_bytes`) will also be honored, so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
 - **Volume Attachment Persistence**: Block storage volume attachments are no longer persisted across reboots to support a higher number of attachments on larger instances.
+<!-- Add note about volume resizing limitations -->
 
 _For more details, refer to the [CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume)._
 
