@@ -118,7 +118,7 @@ To deploy a specific release version:
 kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/internal/driver/deploy/releases/linode-blockstorage-csi-driver.yaml
 ```
 
-### Key Features and Considerations for CSI Driver Deployment
+### 🔧 Advanced Configuration and Operational Details
 
 1. **Storage Classes**
    - **Default Storage Class**: `linode-block-storage-retain` [Learn More](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)
@@ -129,12 +129,32 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
      - **Reclaim Policy**: `Delete`
        - This policy will delete the volume when the PersistentVolumeClaim (PVC) or PersistentVolume (PV) is deleted.
 
+    You can verify the storage classes with:
+
+    ```sh
+    kubectl get storageclass
+    ```
+
 2. **Linode Cloud Controller Manager (CCM)**
    - The deployment assumes that the Linode CCM is initialized and running.
    - If you intend to run this on a cluster without the Linode CCM, you must modify the init container script in the [`cm-get-linode-id.yaml` ConfigMap](https://github.com/linode/linode-blockstorage-csi-driver/blob/main/deploy/kubernetes/base/cm-get-linode-id.yaml) and remove the line containing `exit 1`.
 
-You can verify the storage classes with:
+3. **Maximum Volume Attachments**
+   - The Linode Block Storage CSI Driver supports attaching more than 8 volumes for larger Linode instances. The maximum number of attachable volumes (including instance disks) scales with the instance's memory, up to a maximum of 64 attachments.
 
-```sh
-kubectl get storageclass
-```
+   | Instance Type | Memory/RAM | Max. Volume + Disk Attachments |
+   |---------------|------------|--------------------------------|
+   | g6-nanode-1   | 1GB        | 8                              |
+   | g6-standard-1 | 2GB        | 8                              |
+   | g6-standard-2 | 4GB        | 8                              |
+   | g6-standard-4 | 8GB        | 8                              |
+   | g6-standard-6 | 16GB       | 16                             |
+   | g6-standard-8 | 32GB       | 32                             |
+   | g6-standard-16| 64GB       | 64                             |
+   | g6-standard-20| 96GB       | 64                             |
+   | g6-standard-24| 128GB      | 64                             |
+   | g6-standard-32| 192GB      | 64                             |
+
+   This scaling also applies to dedicated, premium, GPU, and high-memory instance classes. The number of attached volumes is a combination of block storage volumes and instance disks (e.g., the boot disk).
+
+   **Note:** To support this change, block storage volume attachments are no longer persisted across reboots.
