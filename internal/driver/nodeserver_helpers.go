@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	lsblk "github.com/dell/csi-baremetal/pkg/base/linuxutils/lsblk"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -342,7 +343,7 @@ func (ns *NodeServer) formatLUKSVolume(ctx context.Context, devicePath string, l
 	}
 
 	// Format the volume with LUKS encryption.
-	if luksSource, err = ns.encrypt.luksFormat(luksContext, devicePath); err != nil {
+	if luksSource, err = ns.encrypt.luksFormat(ctx, luksContext, devicePath); err != nil {
 		return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 	}
 
