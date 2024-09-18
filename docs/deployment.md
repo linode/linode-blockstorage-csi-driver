@@ -115,7 +115,7 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
 To deploy a specific release version:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/internal/driver/deploy/releases/linode-blockstorage-csi-driver.yaml
+kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/internal/driver/deploy/releases/linode-blockstorage-csi-driver-v0.5.3.yaml
 ```
 
 ### 🔧 Advanced Configuration and Operational Details
