@@ -34,7 +34,7 @@
 
 The Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) Driver for Linode Block Storage enables container orchestrators such as Kubernetes to manage the lifecycle of persistent storage claims.
 
-For more information about Kubernetes CSI, refer to the [Kubernetes CSI](https://kubernetes-csi.github.io/docs/example.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repositories.
+For more information about Kubernetes CSI, refer to the [Kubernetes CSI](https://kubernetes-csi.github.io/docs/introduction.html) and [CSI Spec](https://github.com/container-storage-interface/spec/) repositories.
 
 ## ⚠️ Disclaimers
 
