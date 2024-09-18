@@ -1,13 +1,13 @@
-## How to use these End-to-end (e2e) tests
+## How to Run End-to-End (e2e) Tests
 
 In order to run these e2e tests, you'll need the following:
 - CAPL Management Cluster
 - CAPL Child Test Cluster
 - Test Image 
 
-### 0. Pre-requisites: Install devbox
+### Pre-requisites: Setup Development Environment
 
-Install devbox as described in the [devbox docs](https://www.jetify.com/devbox/docs/installing_devbox/) before running any of the commands below.
+Follow the steps outlined in the [development setup](./development-setup.md) to setup your development environment.
 
 ### 1. Setup a CAPL Management Cluster
 
