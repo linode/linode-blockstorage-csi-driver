@@ -13,6 +13,7 @@ type Device interface {
 	Load(cryptsetup.DeviceType) error
 	Free() bool
 	Dump() int
+	Type() string
 	Deactivate(string) error
 }
 
@@ -45,7 +46,8 @@ func (c CryptSetup) InitByName(name string) (Device, error) {
 }
 
 type LuksDevice struct {
-	Device Device
+	Identifier string
+	Device     Device
 }
 
 func NewLuksDevice(crypt CryptSetupClient, path string) (LuksDevice, error) {
@@ -53,7 +55,7 @@ func NewLuksDevice(crypt CryptSetupClient, path string) (LuksDevice, error) {
 	if err != nil {
 		return LuksDevice{}, err
 	}
-	return LuksDevice{Device: dev}, nil
+	return LuksDevice{Identifier: path, Device: dev}, nil
 }
 
 func NewLuksDeviceByName(crypt CryptSetupClient, name string) (LuksDevice, error) {
@@ -61,7 +63,7 @@ func NewLuksDeviceByName(crypt CryptSetupClient, name string) (LuksDevice, error
 	if err != nil {
 		return LuksDevice{}, err
 	}
-	return LuksDevice{Device: dev}, nil
+	return LuksDevice{Identifier: name, Device: dev}, nil
 }
 
 func NewCryptSetup() CryptSetup {

@@ -138,6 +138,20 @@ func (mr *MockDeviceMockRecorder) Load(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockDevice)(nil).Load), arg0)
 }
 
+// Type mocks base method.
+func (m *MockDevice) Type() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Type")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Type indicates an expected call of Type.
+func (mr *MockDeviceMockRecorder) Type() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockDevice)(nil).Type))
+}
+
 // MockCryptSetupClient is a mock of CryptSetupClient interface.
 type MockCryptSetupClient struct {
 	ctrl     *gomock.Controller
