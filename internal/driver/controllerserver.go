@@ -110,7 +110,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// volume cloning if the datasource is provided in the PVC.
 	// sourceVolumeInfo will be null if no content source is defined.
 	contentSource := req.GetVolumeContentSource()
-	sourceVolumeInfo, err := cs.attemptGetContentSourceVolume(ctx, contentSource)
+	sourceVolumeInfo, err := cs.getContentSourceVolume(ctx, contentSource)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
@@ -282,7 +282,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	} else if !canAttach {
 		// If we can, try and add a little more information to the error message
 		// for the caller.
-		limit, err := cs.maxVolumeAttachments(ctx, instance)
+		limit, err := cs.maxAllowedVolumeAttachments(ctx, instance)
 		if errors.Is(err, errNilInstance) {
 			return &csi.ControllerPublishVolumeResponse{}, errInternal("cannot calculate max volume attachments for a nil instance")
 		} else if err != nil {
