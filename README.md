@@ -13,7 +13,7 @@
   - [Deployment Methods](docs/deployment.md#️-deployment-methods)
     - [Using Helm (Recommended)](docs/deployment.md#1-using-helm)
     - [Using kubectl](docs/deployment.md#2-using-kubectl)
-  - [Advanced Configuration and Operational Details](docs/deployment.md#advanced-configuration-and-operational-details)
+  - [Advanced Configuration and Operational Details](docs/deployment.md#-advanced-configuration-and-operational-details)
 - [Usage Examples](docs/usage.md)
   - [Creating a PersistentVolumeClaim](docs/usage.md#creating-a-persistentvolumeclaim)
   - [Encrypted Drives using LUKS](docs/encrypted-drives.md)
