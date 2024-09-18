@@ -1,15 +1,15 @@
-## How to Run End-to-End (e2e) Tests
+## 🚀 How to Run End-to-End (e2e) Tests
 
 In order to run these e2e tests, you'll need the following:
 - CAPL Management Cluster
 - CAPL Child Test Cluster
 - Test Image 
 
-### Pre-requisites: Setup Development Environment
+### 📋 Pre-requisites: Setup Development Environment
 
 Follow the steps outlined in the [development setup](./development-setup.md) to setup your development environment.
 
-### 1. Setup a CAPL Management Cluster
+### 🏗️ Setup a CAPL Management Cluster
 
 We will be using a kind cluster and install CAPL plus various other providers.
 
@@ -27,7 +27,7 @@ devbox run mgmt-cluster
 ```
 This will download all the necessary binaries to local bin and create a local mgmt cluster.
 
-### 2. Build and Push Test Image
+### 📦 Build and Push Test Image
 
 If you have a PR open, GHA will build & push to docker hub and tag it with the current branch name.
 
@@ -42,7 +42,7 @@ If you do not have PR open, follow the steps below:
   make docker-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
   ```
 
-### 2. Setup a CAPL Child Test Cluster
+### 🔄 Setup a CAPL Child Test Cluster
 
 In order create a test cluster, run the following command:
 
@@ -53,7 +53,7 @@ IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_VERSION=test-e2e
 
 The above command will create a test cluster, install CSI driver using the test image, and export kubeconfig of test-cluster to the root directory
 
-### 3. Run E2E Tests
+### 🧪 Run E2E Tests
 
 Run the following command to run e2e tests:
 
@@ -62,7 +62,7 @@ devbox run e2e-test
 ```
 This will run the chainsaw e2e tests under the `e2e/test` directory
 
-### 4. Cleanup
+### 🧹 Cleanup
 
 Run the following command to cleanup the test cluster:
 
