@@ -1,11 +1,17 @@
 PLATFORM           ?= linux/amd64
 REGISTRY_NAME      ?= index.docker.io
-IMAGE_NAME         ?= linode/linode-blockstorage-csi-driver
+DOCKER_USER        ?= linode
+IMAGE_NAME         ?= linode-blockstorage-csi-driver
 REV                := $(shell git branch --show-current 2> /dev/null || echo "dev")
+ifdef DEV_TAG_EXTENSION
+IMAGE_VERSION      ?= $(REV)-$(DEV_TAG_EXTENSION)
+else
 IMAGE_VERSION      ?= $(REV)
-IMAGE_TAG          ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
+endif
+IMAGE_TAG          ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG  := golangci/golangci-lint:v1.59-alpine
 RELEASE_DIR        ?= release
+DOCKERFILE         ?= Dockerfile
 
 #####################################################################
 # OS / ARCH
@@ -24,19 +30,19 @@ endif
 #####################################################################
 .PHONY: fmt
 fmt:
-	go fmt ./...
+	docker run --rm --platform=$(PLATFORM) -it $(IMAGE_TAG) go fmt ./...
 
 .PHONY: vet
 vet: fmt
-	go vet ./...
+	docker run --rm --platform=$(PLATFORM) -it $(IMAGE_TAG) go vet ./...
 
 .PHONY: lint
 lint: vet
-	docker run --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
+	docker run --rm --platform=$(PLATFORM) --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
 
 .PHONY: verify
 verify:
-	go mod verify
+	docker run --rm --platform=$(PLATFORM) -it $(IMAGE_TAG) go mod verify
 
 .PHONY: clean
 clean:
@@ -59,22 +65,21 @@ WORKER_NODES         ?= 0
 
 .PHONY: build
 build:
-	go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${IMAGE_VERSION}' -extldflags "-static"' ./main.go
+	CGO_ENABLED=1 go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion='${IMAGE_VERSION}'' ./main.go
 
 .PHONY: docker-build
 docker-build:
-	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./Dockerfile .
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./$(DOCKERFILE) .
 
 .PHONY: docker-push
 docker-push:
-	echo "[reminder] Did you run `make docker-build`?"
 	docker push $(IMAGE_TAG)
 
-.PHONY: local-docker-setup
-local-docker-setup: build docker-build docker-push
+.PHONY: docker-setup
+docker-setup: docker-build docker-push
 
 .PHONY: mgmt-and-capl-cluster
-mgmt-and-capl-cluster: local-docker-setup mgmt-cluster capl-cluster
+mgmt-and-capl-cluster: docker-setup mgmt-cluster capl-cluster
 
 .PHONY: capl-cluster
 capl-cluster:
@@ -91,7 +96,7 @@ capl-cluster:
 
 	# Install CSI driver and wait for it to be ready
 	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
-	hack/generate-yaml.sh $(IMAGE_VERSION) $(IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
+	hack/generate-yaml.sh $(IMAGE_VERSION) $(DOCKER_USER)/$(IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
@@ -121,14 +126,11 @@ generate-mock:
 	mockgen -source=internal/driver/nodeserver_helpers.go -destination=mocks/mock_nodeserver.go -package=mocks
 	mockgen -source=pkg/mount-manager/device-utils.go -destination=mocks/mock_deviceutils.go -package=mocks
 	mockgen -source=pkg/mount-manager/fs-utils.go -destination=mocks/mock_fsutils.go -package=mocks
+	mockgen -source=pkg/cryptsetup-client/cryptsetup-client.go -destination=mocks/mock_cryptsetupclient.go -package=mocks
 
 .PHONY: test
-test: vet verify generate-mock
-	go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS)
-
-.PHONY: elevated-test
-elevated-test:
-	sudo go test `go list ./... | grep -v ./mocks$$` -cover -tags=elevated $(TEST_ARGS)
+test:
+	docker run --rm --platform=$(PLATFORM) --privileged -it $(IMAGE_TAG) go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS)
 
 .PHONY: e2e-test
 e2e-test:
