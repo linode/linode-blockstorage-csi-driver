@@ -818,8 +818,8 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().CombinedOutput().Return([]byte("success"), nil)
 			},
-			volumeID:    "3232-pvc1234",
-			wantErr: false,
+			volumeID: "3232-pvc1234",
+			wantErr:  false,
 		},
 		{
 			name: "Success - If volume is not a LUKS volume",
@@ -828,8 +828,8 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().CombinedOutput().Return([]byte("type: none"), nil)
 			},
-			volumeID:    "3232-pvc1234",
-			wantErr: false,
+			volumeID: "3232-pvc1234",
+			wantErr:  false,
 		},
 		{
 			name: "Error - Unable to close LUKS volume",
@@ -844,21 +844,21 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().CombinedOutput().Return(nil, fmt.Errorf("Unable to close LUKS volume"))
 			},
-			volumeID:    "3232-pvc1234",
-			wantErr: true,
+			volumeID: "3232-pvc1234",
+			wantErr:  true,
 		},
 		{
-			name: "Error - Invalid volume ID",
-			volumeID:    "3232-pvc-test-1234",
-			wantErr: true,
+			name:     "Error - Invalid volume ID",
+			volumeID: "3232-pvc-test-1234",
+			wantErr:  true,
 		},
 		{
 			name: "Error - unable to find cryptsetup",
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
 				m.EXPECT().LookPath(gomock.Any()).Return("", osexec.ErrNotFound)
 			},
-			volumeID:    "3232-pvc1234",
-			wantErr: true,
+			volumeID: "3232-pvc1234",
+			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {

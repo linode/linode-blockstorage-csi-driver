@@ -140,11 +140,11 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
-	
+
 	volumeID := req.GetVolumeId()
 	targetPath := req.GetTargetPath()
 	log.V(2).Info("Processing request", "volumeID", volumeID, "targetPath", targetPath)
-	
+
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 

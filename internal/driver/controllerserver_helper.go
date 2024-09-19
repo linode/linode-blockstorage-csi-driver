@@ -255,10 +255,10 @@ func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string,
 // It returns the minimum size if no range is provided, or the required size if specified.
 // It ensures that the size is not negative and does not exceed the maximum limit.
 func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
-    // If no capacity range is provided, return the minimum volume size
-    if capRange == nil {
-        return MinVolumeSizeBytes, nil
-    }
+	// If no capacity range is provided, return the minimum volume size
+	if capRange == nil {
+		return MinVolumeSizeBytes, nil
+	}
 
 	// Volume MUST be at least this big. This field is OPTIONAL.
 	reqSize := capRange.GetRequiredBytes()
@@ -266,47 +266,47 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	// Volume MUST not be bigger than this. This field is OPTIONAL.
 	maxSize := capRange.GetLimitBytes()
 
-    // Validate that at least one size is specified
-    if reqSize == 0 && maxSize == 0 {
-        return 0, errors.New("either RequiredBytes or LimitBytes must be set")
-    }
+	// Validate that at least one size is specified
+	if reqSize == 0 && maxSize == 0 {
+		return 0, errors.New("either RequiredBytes or LimitBytes must be set")
+	}
 
-    // Check for negative values
-    if reqSize < 0 || maxSize < 0 {
-        return 0, errors.New("RequiredBytes and LimitBytes must not be negative")
-    }
+	// Check for negative values
+	if reqSize < 0 || maxSize < 0 {
+		return 0, errors.New("RequiredBytes and LimitBytes must not be negative")
+	}
 
-    // Handle case where only required size is specified
-    if maxSize == 0 {
-        return adjustToMinimumSize(reqSize), nil
-    }
+	// Handle case where only required size is specified
+	if maxSize == 0 {
+		return adjustToMinimumSize(reqSize), nil
+	}
 
-    // Handle case where max size is less than minimum allowed
-    if maxSize < MinVolumeSizeBytes {
-        return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
-    }
+	// Handle case where max size is less than minimum allowed
+	if maxSize < MinVolumeSizeBytes {
+		return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
+	}
 
-    // Determine the final size
-    return determineOptimalSize(reqSize, maxSize), nil
+	// Determine the final size
+	return determineOptimalSize(reqSize, maxSize), nil
 }
 
 // adjustToMinimumSize ensures that the provided size is at least the minimum volume size.
 // If the size is less than MinVolumeSizeBytes, it returns MinVolumeSizeBytes; otherwise, it returns the original size.
 func adjustToMinimumSize(size int64) int64 {
-    if size < MinVolumeSizeBytes {
-        return MinVolumeSizeBytes
-    }
-    return size
+	if size < MinVolumeSizeBytes {
+		return MinVolumeSizeBytes
+	}
+	return size
 }
 
 // determineOptimalSize calculates the optimal size for a volume based on the required size and maximum size.
 // If the required size is zero or less than the maximum size, it returns the maximum size.
 // Otherwise, it returns the required size.
 func determineOptimalSize(reqSize, maxSize int64) int64 {
-    if reqSize == 0 || reqSize < maxSize {
-        return maxSize
-    }
-    return reqSize
+	if reqSize == 0 || reqSize < maxSize {
+		return maxSize
+	}
+	return reqSize
 }
 
 // validVolumeCapabilities checks if the provided volume capabilities are valid.

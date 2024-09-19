@@ -53,8 +53,8 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 	return cs, nil
 }
 
-// CreateVolume provisions a new volume on behalf of a user, which can be used as a block device or mounted filesystem. 
-// This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes. 
+// CreateVolume provisions a new volume on behalf of a user, which can be used as a block device or mounted filesystem.
+// This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
@@ -136,9 +136,9 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-// ControllerPublishVolume attaches a volume to a specified node. 
-// It ensures the volume is not already attached to another node 
-// and that the node can accommodate the attachment. Returns 
+// ControllerPublishVolume attaches a volume to a specified node.
+// It ensures the volume is not already attached to another node
+// and that the node can accommodate the attachment. Returns
 // the device path if successful.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
@@ -309,7 +309,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	if startingToken != "" {
 		startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
 		if errParse != nil {
-			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted, 
+			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
 				"invalid starting token: %q", startingToken)
 		}
 
@@ -370,8 +370,8 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	return resp, nil
 }
 
-// ControllerGetCapabilities retrieves the capabilities supported by the 
-// controller service implemented by this Plugin. It returns a response 
+// ControllerGetCapabilities retrieves the capabilities supported by the
+// controller service implemented by this Plugin. It returns a response
 // containing the capabilities available for the CSI driver.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
@@ -396,7 +396,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
-	
+
 	log.V(2).Info("Processing request", "req", req)
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)

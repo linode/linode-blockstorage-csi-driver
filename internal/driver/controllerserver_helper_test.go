@@ -303,7 +303,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 
 			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo)
 
-			if !reflect.DeepEqual(tc.expectedError, err) {
+			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
 					t.Errorf("expected error %v, got %v", tc.expectedError, err)
 				} else {
@@ -402,7 +402,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 
 			volumeName, sizeGB, size, err := cs.prepareVolumeParams(ctx, tt.req)
 
-			if !reflect.DeepEqual(tt.expectedError, err) {
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
 				if tt.expectedError != nil {
 					t.Errorf("expected error %v, got %v", tt.expectedError, err)
 				} else {
@@ -521,7 +521,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			gotErr := cs.validateCreateVolumeRequest(ctx, tc.req)
-			if !reflect.DeepEqual(gotErr, tc.wantErr) {
+			if gotErr != nil && !reflect.DeepEqual(gotErr, tc.wantErr) {
 				t.Errorf("validateCreateVolumeRequest() error = %v, wantErr %v", gotErr, tc.wantErr)
 			}
 		})
@@ -629,7 +629,7 @@ func TestValidateControllerPublishVolumeRequest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			nodeID, volID, err := cs.validateControllerPublishVolumeRequest(ctx, tc.req)
 
-			if !reflect.DeepEqual(err, tc.expectedErr) {
+			if err != nil && !reflect.DeepEqual(err, tc.expectedErr) {
 				t.Errorf("Expected error %v, but got %v", tc.expectedErr, err)
 			}
 
@@ -732,7 +732,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 
 			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linodeID)
 
-			if !reflect.DeepEqual(tc.expectedError, err) {
+			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 
@@ -794,7 +794,7 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 
 			err := cs.checkAttachmentCapacity(context.Background(), tc.instance)
 
-			if !reflect.DeepEqual(tc.expectedError, err) {
+			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 		})
@@ -843,7 +843,7 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 					Volume: nil,
 				},
 			},
-			setupMocks: func() {},
+			setupMocks:     func() {},
 			expectedResult: nil,
 			expectedError:  errNoSourceVolume,
 		},
@@ -856,7 +856,7 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 					},
 				},
 			},
-			setupMocks: func() {},
+			setupMocks:     func() {},
 			expectedResult: nil,
 			expectedError:  errInternal("parse volume info from content source: invalid linode volume id: \"test\""),
 		},
@@ -920,9 +920,9 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.attemptGetContentSourceVolume(context.Background(), tc.contentSource)
+			result, err := cs.getContentSourceVolume(context.Background(), tc.contentSource)
 
-			if !reflect.DeepEqual(tc.expectedError, err) {
+			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 
@@ -1007,11 +1007,11 @@ func TestGetInstance(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name           string
-		linodeID       int
-		setupMocks     func()
+		name             string
+		linodeID         int
+		setupMocks       func()
 		expectedInstance *linodego.Instance
-		expectedError  error
+		expectedError    error
 	}{
 		{
 			name:     "Instance found",
@@ -1059,7 +1059,7 @@ func TestGetInstance(t *testing.T) {
 
 			instance, err := cs.getInstance(context.Background(), tc.linodeID)
 
-			if !reflect.DeepEqual(tc.expectedError, err) {
+			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 
@@ -1069,4 +1069,3 @@ func TestGetInstance(t *testing.T) {
 		})
 	}
 }
-

@@ -398,7 +398,6 @@ func (ns *NodeServer) closeLuksMountSource(ctx context.Context, volumeID string)
 	return nil
 }
 
-
 // getMountSource extracts the PVC name from a given input string.
 // The input is expected to be in the format "number-pvcname", e.g., "8934-pvc232323".
 // It returns the PVC name (the part starting with "pvc") or an error if the input format is invalid.
