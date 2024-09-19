@@ -497,7 +497,6 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errInternal("get volume: %v", err)
 	}
 
-
 	resp := &csi.ValidateVolumeCapabilitiesResponse{}
 	if validVolumeCapabilities(volumeCapabilities) {
 		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
@@ -531,7 +530,6 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		listOpts.Page = int(startingPage)
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
-
 
 	// List all volumes
 	log.V(4).Info("Listing volumes", "list_opts", listOpts)
@@ -606,7 +604,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
-	
+
 	log.V(2).Info("Processing request", "req", req)
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)

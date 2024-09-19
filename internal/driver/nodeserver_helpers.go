@@ -22,8 +22,6 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-baremetal/pkg/base/linuxutils/lsblk"
-	"github.com/sirupsen/logrus"
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -337,11 +335,11 @@ func (ns *NodeServer) formatLUKSVolume(ctx context.Context, devicePath string, l
 	log.V(4).Info("Entering formatLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
 
 	// Verify if the device is already formatted
-	lsblkExecutor := lsblk.NewLSBLK(logrus.New())
-	devices, _ := lsblkExecutor.GetBlockDevices(devicePath)
-	for number, device := range devices {
-		log.V(4).Info("device", "device number", number, "device", device)
-	}
+	// lsblkExecutor := lsblk.NewLSBLK(logrus.New())
+	// devices, _ := lsblkExecutor.GetBlockDevices(devicePath)
+	// for number, device := range devices {
+	// 	log.V(4).Info("device", "device number", number, "device", device)
+	// }
 
 	// Validate the LUKS context.
 	if err = luksContext.validate(); err != nil {

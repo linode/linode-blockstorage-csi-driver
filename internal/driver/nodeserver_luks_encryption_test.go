@@ -51,16 +51,17 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
 				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
 				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(exec.CodeExitError{Code: 2, Err: fmt.Errorf("test")})
 			},
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
-				m.EXPECT().Load(gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().ActivateByPassphrase("test", gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
@@ -87,16 +88,21 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			},
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
 				// Mount_linux: Format disk
-				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(c).AnyTimes()
 				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
-				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any()).Return(c)
+				m.EXPECT().Command(gomock.Any(), gomock.Any(), gomock.Any()).Return(c).AnyTimes()
 				c.EXPECT().CombinedOutput().Return([]byte("TYPE=ext4"), nil).AnyTimes()
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(nil).AnyTimes()
 			},
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Dump().Return(0).AnyTimes()
+				m.EXPECT().Free().Return(true).AnyTimes()
+				m.EXPECT().Load(gomock.Any()).Return(nil).AnyTimes()
+				m.EXPECT().ActivateByPassphrase(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(true).AnyTimes()
@@ -120,6 +126,12 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().Init(gomock.Any()).Return(nil, fmt.Errorf("luks initializing failed")).AnyTimes()
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(exec.CodeExitError{Code: 2, Err: fmt.Errorf("test")})
+			},
 			wantErr: true,
 		},
 		{
@@ -138,8 +150,13 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(exec.CodeExitError{Code: 2, Err: fmt.Errorf("test")})
+			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(fmt.Errorf("luks formatting failed")).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
 			},
@@ -158,39 +175,19 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				},
 				Secrets: map[string]string{LuksKeyAttribute: "test"},
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(exec.CodeExitError{Code: 2, Err: fmt.Errorf("test")})
+			},
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("luks adding keyslot failed")).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
-			},
-			wantErr: true,
-		},
-		{
-			name:       "Error - unable to load LUKS volume",
-			devicePath: "/tmp/test",
-			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
-				VolumeContext: map[string]string{
-					LuksEncryptedAttribute: "true",
-					LuksCipherAttribute:    "aes-xts-plain64",
-					LuksKeySizeAttribute:   "512",
-					PublishInfoVolumeName:  "test",
-				},
-				Secrets: map[string]string{LuksKeyAttribute: "test"},
-			},
-			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
-				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
-			},
-			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Dump().Return(1).AnyTimes()
-				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-				m.EXPECT().Free().Return(true).AnyTimes()
-				m.EXPECT().Load(gomock.Any()).Return(fmt.Errorf("luks loading failed")).AnyTimes()
 			},
 			wantErr: true,
 		},
@@ -210,12 +207,16 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(exec.CodeExitError{Code: 2, Err: fmt.Errorf("test")})
+			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Dump().Return(1).AnyTimes()
 				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().Free().Return(true).AnyTimes()
-				m.EXPECT().Load(gomock.Any()).Return(nil).AnyTimes()
 				m.EXPECT().ActivateByPassphrase("test", gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("luks activating failed")).AnyTimes()
 			},
 			wantErr: true,
@@ -269,6 +270,7 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 		name                   string
 		expectCryptDeviceCalls func(m *mocks.MockDevice)
 		expectCryptSetUpCalls  func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice)
+		expectExecCalls        func(m *mocks.MockExecutor, c *mocks.MockCommand)
 		volumeID               string
 		wantErr                bool
 	}{
@@ -276,6 +278,12 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 			name: "Success - Able to close LUKS volume",
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().InitByName(gomock.Any()).Return(md, nil).AnyTimes()
+			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
 				m.EXPECT().Free().Return(true).AnyTimes()
@@ -293,6 +301,12 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 				m.EXPECT().Free().Return(true).AnyTimes()
 				m.EXPECT().Deactivate(gomock.Any()).Return(nil).AnyTimes()
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(nil).AnyTimes()
+			},
 			volumeID: "3232-pvc1234",
 			wantErr:  false,
 		},
@@ -301,6 +315,12 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().InitByName(gomock.Any()).Return(nil, fmt.Errorf("luks initializing failed")).AnyTimes()
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(nil).AnyTimes()
+			},
 			wantErr: true,
 		},
 		{
@@ -308,8 +328,13 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 			expectCryptSetUpCalls: func(mc *mocks.MockCryptSetupClient, md *mocks.MockDevice) {
 				mc.EXPECT().InitByName(gomock.Any()).Return(md, nil).AnyTimes()
 			},
+			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
+				// Mount_linux: Format disk
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
+				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
+				c.EXPECT().Run().Return(nil).AnyTimes()
+			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Free().Return(true).AnyTimes()
 				m.EXPECT().Deactivate(gomock.Any()).Return(fmt.Errorf("failed to deactivate")).AnyTimes()
 			},
 			volumeID: "3232-pvc1234",
@@ -365,7 +390,7 @@ func TestNodeServer_formatLUKSVolume(t *testing.T) {
 			name:          "Error - Encryption enabled. Volume not formatted. We will proceed with luks formatting and fail to validate.",
 			expectFsCalls: func(m *mocks.MockFileSystem) {},
 			expectExecCalls: func(m *mocks.MockExecutor, c *mocks.MockCommand) {
-				m.EXPECT().LookPath(gomock.Any()).Return("/bin/test", nil).AnyTimes()
+				m.EXPECT().LookPath(gomock.Any()).Return("/bin/blkid", nil).AnyTimes()
 				m.EXPECT().Command(gomock.Any(), gomock.Any()).Return(c).AnyTimes()
 				c.EXPECT().Run().Return(exec.CodeExitError{Code: 2, Err: fmt.Errorf("test")}).AnyTimes()
 			},

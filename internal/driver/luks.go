@@ -187,7 +187,7 @@ func (e *Encryption) luksOpen(ctx context.Context, luksCtx LuksContext, source s
 	log.V(4).Info("Loading luks device", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
 	err = newLuksDevice.Device.Load(cryptsetup.LUKS2{SectorSize: 512})
 	if err != nil {
-		return "", fmt.Errorf("Loading %s luks device %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
+		return "", fmt.Errorf("Loading %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
 	}
 
 	// Activate the device using the encryption key
