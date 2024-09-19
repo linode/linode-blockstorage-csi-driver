@@ -81,7 +81,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Attempt to retrieve information about a source volume if the request includes a content source.
 	// This is important for scenarios where the volume is being cloned from an existing one.
-	sourceVolInfo, err := cs.attemptGetContentSourceVolume(ctx, req.GetVolumeContentSource())
+	sourceVolInfo, err := cs.getContentSourceVolume(ctx, req.GetVolumeContentSource())
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
@@ -199,7 +199,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	} else if !canAttach {
 		// If we can, try and add a little more information to the error message
 		// for the caller.
-		limit, err := cs.maxVolumeAttachments(ctx, instance)
+		limit, err := cs.maxAllowedVolumeAttachments(ctx, instance)
 		if errors.Is(err, errNilInstance) {
 			return &csi.ControllerPublishVolumeResponse{}, errInternal("cannot calculate max volume attachments for a nil instance")
 		} else if err != nil {

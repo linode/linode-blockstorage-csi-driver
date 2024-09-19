@@ -369,7 +369,7 @@ func TestControllerMaxVolumeAttachments(t *testing.T) {
 					},
 				},
 			}
-			got, err := s.maxVolumeAttachments(context.Background(), tt.instance)
+			got, err := s.maxAllowedVolumeAttachments(context.Background(), tt.instance)
 			if err != nil && !tt.fail {
 				t.Fatal(err)
 			} else if err == nil && tt.fail {

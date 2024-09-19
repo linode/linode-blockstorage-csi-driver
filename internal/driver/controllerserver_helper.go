@@ -86,7 +86,7 @@ func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Ins
 	log.V(4).Info("Checking if volume can be attached", "instance_id", instance.ID)
 
 	// Get the maximum number of volume attachments allowed for the instance
-	limit, err := s.maxVolumeAttachments(ctx, instance)
+	limit, err := s.maxAllowedVolumeAttachments(ctx, instance)
 	if err != nil {
 		return false, err
 	}
@@ -101,9 +101,9 @@ func (s *ControllerServer) canAttach(ctx context.Context, instance *linodego.Ins
 	return len(volumes) < limit, nil
 }
 
-// maxVolumeAttachments calculates the maximum number of volumes that can be attached to a Linode instance,
+// maxAllowedVolumeAttachments calculates the maximum number of volumes that can be attached to a Linode instance,
 // taking into account the instance's memory and currently attached disks.
-func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
+func (s *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Calculating max volume attachments")
 
@@ -123,12 +123,11 @@ func (s *ControllerServer) maxVolumeAttachments(ctx context.Context, instance *l
 	return maxVolumeAttachments(memBytes) - len(disks), nil
 }
 
-// attemptGetContentSourceVolume retrieves information about the Linode volume to clone from.
+// getContentSourceVolume retrieves information about the Linode volume to clone from.
 // It returns a LinodeVolumeKey if a valid source volume is found, or an error if the source is invalid.
-func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*linodevolumes.LinodeVolumeKey, error) {
+func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*linodevolumes.LinodeVolumeKey, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering attemptGetContentSourceVolume", "contentSource", contentSource)
-	defer log.V(4).Info("Exiting attemptGetContentSourceVolume")
+	log.V(4).Info("Attempting to get content source volume")
 
 	if contentSource == nil {
 		return nil, nil // Return nil if no content source is provided
@@ -149,11 +148,17 @@ func (cs *ControllerServer) attemptGetContentSourceVolume(ctx context.Context, c
 	if err != nil {
 		return nil, errInternal("parse volume info from content source: %v", err)
 	}
+	if volumeInfo == nil {
+		return nil, errInternal("processed *LinodeVolumeKey is nil") // Throw an internal error if the processed LinodeVolumeKey is nil
+	}
 
 	// Retrieve the volume data using the parsed volume ID
 	volumeData, err := cs.client.GetVolume(ctx, volumeInfo.VolumeID)
 	if err != nil {
 		return nil, errInternal("get volume %d: %v", volumeInfo.VolumeID, err)
+	}
+	if volumeData == nil {
+		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
 	}
 
 	// Check if the volume's region matches the server's metadata region
@@ -185,7 +190,7 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 
 	// Raise an error if more than one volume with the same label exists
 	if len(volumes) > 1 {
-		return nil, errAlreadyExists("volume %q already exists", label)
+		return nil, errAlreadyExists("more than one volume with the label %q exists", label)
 	}
 
 	// Return the existing volume if found
@@ -328,7 +333,6 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 	// All capabilities are valid; return true
 	return true
 }
-
 
 // validateCreateVolumeRequest checks if the provided CreateVolumeRequest is valid.
 // It ensures that the volume name is not empty, that volume capabilities are provided,
