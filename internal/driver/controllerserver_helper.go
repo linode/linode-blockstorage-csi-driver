@@ -145,14 +145,20 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 
 	// Parse the volume ID from the content source
 	volumeInfo, err := linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
-	if err != nil || volumeInfo == nil {
+	if err != nil {
 		return nil, errInternal("parse volume info from content source: %v", err)
+	}
+	if volumeInfo == nil {
+		return nil, errInternal("processed *LinodeVolumeKey is nil") // Throw an internal error if the processed LinodeVolumeKey is nil
 	}
 
 	// Retrieve the volume data using the parsed volume ID
 	volumeData, err := cs.client.GetVolume(ctx, volumeInfo.VolumeID)
-	if err != nil || volumeData == nil {
+	if err != nil {
 		return nil, errInternal("get volume %d: %v", volumeInfo.VolumeID, err)
+	}
+	if volumeData == nil {
+		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
 	}
 
 	// Check if the volume's region matches the server's metadata region
