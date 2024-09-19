@@ -242,13 +242,13 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeID := req.GetVolumeId()
-	log.V(2).Info("Processing request", "volumeID", volumeID)
+	log.V(2).Info("Processing request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
 	// Validate req (NodeUnstageVolumeRequest)
-	log.V(4).Info("Validating request", "volumeID", volumeID)
+	log.V(4).Info("Validating request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	err := validateNodeUnstageVolumeRequest(ctx, req)
 	if err != nil {
 		return nil, err

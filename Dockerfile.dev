@@ -7,13 +7,10 @@ WORKDIR /linode
 
 RUN apk add \
     blkid \
-    cryptsetup \
     cryptsetup-libs \
     cryptsetup-dev \
     e2fsprogs \
-    findmnt \
     gcc \
-    lsblk \
     make \
     musl-dev \
     pkgconfig \

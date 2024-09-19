@@ -233,7 +233,9 @@ func (e *Encryption) luksClose(ctx context.Context, volumeName string) error {
 	return nil
 }
 
-func (e *Encryption) blkidValid(source string) (bool, error) {
+func (e *Encryption) blkidValid(ctx context.Context, source string) (bool, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering blkidValid", "source", source)
 	if source == "" {
 		return false, errors.New("invalid source")
 	}
@@ -264,6 +266,7 @@ func (e *Encryption) blkidValid(source string) (bool, error) {
 		}
 		return false, errors.New("checking blkdid failed")
 	}
+	log.V(4).Info("target block device is already formatted", "source", source)
 
 	return true, nil
 }

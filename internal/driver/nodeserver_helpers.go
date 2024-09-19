@@ -333,13 +333,8 @@ func (ns *NodeServer) formatLUKSVolume(ctx context.Context, devicePath string, l
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering formatLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
 
-	// Validate the LUKS context.
-	if err = luksContext.validate(); err != nil {
-		return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
-	}
-
 	// LUKS encryption enabled, check if the volume needs to be formatted.
-	formatted, err := ns.encrypt.blkidValid(devicePath)
+	formatted, err := ns.encrypt.blkidValid(ctx, devicePath)
 	if err != nil {
 		return "", errInternal("Failed to validate blkid (%q): %v", devicePath, err)
 	}
