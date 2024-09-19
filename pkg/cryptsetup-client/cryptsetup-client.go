@@ -9,7 +9,9 @@ import (
 type Device interface {
 	Format(cryptsetup.DeviceType, cryptsetup.GenericParams) error
 	KeyslotAddByVolumeKey(int, string, string) error
+	ActivateByVolumeKey(deviceName string, volumeKey string, volumeKeySize int, flags int) error
 	ActivateByPassphrase(deviceName string, keyslot int, passphrase string, flags int) error
+	VolumeKeyGet(keyslot int, passphrase string) ([]byte, int, error)
 	Load(cryptsetup.DeviceType) error
 	Free() bool
 	Dump() int

@@ -13,9 +13,10 @@ RUN apk add \
     e2fsprogs \
     findmnt \
     gcc \
-    pkgconfig \
+    lsblk \
     make \
     musl-dev \
+    pkgconfig \
     xfsprogs
 
 COPY go.mod go.sum ./

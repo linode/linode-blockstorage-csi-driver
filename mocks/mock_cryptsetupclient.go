@@ -54,6 +54,20 @@ func (mr *MockDeviceMockRecorder) ActivateByPassphrase(deviceName, keyslot, pass
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ActivateByPassphrase", reflect.TypeOf((*MockDevice)(nil).ActivateByPassphrase), deviceName, keyslot, passphrase, flags)
 }
 
+// ActivateByVolumeKey mocks base method.
+func (m *MockDevice) ActivateByVolumeKey(deviceName, volumeKey string, volumeKeySize, flags int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ActivateByVolumeKey", deviceName, volumeKey, volumeKeySize, flags)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ActivateByVolumeKey indicates an expected call of ActivateByVolumeKey.
+func (mr *MockDeviceMockRecorder) ActivateByVolumeKey(deviceName, volumeKey, volumeKeySize, flags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ActivateByVolumeKey", reflect.TypeOf((*MockDevice)(nil).ActivateByVolumeKey), deviceName, volumeKey, volumeKeySize, flags)
+}
+
 // Deactivate mocks base method.
 func (m *MockDevice) Deactivate(arg0 string) error {
 	m.ctrl.T.Helper()
@@ -150,6 +164,22 @@ func (m *MockDevice) Type() string {
 func (mr *MockDeviceMockRecorder) Type() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockDevice)(nil).Type))
+}
+
+// VolumeKeyGet mocks base method.
+func (m *MockDevice) VolumeKeyGet(keyslot int, passphrase string) ([]byte, int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VolumeKeyGet", keyslot, passphrase)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(int)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// VolumeKeyGet indicates an expected call of VolumeKeyGet.
+func (mr *MockDeviceMockRecorder) VolumeKeyGet(keyslot, passphrase any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VolumeKeyGet", reflect.TypeOf((*MockDevice)(nil).VolumeKeyGet), keyslot, passphrase)
 }
 
 // MockCryptSetupClient is a mock of CryptSetupClient interface.
