@@ -331,15 +331,7 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 // Finally, it prepares the LUKS volume for mounting.
 func (ns *NodeServer) formatLUKSVolume(ctx context.Context, devicePath string, luksContext LuksContext) (luksSource string, err error) {
 	log := logger.GetLogger(ctx)
-	luksSource = "/dev/mapper/" + luksContext.VolumeName
 	log.V(4).Info("Entering formatLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
-
-	// Verify if the device is already formatted
-	// lsblkExecutor := lsblk.NewLSBLK(logrus.New())
-	// devices, _ := lsblkExecutor.GetBlockDevices(devicePath)
-	// for number, device := range devices {
-	// 	log.V(4).Info("device", "device number", number, "device", device)
-	// }
 
 	// Validate the LUKS context.
 	if err = luksContext.validate(); err != nil {
