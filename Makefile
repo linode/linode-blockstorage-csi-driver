@@ -1,16 +1,17 @@
 PLATFORM           ?= linux/amd64
 REGISTRY_NAME      ?= index.docker.io
-IMAGE_NAME         ?= linode/linode-blockstorage-csi-driver
+DOCKER_USER        ?= linode
+IMAGE_NAME         ?= linode-blockstorage-csi-driver
 REV                := $(shell git branch --show-current 2> /dev/null || echo "dev")
 ifdef DEV_TAG_EXTENSION
 IMAGE_VERSION      ?= $(REV)-$(DEV_TAG_EXTENSION)
 else
 IMAGE_VERSION      ?= $(REV)
 endif
-IMAGE_TAG          ?= $(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
+IMAGE_TAG          ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG  := golangci/golangci-lint:v1.59-alpine
 RELEASE_DIR        ?= release
-DOCKERFILE ?= Dockerfile
+DOCKERFILE         ?= Dockerfile
 
 #####################################################################
 # OS / ARCH
@@ -95,7 +96,7 @@ capl-cluster:
 
 	# Install CSI driver and wait for it to be ready
 	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
-	hack/generate-yaml.sh $(IMAGE_VERSION) $(IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
+	hack/generate-yaml.sh $(IMAGE_VERSION) $(DOCKER_USER)/$(IMAGE_NAME) |KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
 	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
