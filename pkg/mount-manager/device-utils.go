@@ -78,7 +78,7 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 		// Seeing this error means that the diskSDPattern is malformed.
 		klog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
 	}
-	sdBeforeSet := sets.NewString(sdBefore...)
+	sdBeforeSet := sets.New[string](sdBefore...)
 	// TODO(#69): Verify udevadm works as intended in driver
 	if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
 		// udevadm errors should not block disk detachment, log and continue
@@ -100,7 +100,9 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 // --action=change" for newly created "/dev/sd*" drives (exist only in
 // after set). This is workaround for Issue #7972. Once the underlying
 // issue has been resolved, this may be removed.
-func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
+
+// s1 := Set[string]{} s2 := New[string]()
+func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string]) error {
 	sdAfter, err := filepath.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("error filepath.Glob(\"%s\"): %w", diskSDPattern, err)

@@ -1,0 +1,29 @@
+FROM golang:1.23.1-alpine AS builder
+# from makefile
+ARG REV
+
+RUN mkdir -p /linode
+WORKDIR /linode
+
+RUN apk add \
+    blkid \
+    cryptsetup \
+    cryptsetup-libs \
+    cryptsetup-dev \
+    e2fsprogs \
+    findmnt \
+    gcc \
+    lsblk \
+    make \
+    musl-dev \
+    pkgconfig \
+    xfsprogs
+
+COPY go.mod go.sum ./
+RUN go mod tidy
+
+COPY . .
+
+RUN CGO_ENABLED=1 go build -a -ldflags '-X main.vendorVersion='${REV}'' -o /bin/linode-blockstorage-csi-driver /linode
+RUN CGO_ENABLED=1 go install go.uber.org/mock/mockgen@latest
+CMD ["sh"]
