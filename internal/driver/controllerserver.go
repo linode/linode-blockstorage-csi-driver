@@ -440,7 +440,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
-	
+
 	log.V(2).Info("Processing request", "req", req)
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)

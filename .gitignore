@@ -24,6 +24,7 @@ _cgo_export.*
 _output
 _testmain.go
 linode-blockstorage-csi-driver
+test-cluster-kubeconfig.yaml
 
 *.exe
 *.test

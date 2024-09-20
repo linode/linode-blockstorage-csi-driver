@@ -140,27 +140,27 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
-	
-	volumeID := req.GetVolumeId()
+
 	targetPath := req.GetTargetPath()
+	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID, "targetPath", targetPath)
-	
+
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
 	// Validate request object
-	log.V(4).Info("Validating request", "volumeID", volumeID)
+	log.V(4).Info("Validating request", "volumeID", volumeID, "targetPath", targetPath)
 	if err := validateNodeUnpublishVolumeRequest(ctx, req); err != nil {
 		return nil, err
 	}
 
-	// Unmount the target path
-	log.V(4).Info("Unmounting target path", "volumeID", volumeID, "targetPath", targetPath)
-	if err := mount.CleanupMountPoint(req.GetTargetPath(), ns.mounter.Interface, true /* bind mount */); err != nil {
-		return nil, errInternal("Failed to unmount %s: %v", targetPath, err)
+	// Unmount the target path and delete the remaining directory
+	log.V(4).Info("Unmounting and deleting target path", "volumeID", volumeID, "targetPath", targetPath)
+	if err := mount.CleanupMountPoint(targetPath, ns.mounter.Interface, true /* bind mount */); err != nil {
+		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", targetPath, err)
 	}
 
-	log.V(2).Info("Successfully completed", "volumeID", volumeID)
+	log.V(2).Info("Successfully completed", "volumeID", volumeID, "targetPath", targetPath)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -240,29 +240,30 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
 	defer done()
 
-	volumeID := req.GetVolumeId()
 	stagingTargetPath := req.GetStagingTargetPath()
+	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
 	// Validate req (NodeUnstageVolumeRequest)
-	log.V(4).Info("Validating request", "volumeID", volumeID)
-	if err := validateNodeUnstageVolumeRequest(ctx, req); err != nil {
+	log.V(4).Info("Validating request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
+	err := validateNodeUnstageVolumeRequest(ctx, req)
+	if err != nil {
 		return nil, err
 	}
 
-	// Unmount the target path
-	log.V(4).Info("Unmounting and deleting staging target path", "volumeID", volumeID, "targetPath", stagingTargetPath)
-	if err := mount.CleanupMountPoint(stagingTargetPath, ns.mounter.Interface, true /* bind mount */); err != nil {
-		return nil, errInternal("Failed to unmount %s: %v", stagingTargetPath, err)
+	log.V(4).Info("Unmounting staging target path", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
+	err = mount.CleanupMountPoint(stagingTargetPath, ns.mounter.Interface, true /* bind mount */)
+	if err != nil {
+		return nil, errInternal("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err)
 	}
 
 	// If LUKS volume is used, close the LUKS device
 	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	if err := ns.closeLuksMountSource(ctx, volumeID); err != nil {
-		return nil, errInternal("Failed to close the luks volume %s: %v", volumeID, err)
+		return nil, fmt.Errorf("closing luks to unstage volume %s: %w", volumeID, err)
 	}
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID)
