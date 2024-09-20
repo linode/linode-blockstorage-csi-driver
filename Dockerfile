@@ -16,7 +16,7 @@ RUN go mod download
 
 RUN CGO_ENABLED=1 go build -a -ldflags '-X main.vendorVersion='${REV}'' -o /bin/linode-blockstorage-csi-driver /linode
 
-FROM alpine:3.20.3
+FROM alpine:3.18.4
 LABEL maintainers="Linode"
 LABEL description="Linode CSI Driver"
 
