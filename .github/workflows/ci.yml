@@ -12,6 +12,9 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
+      - name: Install cryptsetup
+        run: |
+          sudo apt install libcryptsetup12 libcryptsetup-dev
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -25,7 +28,6 @@ jobs:
           version: latest
       - run: make build
       - run: go test -cover ./... -coverprofile ./coverage.out
-      - run: make elevated-test
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -39,13 +41,16 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
-      IMAGE_VERSION: ${{ github.ref == 'refs/heads/main' && 'latest' || github.head_ref || github.ref_name }}
+      IMAGE_VERSION: ${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
       LINODE_REGION: us-sea
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
       WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '0' }}
       E2E_SELECTOR: ${{ github.ref == 'refs/heads/main' && 'all' || 'quick' }}
     steps:
+      - name: Install cryptsetup
+        run: |
+          sudo apt install libcryptsetup12 libcryptsetup-dev
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
