@@ -22,14 +22,20 @@ limitations under the License.
 package driver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
+
+	cryptsetup "github.com/martinjungblut/go-cryptsetup"
+
+	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 type LuksContext struct {
@@ -83,12 +89,14 @@ func (ctx *LuksContext) validate() error {
 type Encryption struct {
 	Exec       Executor
 	FileSystem mountmanager.FileSystem
+	CryptSetup cryptsetupclient.CryptSetupClient
 }
 
-func NewLuksEncryption(executor utilexec.Interface, fileSystem mountmanager.FileSystem) Encryption {
+func NewLuksEncryption(executor utilexec.Interface, fileSystem mountmanager.FileSystem, cryptSetup cryptsetupclient.CryptSetupClient) Encryption {
 	return Encryption{
 		Exec:       executor,
 		FileSystem: fileSystem,
+		CryptSetup: cryptSetup,
 	}
 }
 
@@ -115,149 +123,119 @@ func getLuksContext(secrets map[string]string, context map[string]string, lifecy
 	}
 }
 
-func (e *Encryption) luksFormat(ctx LuksContext, source string) error {
-	cryptsetupCmd, err := e.getCryptsetupCmd()
+func (e *Encryption) luksFormat(ctx context.Context, luksCtx LuksContext, source string) (string, error) {
+	log := logger.GetLogger(ctx)
+
+	// Set params
+	keySize, err := strconv.Atoi(luksCtx.EncryptionKeySize)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("keysize str to int coversion: %w", err)
+	}
+	cipherString := strings.SplitN(luksCtx.EncryptionCipher, "-", 2)
+	genericParams := cryptsetup.GenericParams{
+		Cipher:        cipherString[0],
+		CipherMode:    cipherString[1],
+		VolumeKey:     luksCtx.EncryptionKey,
+		VolumeKeySize: keySize / 8,
 	}
 
-	// initialize the luks partition
-	cryptsetupArgs := []string{
-		"-v",
-		"--batch-mode",
-		"--cipher", ctx.EncryptionCipher,
-		"--key-size", ctx.EncryptionKeySize,
-		"--key-file", "-",
-		"luksFormat", source,
-	}
-
-	klog.V(4).Info("executing cryptsetup luksFormat command ", cryptsetupArgs)
-
-	cmd := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...)
-
-	// Set the encryption key as stdin
-	cmd.SetStdin(strings.NewReader(ctx.EncryptionKey))
-
-	out, err := cmd.CombinedOutput()
+	// Initialize the device using the path
+	log.V(4).Info("Initializing device to perform luks format ", source)
+	newLuksDevice, err := cryptsetupclient.NewLuksDevice(e.CryptSetup, source)
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksFormat failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
+		return "", fmt.Errorf("initializing luks device to format: %w", err)
 	}
 
-	// open the luks partition
-	klog.V(4).Info("luksOpen ", source)
-	err = e.luksOpen(ctx, source)
+	// Format the device
+	log.V(4).Info("Formatting luks device ", newLuksDevice.Identifier)
+	err = newLuksDevice.Device.Format(cryptsetup.LUKS2{SectorSize: 512}, genericParams)
 	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
+		return "", fmt.Errorf("formatting luks device: %w", err)
 	}
 
-	defer func() {
-		if e := e.luksClose(ctx.VolumeName); e != nil {
-			klog.Errorf("cannot close luks device: %s", e.Error())
+	// Add keysot by volumekey
+	log.V(4).Info("Adding keysot by volumekey")
+	if err := newLuksDevice.Device.KeyslotAddByVolumeKey(0, "", luksCtx.EncryptionKey); err != nil {
+		return "", fmt.Errorf("adding keysot by volumekey: %w", err)
+	}
+	defer newLuksDevice.Device.Free()
+
+	// Activate the device using the encryption key
+	log.V(4).Info("Activating luks device using volumekey", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
+	err = newLuksDevice.Device.ActivateByPassphrase(luksCtx.VolumeName, 0, luksCtx.EncryptionKey, 0)
+	if err != nil {
+		return "", fmt.Errorf("activating %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
+	}
+	log.V(4).Info("The LUKS volume is now ready ", luksCtx.VolumeName)
+
+	// Return the mapper path
+	return "/dev/mapper/" + luksCtx.VolumeName, nil
+}
+
+func (e *Encryption) luksOpen(ctx context.Context, luksCtx LuksContext, source string) (string, error) {
+	log := logger.GetLogger(ctx)
+
+	// Initialize the device using the path
+	log.V(4).Info("Initializing device to perform luks open ", source)
+	newLuksDevice, err := cryptsetupclient.NewLuksDevice(e.CryptSetup, source)
+	if err != nil {
+		return "", fmt.Errorf("initializing luks device to open: %w", err)
+	}
+	defer newLuksDevice.Device.Free()
+
+	// Loading the device
+	log.V(4).Info("Loading luks device", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
+	err = newLuksDevice.Device.Load(cryptsetup.LUKS2{SectorSize: 512})
+	if err != nil {
+		return "", fmt.Errorf("Loading %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
+	}
+
+	// Activate the device using the encryption key
+	log.V(4).Info("Activating luks device using volumekey", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
+	if err := newLuksDevice.Device.ActivateByPassphrase(luksCtx.VolumeName, 0, luksCtx.EncryptionKey, 0); err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			return "/dev/mapper/" + luksCtx.VolumeName, nil
 		}
-	}()
-
-	klog.V(4).Info("The LUKS volume name is ", ctx.VolumeName)
-
-	return nil
-}
-
-// prepares a luks-encrypted volume for mounting and returns the path of the mapped volume
-func (e *Encryption) luksPrepareMount(ctx LuksContext, source string) (string, error) {
-	if err := e.luksOpen(ctx, source); err != nil {
-		return "", err
+		return "", fmt.Errorf("activating %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
 	}
-	return "/dev/mapper/" + ctx.VolumeName, nil
+
+	log.V(4).Info("The LUKS volume is now ready ", luksCtx.VolumeName)
+
+	// Return the mapper path
+	return "/dev/mapper/" + luksCtx.VolumeName, nil
 }
 
-func (e *Encryption) luksClose(volume string) error {
-	cryptsetupCmd, err := e.getCryptsetupCmd()
+func (e *Encryption) luksClose(ctx context.Context, volumeName string) error {
+	log := logger.GetLogger(ctx)
+	// Initialize the device by name
+	log.V(4).Info("Initalizing device to perform luks close ", volumeName)
+	newLuksDeviceByName, err := cryptsetupclient.NewLuksDeviceByName(e.CryptSetup, volumeName)
 	if err != nil {
-		return err
-	}
-	cryptsetupArgs := []string{"--batch-mode", "close", volume}
-
-	klog.V(4).Info("executing cryptsetup close command")
-
-	out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("removing luks mapping failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
-	}
-	return nil
-}
-
-func (e *Encryption) luksOpen(ctx LuksContext, volume string) error {
-	// check if the luks volume is already open
-	if _, err := e.FileSystem.Stat("/dev/mapper/" + ctx.VolumeName); !e.FileSystem.IsNotExist(err) {
-		klog.V(4).Infof("luks volume is already open %s", volume)
+		log.V(4).Info("device is no longer active ", volumeName)
 		return nil
 	}
+	log.V(4).Info("Initalized device to perform luks close ", volumeName)
 
-	cryptsetupCmd, err := e.getCryptsetupCmd()
-	if err != nil {
-		return err
+	// Deactivating the device
+	log.V(4).Info("Deactivating and closing the volume ", volumeName)
+	if err := newLuksDeviceByName.Device.Deactivate(volumeName); err != nil {
+		return fmt.Errorf("deactivating %s luks device: %w", volumeName, err)
 	}
-	cryptsetupArgs := []string{
-		"--batch-mode",
-		"luksOpen",
-		"--key-file", "-",
-		volume, ctx.VolumeName,
+
+	// Freeing the device
+	log.V(4).Info("Releasing/Freeing the device ", volumeName)
+	if !newLuksDeviceByName.Device.Free() {
+		return errors.New("could not release/free the luks device")
 	}
-	klog.V(4).Info("executing cryptsetup luksOpen command")
+	log.V(4).Info("Released/Freed the device ", volumeName)
 
-	cmd := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...)
-
-	// Set the encryption key as stdin
-	cmd.SetStdin(strings.NewReader(ctx.EncryptionKey))
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("cryptsetup luksOpen failed: %w cmd: '%s %s' output: %q",
-			err, cryptsetupCmd, strings.Join(cryptsetupArgs, " "), string(out))
-	}
+	log.V(4).Info("Released/Freed and Deactivated/Closed the volume ", volumeName)
 	return nil
 }
 
-// isLuksMapping checks if the specified volume ID is a LUKS volume 
-// by executing the 'cryptsetup status' command. It returns true if 
-// the volume is LUKS, false otherwise, along with any error encountered.
-func (e *Encryption) isLuksMapping(volume string) (bool, error) {
-	cryptsetupCmd, err := e.getCryptsetupCmd()
-	if err != nil {
-		return false, err
-	}
-	cryptsetupArgs := []string{"status", volume}
-
-	out, err := e.Exec.Command(cryptsetupCmd, cryptsetupArgs...).CombinedOutput()
-	if err != nil {
-		return false, nil
-	}
-	for _, statusLine := range strings.Split(string(out), "\n") {
-		if strings.Contains(statusLine, "type:") {
-			if strings.Contains(strings.ToLower(statusLine), "luks") {
-				return true, nil
-			}
-			return false, nil
-		}
-	}
-	return false, nil
-}
-
-func (e *Encryption) getCryptsetupCmd() (string, error) {
-	cryptsetupCmd := "cryptsetup"
-	_, err := e.Exec.LookPath(cryptsetupCmd)
-	if err != nil {
-		if err == exec.ErrNotFound {
-			return "", fmt.Errorf("%q executable not found in $PATH", cryptsetupCmd)
-		}
-		return "", err
-	}
-	return cryptsetupCmd, nil
-}
-
-func (e *Encryption) blkidValid(source string) (bool, error) {
+func (e *Encryption) blkidValid(ctx context.Context, source string) (bool, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Entering blkidValid", "source", source)
 	if source == "" {
 		return false, errors.New("invalid source")
 	}
@@ -288,6 +266,7 @@ func (e *Encryption) blkidValid(source string) (bool, error) {
 		}
 		return false, errors.New("checking blkdid failed")
 	}
+	log.V(4).Info("target block device is already formatted", "source", source)
 
 	return true, nil
 }

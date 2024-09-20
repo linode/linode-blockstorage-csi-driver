@@ -17,7 +17,7 @@
   ],
   "shell": {
     "init_hook": [
-      "echo 'Welcome to devbox!' > /dev/null"
+      "export \"GOROOT=$(go env GOROOT)\""
     ],
     "scripts": {
       "mgmt-and-capl-cluster": "make mgmt-and-capl-cluster",
