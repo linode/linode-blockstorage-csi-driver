@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-
 	"go.uber.org/mock/gomock"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
+
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 )
 
 func TestNodeServer_mountVolume_linux(t *testing.T) {

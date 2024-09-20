@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linodego"
+
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
-	"github.com/linode/linodego"
 )
 
+//nolint:gocognit // As simple as possible.
 func TestListVolumes(t *testing.T) {
 	cases := map[string]struct {
 		volumes  []linodego.Volume
@@ -83,11 +85,12 @@ func TestListVolumes(t *testing.T) {
 			}
 
 			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
-			if err != nil && !tt.throwErr {
+			switch {
+			case (err != nil && !tt.throwErr):
 				t.Fatal("failed to list volumes:", err)
-			} else if err != nil && tt.throwErr {
+			case (err != nil && tt.throwErr):
 				// expected failure
-			} else if err == nil && tt.throwErr {
+			case (err == nil && tt.throwErr):
 				t.Fatal("should have failed to list volumes")
 			}
 
@@ -101,7 +104,7 @@ func TestListVolumes(t *testing.T) {
 				var linodeVolume *linodego.Volume
 				for _, v := range tt.volumes {
 					key := linodevolumes.CreateLinodeVolumeKey(v.ID, v.Label)
-					if volume.VolumeId == key.GetVolumeKey() {
+					if volume.GetVolumeId() == key.GetVolumeKey() {
 						v := v
 						linodeVolume = &v
 						break
@@ -111,11 +114,11 @@ func TestListVolumes(t *testing.T) {
 					t.Fatalf("no matching linode volume for %#v", volume)
 				}
 
-				if want, got := int64(linodeVolume.Size<<30), volume.CapacityBytes; want != got {
+				if want, got := int64(linodeVolume.Size<<30), volume.GetCapacityBytes(); want != got {
 					t.Errorf("mismatched volume size: want=%d got=%d", want, got)
 				}
 				for _, topology := range volume.GetAccessibleTopology() {
-					region, ok := topology.Segments[VolumeTopologyRegion]
+					region, ok := topology.GetSegments()[VolumeTopologyRegion]
 					if !ok {
 						t.Error("region not set in volume topology")
 					}
@@ -129,7 +132,7 @@ func TestListVolumes(t *testing.T) {
 					t.Error("nil status")
 					continue
 				}
-				if status.VolumeCondition.Abnormal {
+				if status.GetVolumeCondition().GetAbnormal() {
 					t.Error("abnormal volume condition")
 				}
 
@@ -179,35 +182,48 @@ func (c *fakeLinodeClient) ListInstanceDisks(_ context.Context, _ int, _ *linode
 	return c.disks, nil
 }
 
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) GetInstance(context.Context, int) (*linodego.Instance, error) {
 	return nil, nil
 }
 
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) GetVolume(context.Context, int) (*linodego.Volume, error) {
 	return nil, nil
 }
 
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) CreateVolume(context.Context, linodego.VolumeCreateOptions) (*linodego.Volume, error) {
 	return nil, nil
 }
 
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) CloneVolume(context.Context, int, string) (*linodego.Volume, error) {
 	return nil, nil
 }
 
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) AttachVolume(context.Context, int, *linodego.VolumeAttachOptions) (*linodego.Volume, error) {
 	return nil, nil
 }
+
 func (flc *fakeLinodeClient) DetachVolume(context.Context, int) error { return nil }
+
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) WaitForVolumeLinodeID(context.Context, int, *int, int) (*linodego.Volume, error) {
 	return nil, nil
 }
 
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus, int) (*linodego.Volume, error) {
 	return nil, nil
 }
-func (flc *fakeLinodeClient) DeleteVolume(context.Context, int) error      { return nil }
+
+func (flc *fakeLinodeClient) DeleteVolume(context.Context, int) error { return nil }
+
 func (flc *fakeLinodeClient) ResizeVolume(context.Context, int, int) error { return nil }
+
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error) {
 	return nil, nil
 }

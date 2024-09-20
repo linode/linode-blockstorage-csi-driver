@@ -9,8 +9,9 @@ import (
 	"strconv"
 
 	metadata "github.com/linode/go-metadata"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linodego"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // Metadata contains metadata about the node/instance the CSI node plugin
@@ -51,7 +52,7 @@ func GetMetadata(ctx context.Context) (Metadata, error) {
 		"region", data.Region,
 		"memory", data.Specs.Memory)
 
-	metadata := Metadata{
+	nodeMetadata := Metadata{
 		ID:     data.ID,
 		Label:  data.Label,
 		Region: data.Region,
@@ -59,7 +60,7 @@ func GetMetadata(ctx context.Context) (Metadata, error) {
 	}
 
 	log.V(2).Info("Successfully completed")
-	return metadata, nil
+	return nodeMetadata, nil
 }
 
 // memoryToBytes converts the given amount of memory in MB, to bytes.
@@ -87,7 +88,7 @@ var errNilClient = errors.New("nil client")
 // GetMetadataFromAPI attempts to retrieve metadata about the current
 // node/instance directly from the Linode API.
 func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
+	log, _, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
 	defer done()
 
 	log.V(2).Info("Processing request")
@@ -102,16 +103,18 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 	}
 
 	log.V(4).Info("Opening LinodeIDPath", "path", LinodeIDPath)
-	f, err := os.Open(LinodeIDPath)
+	fileObj, err := os.Open(LinodeIDPath)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("open: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		err = fileObj.Close()
+	}()
 
 	log.V(4).Info("Reading LinodeID from file")
 	// Read in the file, but use a LimitReader to make sure we are not
 	// reading in junk.
-	data, err := io.ReadAll(io.LimitReader(f, 1<<10))
+	data, err := io.ReadAll(io.LimitReader(fileObj, 1<<10))
 	if err != nil {
 		return Metadata{}, fmt.Errorf("read all: %w", err)
 	}
@@ -133,7 +136,7 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 		memory = memoryToBytes(instance.Specs.Memory)
 	}
 
-	metadata := Metadata{
+	nodeMetadata := Metadata{
 		ID:     linodeID,
 		Label:  instance.Label,
 		Region: instance.Region,
@@ -141,11 +144,11 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 	}
 
 	log.V(4).Info("Successfully retrieved metadata",
-		"instanceID", metadata.ID,
-		"instanceLabel", metadata.Label,
-		"region", metadata.Region,
-		"memory", metadata.Memory)
+		"instanceID", nodeMetadata.ID,
+		"instanceLabel", nodeMetadata.Label,
+		"region", nodeMetadata.Region,
+		"memory", nodeMetadata.Memory)
 
 	log.V(2).Info("Successfully completed")
-	return metadata, nil
+	return nodeMetadata, nil
 }

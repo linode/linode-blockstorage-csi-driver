@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-
 	"go.uber.org/mock/gomock"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
+
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 )
 
 func TestNodeServer_mountVolume_luks(t *testing.T) {
@@ -343,7 +343,6 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -406,7 +405,6 @@ func TestNodeServer_formatLUKSVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// SetUp()
 
 			ctrl := gomock.NewController(t)
@@ -435,7 +433,7 @@ func TestNodeServer_formatLUKSVolume(t *testing.T) {
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem, mockCryptSetupClient),
 			}
 
-			got, err := ns.formatLUKSVolume(context.Background(), tt.devicePath, tt.luksContext)
+			got, err := ns.formatLUKSVolume(context.Background(), tt.devicePath, &tt.luksContext)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NodeServer.formatLUKSVolume() error = %v, wantErr %v", err, tt.wantErr)
 				return

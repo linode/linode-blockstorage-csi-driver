@@ -33,7 +33,7 @@ type LinodeClient interface {
 	NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error)
 }
 
-func NewLinodeClient(token, ua string, apiURL string) (*linodego.Client, error) {
+func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
 	// Use linodego built-in http client which supports setting root CA cert
 	linodeClient := linodego.NewClient(nil)
 	linodeClient.SetUserAgent(ua)
@@ -58,17 +58,17 @@ func NewLinodeClient(token, ua string, apiURL string) (*linodego.Client, error) 
 // getAPIURLComponents returns the API URL components (base URL, api version) given an input URL.
 // This is necessary due to some recent changes with how linodego handles
 // client.SetBaseURL(...) and client.SetAPIVersion(...)
-func getAPIURLComponents(apiURL string) (string, string, error) {
-	u, err := url.Parse(apiURL)
+func getAPIURLComponents(apiURL string) (host, version string, err error) {
+	urlObj, err := url.Parse(apiURL)
 	if err != nil {
 		return "", "", err
 	}
 
-	version := ""
-	host := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	version = ""
+	host = fmt.Sprintf("%s://%s", urlObj.Scheme, urlObj.Host)
 
-	if strings.ReplaceAll(u.Path, "/", "") == "" {
-		pathSegments := strings.Split(u.Path, "/")
+	if strings.ReplaceAll(urlObj.Path, "/", "") == "" {
+		pathSegments := strings.Split(urlObj.Path, "/")
 		// The API version will be the last path value
 		version = pathSegments[len(pathSegments)-1]
 	}
