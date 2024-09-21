@@ -63,7 +63,6 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
 	defer done()
 
-	name := req.GetName()
 	log.V(2).Info("Processing request", "req", req)
 
 	if name == "" {
@@ -79,8 +78,9 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, errInvalidVolumeCapability(volCapabilities)
 	}
 
-	capRange := req.GetCapacityRange()
-	size, err := getRequestCapacitySize(capRange)
+	// Prepare the volume parameters such as name and SizeGB from the request.
+	// This step may involve calculations or adjustments based on the request's content.
+	volName, sizeGB, size, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
@@ -177,8 +177,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			},
 		}
 	}
-
-	log.V(2).Info("Volume created successfully", "response", resp)
+	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
 }
 
