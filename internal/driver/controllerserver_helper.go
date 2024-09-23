@@ -10,6 +10,8 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -22,10 +24,10 @@ import (
 // volume endpoints deal with "GB".
 // Internally, the driver will deal with sizes and capacities in bytes, but
 // convert to and from "GB" when interacting with the Linode API.
-const MinVolumeSizeBytes = 10 << 30 // 10GiB
-
-// Set sentinel error
-var ErrNotFound = errors.New("not found")
+const (
+	MinVolumeSizeBytes = 10 << 30 // 10GiB
+	True               = "true"
+)
 
 // bytesToGB is a convenience function that converts the given number of bytes
 // to gigabytes.
@@ -129,12 +131,12 @@ func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, ins
 
 // getContentSourceVolume retrieves information about the Linode volume to clone from.
 // It returns a LinodeVolumeKey if a valid source volume is found, or an error if the source is invalid.
-func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (*linodevolumes.LinodeVolumeKey, error) {
+func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (volKey *linodevolumes.LinodeVolumeKey, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to get content source volume")
 
 	if contentSource == nil {
-		return nil, ErrNotFound
+		return volKey, nil // Return nil if no content source is provided
 	}
 
 	// Check if the content source type is a volume
@@ -148,18 +150,18 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 	}
 
 	// Parse the volume ID from the content source
-	volumeInfo, err := linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
+	volKey, err = linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
 	if err != nil {
 		return nil, errInternal("parse volume info from content source: %v", err)
 	}
-	if volumeInfo == nil {
+	if volKey == nil {
 		return nil, errInternal("processed *LinodeVolumeKey is nil") // Throw an internal error if the processed LinodeVolumeKey is nil
 	}
 
 	// Retrieve the volume data using the parsed volume ID
-	volumeData, err := cs.client.GetVolume(ctx, volumeInfo.VolumeID)
+	volumeData, err := cs.client.GetVolume(ctx, volKey.VolumeID)
 	if err != nil {
-		return nil, errInternal("get volume %d: %v", volumeInfo.VolumeID, err)
+		return nil, errInternal("get volume %d: %v", volKey.VolumeID, err)
 	}
 	if volumeData == nil {
 		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
@@ -171,7 +173,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 	}
 
 	log.V(4).Info("Content source volume", "volumeData", volumeData)
-	return volumeInfo, nil
+	return volKey, nil
 }
 
 // attemptCreateLinodeVolume creates a Linode volume while ensuring idempotency.
@@ -347,7 +349,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
 
 	// Check if the volume name is empty; if so, return an error indicating no volume name was provided.
-	if len(req.GetName()) == 0 {
+	if req.GetName() == "" {
 		return errNoVolumeName
 	}
 
@@ -369,7 +371,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // prepareVolumeParams prepares the volume parameters for creation.
 // It extracts the capacity range from the request, calculates the size,
 // and generates a normalized volume name. Returns the volume name and size in GB.
-func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (string, int, int64, error) {
+func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (volumeName string, targetSizeGB int, size int64, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
@@ -377,15 +379,15 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	// Retrieve the capacity range from the request to determine the size limits for the volume.
 	capRange := req.GetCapacityRange()
 	// Get the requested size in bytes, handling any potential errors.
-	size, err := getRequestCapacitySize(capRange)
+	size, err = getRequestCapacitySize(capRange)
 	if err != nil {
 		return "", 0, 0, err
 	}
 
-	condensedName := strings.Replace(req.GetName(), "-", "", -1)
+	condensedName := strings.ReplaceAll(req.GetName(), "-", "")
 	preKey := linodevolumes.CreateLinodeVolumeKey(0, condensedName)
-	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
-	targetSizeGB := bytesToGB(size)
+	volumeName = preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+	targetSizeGB = bytesToGB(size)
 
 	log.V(4).Info("Volume parameters prepared", "volumeName", volumeName, "targetSizeGB", targetSizeGB)
 	return volumeName, targetSizeGB, size, nil
@@ -400,11 +402,11 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 	volumeContext := make(map[string]string)
 
-	if req.Parameters[LuksEncryptedAttribute] == "true" {
-		volumeContext[LuksEncryptedAttribute] = "true"
+	if req.GetParameters()[LuksEncryptedAttribute] == True {
+		volumeContext[LuksEncryptedAttribute] = True
 		volumeContext[PublishInfoVolumeName] = req.GetName()
-		volumeContext[LuksCipherAttribute] = req.Parameters[LuksCipherAttribute]
-		volumeContext[LuksKeySizeAttribute] = req.Parameters[LuksKeySizeAttribute]
+		volumeContext[LuksCipherAttribute] = req.GetParameters()[LuksCipherAttribute]
+		volumeContext[LuksKeySizeAttribute] = req.GetParameters()[LuksKeySizeAttribute]
 	}
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
@@ -447,7 +449,7 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 
 // prepareCreateVolumeResponse constructs a CreateVolumeResponse from the created volume details.
 // It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
-func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int64, context map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
+func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int64, volContext map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
 	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
@@ -464,7 +466,7 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 					},
 				},
 			},
-			VolumeContext: context,
+			VolumeContext: volContext,
 		},
 	}
 
@@ -485,32 +487,32 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 // It extracts the Linode ID and Volume ID from the request and checks if the
 // volume capability is provided and valid. If any validation fails, it returns
 // an appropriate error.
-func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (int, int, error) {
+func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (linodeID, volumeID int, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering validateControllerPublishVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateControllerPublishVolumeRequest()")
 
 	// extract the linode ID from the request
-	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerPublishVolume", req)
-	if statusErr != nil {
-		return 0, 0, statusErr
+	linodeID, err = linodevolumes.NodeIdAsInt("ControllerPublishVolume", req)
+	if err != nil {
+		return 0, 0, err
 	}
 
 	// extract the volume ID from the request
-	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerPublishVolume", req)
-	if statusErr != nil {
-		return 0, 0, statusErr
+	volumeID, err = linodevolumes.VolumeIdAsInt("ControllerPublishVolume", req)
+	if err != nil {
+		return 0, 0, err
 	}
 
 	// retrieve the volume capability from the request
-	cap := req.GetVolumeCapability()
+	volCap := req.GetVolumeCapability()
 	// return an error if no volume capability is provided
-	if cap == nil {
+	if volCap == nil {
 		return 0, 0, errNoVolumeCapability
 	}
 	// return an error if the volume capability is invalid
-	if !validVolumeCapabilities([]*csi.VolumeCapability{cap}) {
-		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{cap})
+	if !validVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
+		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{volCap})
 	}
 
 	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
@@ -611,7 +613,8 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 	if err != nil {
 		code := codes.Internal // Default error code is Internal.
 		// Check if the error indicates that the volume is already attached.
-		if apiErr, ok := err.(*linodego.Error); ok && strings.Contains(apiErr.Message, "is already attached") {
+		var apiErr *linodego.Error
+		if errors.As(err, &apiErr) && strings.Contains(apiErr.Message, "is already attached") {
 			code = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
 		}
 		return status.Errorf(code, "attach volume: %v", err)
