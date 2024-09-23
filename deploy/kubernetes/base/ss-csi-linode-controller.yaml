@@ -44,6 +44,11 @@ spec:
             - "--volume-name-uuid-length=16"
             - "--csi-address=$(ADDRESS)"
             - "--v=2"
+            - "--metrics-address=0.0.0.0:10248"
+          ports:
+            - name: metrics
+              containerPort: 10248
+              protocol: TCP
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -56,6 +61,11 @@ spec:
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
+            - "--metrics-address=0.0.0.0:10249"
+          ports:
+            - name: metrics
+              containerPort: 10249
+              protocol: TCP
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -78,6 +88,11 @@ spec:
           image: linode/linode-blockstorage-csi-driver:latest
           args:
             - "--v=2"
+            - "--metrics-address=0.0.0.0:10250"
+          ports:
+            - name: metrics
+              containerPort: 10250
+              protocol: TCP
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
