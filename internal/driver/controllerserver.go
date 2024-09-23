@@ -57,7 +57,7 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 // This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -86,7 +86,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.Parameters[VolumeTags], sourceVolInfo)
+	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
@@ -104,7 +104,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 // function will return a success response without any error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
 	defer done()
 
 	volID, statusErr := linodevolumes.VolumeIdAsInt("DeleteVolume", req)
@@ -141,8 +141,8 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // and that the node can accommodate the attachment. Returns
 // the device path if successful.
 // For more details, refer to the CSI Driver Spec documentation.
-func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerPublishVolume")
+func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (resp *csi.ControllerPublishVolumeResponse, err error) {
+	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerPublishVolume")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -150,14 +150,14 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Validate the request and get Linode ID and Volume ID
 	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
 	if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
+		return resp, err
 	}
 
 	// Check if the volume exists and is valid.
 	// If the volume is already attached to the specified instance, it returns its device path.
 	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, linodeID)
 	if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
+		return resp, err
 	}
 	// If devicePath is not empty, the volume is already attached
 	if devicePath != "" {
@@ -171,34 +171,35 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Retrieve and validate the instance associated with the Linode ID
 	instance, err := cs.getInstance(ctx, linodeID)
 	if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
+		return resp, err
 	}
 
 	// Check if the instance can accommodate the volume attachment
-	if err := cs.checkAttachmentCapacity(ctx, instance); err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
+	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
+		return resp, capErr
 	}
 
 	// Attach the volume to the specified instance
-	if err := cs.attachVolume(ctx, volumeID, linodeID); err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
+	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
+		return resp, attachErr
 	}
 
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
 	// Wait for the volume to be successfully attached to the instance
 	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
-		return &csi.ControllerPublishVolumeResponse{}, err
+		return resp, err
 	}
 
 	log.V(2).Info("Volume attached successfully", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
 
 	// Return the response with the device path of the attached volume
-	return &csi.ControllerPublishVolumeResponse{
+	resp = &csi.ControllerPublishVolumeResponse{
 		PublishContext: map[string]string{
 			devicePathKey: volume.FilesystemPath,
 		},
-	}, nil
+	}
+	return resp, nil
 }
 
 // ControllerUnpublishVolume detaches a specified volume from a node.
@@ -209,7 +210,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 // return a successful response without error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerUnpublishVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerUnpublishVolume")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -256,8 +257,8 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 // ValidateVolumeCapabilities checks if the requested volume capabilities are supported by the volume.
 // It returns a confirmation response if the capabilities are valid, or an error if the volume does not exist
 // or if no capabilities were provided. Refer to the @CSI Driver Spec for more details.
-func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("ValidateVolumeCapabilities")
+func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (resp *csi.ValidateVolumeCapabilitiesResponse, err error) {
+	log, _, done := logger.GetLogger(ctx).WithMethod("ValidateVolumeCapabilities")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -278,7 +279,7 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errInternal("get volume: %v", err)
 	}
 
-	resp := &csi.ValidateVolumeCapabilitiesResponse{}
+	resp = &csi.ValidateVolumeCapabilitiesResponse{}
 	if validVolumeCapabilities(volumeCapabilities) {
 		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
 	}
@@ -293,7 +294,7 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 // parameters as specified in the CSI Driver Spec.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("ListVolumes")
+	log, _, done := logger.GetLogger(ctx).WithMethod("ListVolumes")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -325,8 +326,8 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	}
 
 	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
-	for _, vol := range volumes {
-		key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
+	for volNum := range volumes {
+		key := linodevolumes.CreateLinodeVolumeKey(volumes[volNum].ID, volumes[volNum].Label)
 
 		// If the volume is attached to a Linode instance, add it to the
 		// list. Note that in the Linode API, volumes can only be
@@ -336,18 +337,18 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		// make(), since the CSI specification says this response field
 		// is optional, and thus it should tolerate a nil slice.
 		var publishedNodeIDs []string
-		if vol.LinodeID != nil {
-			publishedNodeIDs = append(publishedNodeIDs, strconv.Itoa(*vol.LinodeID))
+		if volumes[volNum].LinodeID != nil {
+			publishedNodeIDs = append(publishedNodeIDs, strconv.Itoa(*volumes[volNum].LinodeID))
 		}
 
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
 				VolumeId:      key.GetVolumeKey(),
-				CapacityBytes: gbToBytes(vol.Size),
+				CapacityBytes: gbToBytes(volumes[volNum].Size),
 				AccessibleTopology: []*csi.Topology{
 					{
 						Segments: map[string]string{
-							VolumeTopologyRegion: vol.Region,
+							VolumeTopologyRegion: volumes[volNum].Region,
 						},
 					},
 				},
@@ -393,8 +394,8 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 // and performs the resize operation. If the volume is successfully resized,
 // it returns the new capacity and indicates that no node expansion is required.
 // For more details, refer to the CSI Driver Spec documentation.
-func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
+func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (resp *csi.ControllerExpandVolumeResponse, err error) {
+	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -406,38 +407,39 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 	size, err := getRequestCapacitySize(req.GetCapacityRange())
 	if err != nil {
-		return &csi.ControllerExpandVolumeResponse{}, errInternal("get requested size from capacity range: %v", err)
+		return resp, errInternal("get requested size from capacity range: %v", err)
 	}
 
 	// Get the volume
 	log.V(4).Info("Checking if volume exists", "volume_id", volumeID)
 	vol, err := cs.client.GetVolume(ctx, volumeID)
 	if err != nil {
-		return &csi.ControllerExpandVolumeResponse{}, errInternal("get volume: %v", err)
+		return resp, errInternal("get volume: %v", err)
 	}
 
 	// Is the caller trying to resize the volume to be smaller than it currently is?
 	if vol.Size > bytesToGB(size) {
-		return &csi.ControllerExpandVolumeResponse{}, errResizeDown
+		return resp, errResizeDown
 	}
 
 	// Resize the volume
 	log.V(4).Info("Calling API to resize volume", "volume_id", volumeID)
-	if err := cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
-		return &csi.ControllerExpandVolumeResponse{}, errInternal("resize volume %d: %v", volumeID, err)
+	if err = cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
+		return resp, errInternal("resize volume %d: %v", volumeID, err)
 	}
 
 	// Wait for the volume to become active
 	log.V(4).Info("Waiting for volume to become active", "volume_id", volumeID)
 	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
 	if err != nil {
-		return &csi.ControllerExpandVolumeResponse{}, errInternal("timed out waiting for volume %d to become active: %v", volumeID, err)
+		return resp, errInternal("timed out waiting for volume %d to become active: %v", volumeID, err)
 	}
 	log.V(4).Info("Volume active", "vol", vol)
 
 	log.V(2).Info("Volume resized successfully", "volume_id", volumeID)
-	return &csi.ControllerExpandVolumeResponse{
+	resp = &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         size,
 		NodeExpansionRequired: false,
-	}, nil
+	}
+	return resp, nil
 }

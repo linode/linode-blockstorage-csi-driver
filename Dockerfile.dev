@@ -1,6 +1,7 @@
 FROM golang:1.23.1-alpine AS builder
 # from makefile
 ARG REV
+ARG GOLANGCI_LINT_VERSION
 
 RUN mkdir -p /linode
 WORKDIR /linode
@@ -10,6 +11,7 @@ RUN apk add \
     cryptsetup \
     cryptsetup-libs \
     cryptsetup-dev \
+    curl \
     e2fsprogs \
     findmnt \
     gcc \
@@ -26,4 +28,6 @@ COPY . .
 
 RUN CGO_ENABLED=1 go build -a -ldflags '-X main.vendorVersion='${REV}'' -o /bin/linode-blockstorage-csi-driver /linode
 RUN CGO_ENABLED=1 go install go.uber.org/mock/mockgen@latest
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION}
+
 CMD ["sh"]

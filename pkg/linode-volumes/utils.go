@@ -32,11 +32,11 @@ func hashStringToInt(b string) int {
 
 func VolumeIdAsInt(caller string, w withVolume) (int, error) {
 	strVolID := w.GetVolumeId()
-	if len(caller) != 0 {
-		caller = caller + " "
+	if caller != "" {
+		caller += " "
 	}
 
-	if len(strVolID) == 0 {
+	if strVolID == "" {
 		return 0, status.Errorf(codes.InvalidArgument, "%sVolume ID must be provided", caller)
 	}
 
@@ -53,11 +53,11 @@ func VolumeIdAsInt(caller string, w withVolume) (int, error) {
 
 func NodeIdAsInt(caller string, w withNode) (int, error) {
 	strNodeID := w.GetNodeId()
-	if len(caller) != 0 {
-		caller = caller + " "
+	if caller != "" {
+		caller += " "
 	}
 
-	if len(strNodeID) == 0 {
+	if strNodeID == "" {
 		return 0, status.Errorf(codes.InvalidArgument, "%sNode ID must be provided", caller)
 	}
 

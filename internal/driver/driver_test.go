@@ -6,11 +6,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"go.uber.org/mock/gomock"
 	"k8s.io/mount-utils"
 
-	"go.uber.org/mock/gomock"
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 )
 
 var (

@@ -19,6 +19,9 @@ var (
 	errNoStagingTargetPath  = status.Error(codes.InvalidArgument, "staging target path is not set")
 	errNoTargetPath         = status.Error(codes.InvalidArgument, "target path is not set")
 
+	// errNilSource is a general-purpose error used to indicate a nil source the volume will be created from
+	errNilSource = errInternal("nil source volume")
+
 	// errNilInstance is a general-purpose error used to indicate a nil
 	// [github.com/linode/linodego.Instance] was passed as an argument to a
 	// function.

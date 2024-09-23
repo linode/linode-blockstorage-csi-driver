@@ -21,13 +21,14 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linodego"
+	"golang.org/x/net/context"
+	"k8s.io/mount-utils"
+
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
-	"github.com/linode/linodego"
-	"golang.org/x/net/context"
-	"k8s.io/mount-utils"
 )
 
 type NodeServer struct {
@@ -81,7 +82,7 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
 
 	volumeID := req.GetVolumeId()
@@ -138,7 +139,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
 
 	targetPath := req.GetTargetPath()
@@ -165,7 +166,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
 	defer done()
 
 	volumeID := req.GetVolumeId()
@@ -220,7 +221,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// Check if the volume mode is set to 'Block'
 	// Do nothing else with the mount point for stage
-	if blk := req.VolumeCapability.GetBlock(); blk != nil {
+	if blk := req.GetVolumeCapability().GetBlock(); blk != nil {
 		log.V(4).Info("Volume is a block volume", "volumeID", volumeID)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
@@ -237,7 +238,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
 	defer done()
 
 	stagingTargetPath := req.GetStagingTargetPath()
@@ -271,7 +272,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
 	defer done()
 
 	volumeID := req.GetVolumeId()
@@ -304,7 +305,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodeExpandVolumeResponse{
-		CapacityBytes: req.CapacityRange.RequiredBytes,
+		CapacityBytes: req.GetCapacityRange().GetRequiredBytes(),
 	}, nil
 }
 
@@ -353,7 +354,7 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 }
 
 func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("NodeGetVolumeStats")
+	log, _, done := logger.GetLogger(ctx).WithMethod("NodeGetVolumeStats")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)

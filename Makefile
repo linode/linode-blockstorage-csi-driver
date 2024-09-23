@@ -1,17 +1,18 @@
-PLATFORM           ?= linux/amd64
-REGISTRY_NAME      ?= index.docker.io
-DOCKER_USER        ?= linode
-IMAGE_NAME         ?= linode-blockstorage-csi-driver
-REV                := $(shell git branch --show-current 2> /dev/null || echo "dev")
+PLATFORM              ?= linux/amd64
+REGISTRY_NAME         ?= index.docker.io
+DOCKER_USER           ?= linode
+IMAGE_NAME            ?= linode-blockstorage-csi-driver
+REV                   := $(shell git branch --show-current 2> /dev/null || echo "dev")
 ifdef DEV_TAG_EXTENSION
-IMAGE_VERSION      ?= $(REV)-$(DEV_TAG_EXTENSION)
+IMAGE_VERSION         ?= $(REV)-$(DEV_TAG_EXTENSION)
 else
-IMAGE_VERSION      ?= $(REV)
+IMAGE_VERSION         ?= $(REV)
 endif
-IMAGE_TAG          ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
-GOLANGCI_LINT_IMG  := golangci/golangci-lint:v1.59-alpine
-RELEASE_DIR        ?= release
-DOCKERFILE         ?= Dockerfile
+IMAGE_TAG             ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
+GOLANGCI_LINT_IMG     := golangci/golangci-lint:v1.59-alpine
+RELEASE_DIR           ?= release
+DOCKERFILE            ?= Dockerfile
+GOLANGCI_LINT_VERSION ?= v1.61.0
 
 #####################################################################
 # OS / ARCH
@@ -30,15 +31,15 @@ endif
 #####################################################################
 .PHONY: fmt
 fmt:
-	docker run --rm --platform=$(PLATFORM) -it $(IMAGE_TAG) go fmt ./...
+	docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG) go fmt ./...
 
 .PHONY: vet
 vet: fmt
-	docker run --rm --platform=$(PLATFORM) -it $(IMAGE_TAG) go vet ./...
+	docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG) go vet ./...
 
 .PHONY: lint
 lint: vet
-	docker run --rm --platform=$(PLATFORM) --rm -v $(PWD):/app -w /app ${GOLANGCI_LINT_IMG} golangci-lint run -v
+	docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG) golangci-lint run -v -c .golangci.yml --fix
 
 .PHONY: verify
 verify:
@@ -69,7 +70,11 @@ build:
 
 .PHONY: docker-build
 docker-build:
-	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain -t $(IMAGE_TAG) --build-arg REV=$(IMAGE_VERSION) -f ./$(DOCKERFILE) .
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain \
+		-t $(IMAGE_TAG) \
+		--build-arg REV=$(IMAGE_VERSION) \
+		--build-arg GOLANGCI_LINT_VERSION=$(GOLANGCI_LINT_VERSION) \
+		-f ./$(DOCKERFILE) .
 
 .PHONY: docker-push
 docker-push:

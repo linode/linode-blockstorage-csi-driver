@@ -9,12 +9,13 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linodego"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 )
 
 func TestPrepareCreateVolumeResponse(t *testing.T) {
@@ -781,8 +782,8 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 				},
 			},
 			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{linodego.InstanceDisk{ID: 1}, linodego.InstanceDisk{ID: 2}}, nil).AnyTimes()
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{linodego.Volume{ID: 1}, linodego.Volume{ID: 2}, linodego.Volume{ID: 3}, linodego.Volume{ID: 4}, linodego.Volume{ID: 5}, linodego.Volume{ID: 6}}, nil)
+				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
+				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil)
 			},
 			expectedError: errMaxVolumeAttachments(6),
 		},
@@ -825,7 +826,7 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 			contentSource:  nil,
 			setupMocks:     func() {},
 			expectedResult: nil,
-			expectedError:  nil,
+			expectedError:  errNilSource,
 		},
 		{
 			name: "Invalid content source type",
@@ -984,11 +985,12 @@ func TestAttachVolume(t *testing.T) {
 
 			err := cs.attachVolume(context.Background(), tc.volumeID, tc.linodeID)
 
-			if tc.expectedError == nil && err != nil {
+			switch {
+			case tc.expectedError == nil && err != nil:
 				t.Errorf("expected no error, got %v", err)
-			} else if tc.expectedError != nil && err == nil {
+			case tc.expectedError != nil && err == nil:
 				t.Errorf("expected error %v, got nil", tc.expectedError)
-			} else if tc.expectedError != nil && err != nil {
+			case tc.expectedError != nil && err != nil:
 				if tc.expectedError.Error() != err.Error() {
 					t.Errorf("expected error %v, got %v", tc.expectedError, err)
 				}

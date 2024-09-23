@@ -5,10 +5,11 @@ import (
 	"reflect"
 	"testing"
 
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/linode/linodego"
 	"k8s.io/mount-utils"
+
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 func TestNewNodeServer(t *testing.T) {
