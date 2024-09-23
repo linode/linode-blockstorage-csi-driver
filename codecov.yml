@@ -1,0 +1,5 @@
+ignore:
+  - "mocks/*"
+
+github_checks:
+  annotations: false
