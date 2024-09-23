@@ -348,12 +348,17 @@ spec:
       - args:
         - --v=2
         - --csi-address=$(ADDRESS)
+        - --metrics-address=0.0.0.0:10250
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
         image: registry.k8s.io/sig-storage/csi-resizer:v1.3.0
         imagePullPolicy: IfNotPresent
         name: csi-resizer
+        ports:
+        - containerPort: 10250
+          name: metrics
+          protocol: TCP
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
@@ -364,7 +369,6 @@ spec:
         - --node=$(NODE_NAME)
         - --bs-prefix=$(LINODE_BS_PREFIX)
         - --v=2
-        - --metrics-address=0.0.0.0:10250
         env:
         - name: CSI_ENDPOINT
           value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -383,10 +387,6 @@ spec:
               name: linode
         image: linode/linode-blockstorage-csi-driver:latest
         name: linode-csi-plugin
-        ports:
-        - containerPort: 10250
-          name: metrics
-          protocol: TCP
         volumeMounts:
         - mountPath: /linode-info
           name: linode-info
