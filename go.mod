@@ -14,7 +14,7 @@ require (
 	go.uber.org/mock v0.4.0
 	golang.org/x/net v0.29.0
 	golang.org/x/sys v0.25.0
-	google.golang.org/grpc v1.66.2
+	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.34.2
 	k8s.io/apimachinery v0.31.1
 	k8s.io/klog/v2 v2.130.1
@@ -31,6 +31,6 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	golang.org/x/text v0.18.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
