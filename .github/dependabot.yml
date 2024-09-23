@@ -10,8 +10,10 @@ updates:
     groups:
       kubernetes:
         patterns: [ "k8s.io/*", "sigs.k8s.io/*" ]
+        update-types: ["minor"]
       otel:
         patterns: ["go.opentelemetry.io/*"]
+        update-types: ["minor"]
     commit-message:
       prefix: ":seedling:"
     labels:
