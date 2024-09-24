@@ -384,8 +384,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		return "", 0, 0, err
 	}
 
-	condensedName := strings.ReplaceAll(req.GetName(), "-", "")
-	preKey := linodevolumes.CreateLinodeVolumeKey(0, condensedName)
+	preKey := linodevolumes.CreateLinodeVolumeKey(0, req.GetName())
 	volumeName = preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 	targetSizeGB = bytesToGB(size)
 

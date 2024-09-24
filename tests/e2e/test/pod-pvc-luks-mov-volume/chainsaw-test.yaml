@@ -180,7 +180,6 @@ spec:
               ($error): ~
               (contains($stdout, 'TYPE="crypto_LUKS"')): true
 
-              
     # This section moves the volume back to the control plane node and verifies that the pod is ready,
     # the volume is mounted, and that the volume remains a LUKS volume after the move.
     - name: Move the volume back to control plane node
