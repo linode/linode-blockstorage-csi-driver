@@ -233,21 +233,33 @@ func TestGetVolumeLabel(t *testing.T) {
 
 func TestGetNormalizedLabel(t *testing.T) {
 	testCases := []struct {
-		name           string
-		label          string
-		expectedOutput string
+		name     string
+		label    string
+		expected string
 	}{
-		{"Short label", "short-label", "short-label"},
-		{"Exact length label", "exactly-32-characters-long-label", "exactly-32-characters-long-label"},
-		{"Long label", "this-label-is-definitely-longer-than-32-characters", "this-label-is-definitely-longer-"},
+		{
+			name:     "Short label",
+			label:    "short-label",
+			expected: "short-label",
+		},
+		{
+			name:     "Exact length label",
+			label:    "exactly-32-characters-long-label",
+			expected: "exactly-32-characters-long-label",
+		},
+		{
+			name:     "Long label",
+			label:    "this-label-is-definitely-longer-than-32-characters",
+			expected: "this-label-is-definitely-longer-",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			key := LinodeVolumeKey{VolumeID: 1, Label: tc.label}
 			result := key.GetNormalizedLabel()
-			if result != tc.expectedOutput {
-				t.Errorf("Expected '%s', got '%s'", tc.expectedOutput, result)
+			if result != tc.expected {
+				t.Errorf("Expected '%s', got '%s'", tc.expected, result)
 			}
 		})
 	}
@@ -255,22 +267,37 @@ func TestGetNormalizedLabel(t *testing.T) {
 
 func TestGetNormalizedLabelWithPrefix(t *testing.T) {
 	testCases := []struct {
-		name           string
-		label          string
-		prefix         string
-		expectedOutput string
+		name     string
+		label    string
+		prefix   string
+		expected string
 	}{
-		{"Short label with prefix", "short-label", "prefix-", "prefix-short-label"},
-		{"Long label with short prefix", "this-label-is-definitely-longer-than-32-characters", "px-", "px-this-label-is-definitely-long"},
-		{"Short label with long prefix", "short", "very-long-prefix-that-exceeds-", "very-long-prefix-that-exceeds-sh"},
+		{
+			name:     "Short label with prefix",
+			label:    "short-label",
+			prefix:   "prefix-",
+			expected: "prefix-short-label",
+		},
+		{
+			name:     "Long label with short prefix",
+			label:    "this-label-is-definitely-longer-than-32-characters",
+			prefix:   "px-",
+			expected: "px-this-label-is-definitely-long",
+		},
+		{
+			name:     "Short label with long prefix",
+			label:    "short",
+			prefix:   "very-long-prefix-that-exceeds-",
+			expected: "very-long-prefix-that-exceeds-sh",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			key := LinodeVolumeKey{VolumeID: 1, Label: tc.label}
 			result := key.GetNormalizedLabelWithPrefix(tc.prefix)
-			if result != tc.expectedOutput {
-				t.Errorf("Expected '%s', got '%s'", tc.expectedOutput, result)
+			if result != tc.expected {
+				t.Errorf("Expected '%s', got '%s'", tc.expected, result)
 			}
 		})
 	}
@@ -278,21 +305,31 @@ func TestGetNormalizedLabelWithPrefix(t *testing.T) {
 
 func TestGetVolumeKey(t *testing.T) {
 	testCases := []struct {
-		name           string
-		volumeID       int
-		label          string
-		expectedOutput string
+		name     string
+		volumeID int
+		label    string
+		expected string
 	}{
-		{"Short label", 123, "short-label", "123-short-label"},
-		{"Long label", 456, "this-label-is-definitely-longer-than-32-characters", "456-this-label-is-definitely-longer-"},
+		{
+			name:     "Short label",
+			volumeID: 123,
+			label:    "short-label",
+			expected: "123-short-label",
+		},
+		{
+			name:     "Long label",
+			volumeID: 456,
+			label:    "this-label-is-definitely-longer-than-32-characters",
+			expected: "456-this-label-is-definitely-longer-",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			key := LinodeVolumeKey{VolumeID: tc.volumeID, Label: tc.label}
 			result := key.GetVolumeKey()
-			if result != tc.expectedOutput {
-				t.Errorf("Expected '%s', got '%s'", tc.expectedOutput, result)
+			if result != tc.expected {
+				t.Errorf("Expected '%s', got '%s'", tc.expected, result)
 			}
 		})
 	}
