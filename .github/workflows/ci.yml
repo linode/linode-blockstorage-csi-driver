@@ -46,7 +46,6 @@ jobs:
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
       WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '1' }}
-      E2E_SELECTOR: ${{ github.ref == 'refs/heads/main' && 'all' || 'quick' }}
     steps:
       - name: Install cryptsetup
         run: |

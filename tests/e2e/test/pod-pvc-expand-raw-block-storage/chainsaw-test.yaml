@@ -5,8 +5,9 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-expand-raw-block-storage
   labels:
-    all: 
-    quick: 
+    all:
+    rawblock:
+    expandvol:
 spec:
   bindings:
     - name: nodes

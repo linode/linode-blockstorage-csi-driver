@@ -5,8 +5,8 @@ metadata:
   creationTimestamp: null
   name: statefulset-pvc
   labels:
-    all: 
-    quick: 
+    all:
+    statefulset:
 spec:
   bindings:
     - name: nodes

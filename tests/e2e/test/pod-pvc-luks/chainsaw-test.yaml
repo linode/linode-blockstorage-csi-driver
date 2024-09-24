@@ -5,8 +5,8 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-luks
   labels:
-    all: 
-    quick: 
+    all:
+    luksbasic:
 spec:
   bindings:
     - name: lukskey

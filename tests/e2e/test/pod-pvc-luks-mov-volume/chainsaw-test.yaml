@@ -12,8 +12,7 @@ metadata:
   name: pod-pvc-luks-mov-volume
   labels:
     all:
-    quick:
-    volumemove:
+    luksmove:
 spec:
   bindings:
     - name: lukskey
