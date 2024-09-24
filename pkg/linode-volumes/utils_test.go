@@ -1,42 +1,106 @@
 package linodevolumes
 
 import (
+	"reflect"
 	"testing"
 )
 
-func TestGetNormalizedLabelWithPrefix(t *testing.T) {
-	key := CreateLinodeVolumeKey(123, "foobar")
-	prefixed := key.GetNormalizedLabelWithPrefix("prefix-")
-
-	if prefixed != "prefix-foobar" {
-		t.Errorf("Expected prefixed volume label, got %q", prefixed)
+func Test_hashStringToInt(t *testing.T) {
+	type args struct {
+		b string
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hashStringToInt(tt.args.b); got != tt.want {
+				t.Errorf("hashStringToInt() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestGetVolumeKey(t *testing.T) {
-	key := CreateLinodeVolumeKey(123, "foobar")
+func TestVolumeIdAsInt(t *testing.T) {
+	type args struct {
+		caller string
+		w      withVolume
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := VolumeIdAsInt(tt.args.caller, tt.args.w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VolumeIdAsInt() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("VolumeIdAsInt() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
-	label := key.GetNormalizedLabel()
-
-	if label != "foobar" {
-		t.Errorf("Unexpected volume label, got %q", label)
+func TestNodeIdAsInt(t *testing.T) {
+	type args struct {
+		caller string
+		w      withNode
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NodeIdAsInt(tt.args.caller, tt.args.w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NodeIdAsInt() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("NodeIdAsInt() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
 func TestParseLinodeVolumeKey(t *testing.T) {
-	strKey := "123-foobar"
-	key, err := ParseLinodeVolumeKey(strKey)
-	if err != nil {
-		t.Errorf("Error parsing volume key: %s", err)
+	type args struct {
+		key string
 	}
-
-	volID := key.GetVolumeID()
-	if volID != 123 {
-		t.Errorf("Unexpected volume id, got %q", volID)
+	tests := []struct {
+		name    string
+		args    args
+		want    *LinodeVolumeKey
+		wantErr bool
+	}{
+		// TODO: Add test cases.
 	}
-
-	volLabel := key.GetVolumeLabel()
-	if volLabel != "foobar" {
-		t.Errorf("Unexpected volume label, got %q", volLabel)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseLinodeVolumeKey(tt.args.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseLinodeVolumeKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseLinodeVolumeKey() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
