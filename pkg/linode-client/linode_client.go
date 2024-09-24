@@ -67,10 +67,14 @@ func getAPIURLComponents(apiURL string) (host, version string, err error) {
 	version = ""
 	host = fmt.Sprintf("%s://%s", urlObj.Scheme, urlObj.Host)
 
-	if strings.ReplaceAll(urlObj.Path, "/", "") == "" {
-		pathSegments := strings.Split(urlObj.Path, "/")
-		// The API version will be the last path value
-		version = pathSegments[len(pathSegments)-1]
+	// Check if the URL path is not empty
+	if strings.TrimPrefix(urlObj.Path, "/") != "" {
+		// Split the path into segments
+		pathSegments := strings.Split(strings.TrimPrefix(urlObj.Path, "/"), "/")
+		// If there are any segments, the first one is the API version
+		if len(pathSegments) > 0 {
+			version = pathSegments[0]
+		}
 	}
 
 	return host, version, nil
