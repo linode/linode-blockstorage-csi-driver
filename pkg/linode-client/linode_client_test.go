@@ -21,31 +21,31 @@ func TestNewLinodeClient(t *testing.T) {
 		{
 			name: "Valid input without custom API URL",
 			args: args{
-				token: "test-token",
-				ua:    "test-user-agent",
+				token:  "test-token",
+				ua:     "test-user-agent",
 				apiURL: "",
 			},
-			want: &linodego.Client{},
+			want:    &linodego.Client{},
 			wantErr: false,
 		},
 		{
 			name: "Valid input with custom API URL",
 			args: args{
-				token: "test-token",
-				ua:    "test-user-agent",
+				token:  "test-token",
+				ua:     "test-user-agent",
 				apiURL: "https://api.linode.com/v4",
 			},
-			want: &linodego.Client{},
+			want:    &linodego.Client{},
 			wantErr: false,
 		},
 		{
 			name: "Invalid API URL",
 			args: args{
-				token: "test-token",
-				ua:    "test-user-agent",
+				token:  "test-token",
+				ua:     "test-user-agent",
 				apiURL: "://invalid-url",
 			},
-			want: nil,
+			want:    nil,
 			wantErr: true,
 		},
 	}
