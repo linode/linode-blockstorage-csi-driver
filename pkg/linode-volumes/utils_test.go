@@ -206,3 +206,94 @@ type mockWithNode struct {
 func (m *mockWithNode) GetNodeId() string {
 	return m.nodeID
 }
+
+func TestCreateLinodeVolumeKey(t *testing.T) {
+	key := CreateLinodeVolumeKey(123, "test-volume")
+	if key.VolumeID != 123 {
+		t.Errorf("Expected VolumeID 123, got %d", key.VolumeID)
+	}
+	if key.Label != "test-volume" {
+		t.Errorf("Expected Label 'test-volume', got '%s'", key.Label)
+	}
+}
+
+func TestGetVolumeID(t *testing.T) {
+	key := LinodeVolumeKey{VolumeID: 456, Label: "sample-volume"}
+	if key.GetVolumeID() != 456 {
+		t.Errorf("Expected VolumeID 456, got %d", key.GetVolumeID())
+	}
+}
+
+func TestGetVolumeLabel(t *testing.T) {
+	key := LinodeVolumeKey{VolumeID: 789, Label: "another-volume"}
+	if key.GetVolumeLabel() != "another-volume" {
+		t.Errorf("Expected Label 'another-volume', got '%s'", key.GetVolumeLabel())
+	}
+}
+
+func TestGetNormalizedLabel(t *testing.T) {
+	testCases := []struct {
+		name           string
+		label          string
+		expectedOutput string
+	}{
+		{"Short label", "short-label", "short-label"},
+		{"Exact length label", "exactly-32-characters-long-label", "exactly-32-characters-long-label"},
+		{"Long label", "this-label-is-definitely-longer-than-32-characters", "this-label-is-definitely-longer-"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := LinodeVolumeKey{VolumeID: 1, Label: tc.label}
+			result := key.GetNormalizedLabel()
+			if result != tc.expectedOutput {
+				t.Errorf("Expected '%s', got '%s'", tc.expectedOutput, result)
+			}
+		})
+	}
+}
+
+func TestGetNormalizedLabelWithPrefix(t *testing.T) {
+	testCases := []struct {
+		name           string
+		label          string
+		prefix         string
+		expectedOutput string
+	}{
+		{"Short label with prefix", "short-label", "prefix-", "prefix-short-label"},
+		{"Long label with short prefix", "this-label-is-definitely-longer-than-32-characters", "px-", "px-this-label-is-definitely-long"},
+		{"Short label with long prefix", "short", "very-long-prefix-that-exceeds-", "very-long-prefix-that-exceeds-sh"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := LinodeVolumeKey{VolumeID: 1, Label: tc.label}
+			result := key.GetNormalizedLabelWithPrefix(tc.prefix)
+			if result != tc.expectedOutput {
+				t.Errorf("Expected '%s', got '%s'", tc.expectedOutput, result)
+			}
+		})
+	}
+}
+
+func TestGetVolumeKey(t *testing.T) {
+	testCases := []struct {
+		name           string
+		volumeID       int
+		label          string
+		expectedOutput string
+	}{
+		{"Short label", 123, "short-label", "123-short-label"},
+		{"Long label", 456, "this-label-is-definitely-longer-than-32-characters", "456-this-label-is-definitely-longer-"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := LinodeVolumeKey{VolumeID: tc.volumeID, Label: tc.label}
+			result := key.GetVolumeKey()
+			if result != tc.expectedOutput {
+				t.Errorf("Expected '%s', got '%s'", tc.expectedOutput, result)
+			}
+		})
+	}
+}
