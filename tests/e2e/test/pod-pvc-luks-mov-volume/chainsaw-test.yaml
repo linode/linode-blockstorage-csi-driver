@@ -12,6 +12,7 @@ metadata:
   name: pod-pvc-luks-mov-volume
   labels:
     all:
+    quick:
     volumemove:
 spec:
   bindings:
@@ -122,9 +123,9 @@ spec:
                       nodeAffinity:
                         requiredDuringSchedulingIgnoredDuringExecution:
                           nodeSelectorTerms:
-                          - matchExpressions:
-                            - key: node-role.kubernetes.io/control-plane
-                              operator: DoesNotExist
+                            - matchExpressions:
+                                - key: node-role.kubernetes.io/control-plane
+                                  operator: DoesNotExist
     - name: Rollout restart the statefulset
       try:
         - script:
@@ -197,13 +198,13 @@ spec:
                       nodeAffinity:
                         requiredDuringSchedulingIgnoredDuringExecution:
                           nodeSelectorTerms:
-                          - matchExpressions:
-                            - key: node-role.kubernetes.io/control-plane
-                              operator: Exists
+                            - matchExpressions:
+                                - key: node-role.kubernetes.io/control-plane
+                                  operator: Exists
                     tolerations:
-                    - key: "node-role.kubernetes.io/control-plane"
-                      operator: "Exists"
-                      effect: "NoSchedule"
+                      - key: "node-role.kubernetes.io/control-plane"
+                        operator: "Exists"
+                        effect: "NoSchedule"
     - name: Rollout restart the statefulset
       try:
         - script:
