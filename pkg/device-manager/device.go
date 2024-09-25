@@ -12,15 +12,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mountmanager
+package devicemanager
 
 import (
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/apimachinery/pkg/util/sets"
 	klog "k8s.io/klog/v2"
 )
@@ -47,13 +47,13 @@ type DeviceUtils interface {
 }
 
 type deviceUtils struct {
-	exec Executor
-	fs FileSystem
+	exec mountmanager.Executor
+	fs   filesystem.FileSystem
 }
 
 var _ DeviceUtils = &deviceUtils{}
 
-func NewDeviceUtils(fs FileSystem, exec Executor) *deviceUtils {
+func NewDeviceUtils(fs filesystem.FileSystem, exec mountmanager.Executor) *deviceUtils {
 	return &deviceUtils{fs: fs, exec: exec}
 }
 
@@ -88,7 +88,7 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 	}
 
 	for _, devicePath := range devicePaths {
-		if pathExists, err := pathExists(devicePath); err != nil {
+		if pathExists, err := pathExists(devicePath, m.fs); err != nil {
 			return "", fmt.Errorf("error checking if path exists: %w", err)
 		} else if pathExists {
 			return devicePath, nil
@@ -104,7 +104,7 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 // issue has been resolved, this may be removed.
 
 // s1 := Set[string]{} s2 := New[string]()
-func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string], fs FileSystem, exec Executor) error {
+func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string], fs filesystem.FileSystem, exec mountmanager.Executor) error {
 	sdAfter, err := fs.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("error filepath.Glob(\"%s\"): %w", diskSDPattern, err)
@@ -112,7 +112,7 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string], fs FileSystem, exec 
 
 	for _, sd := range sdAfter {
 		if !sdBeforeSet.Has(sd) {
-			return udevadmChangeToDrive(sd, exec)
+			return udevadmChangeToDrive(sd, fs, exec)
 		}
 	}
 
@@ -122,11 +122,11 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string], fs FileSystem, exec 
 // Calls "udevadm trigger --action=change" on the specified drive.
 // drivePath must be the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToDrive(drivePath string, exec Executor) error {
+func udevadmChangeToDrive(drivePath string, fs filesystem.FileSystem, exec mountmanager.Executor) error {
 	klog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)
 
 	// Evaluate symlink, if any
-	drive, err := filepath.EvalSymlinks(drivePath)
+	drive, err := fs.EvalSymlinks(drivePath)
 	if err != nil {
 		return fmt.Errorf("eval symlinks %q: %w", drivePath, err)
 	}
@@ -150,12 +150,12 @@ func udevadmChangeToDrive(drivePath string, exec Executor) error {
 }
 
 // PathExists returns true if the specified path exists.
-func pathExists(devicePath string) (bool, error) {
-	_, err := os.Stat(devicePath)
+func pathExists(devicePath string, fs filesystem.FileSystem) (bool, error) {
+	_, err := fs.Stat(devicePath)
 	if err == nil {
 		return true, nil
 	}
-	if os.IsNotExist(err) {
+	if fs.IsNotExist(err) {
 		return false, nil
 	}
 	return false, err

@@ -27,6 +27,8 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
+	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -123,8 +125,8 @@ func handle(ctx context.Context) error {
 	}
 
 	mounter := mountmanager.NewSafeMounter()
-	fileSystem := mountmanager.NewFileSystem()
-	deviceUtils := mountmanager.NewDeviceUtils(fileSystem, mounter.Exec)
+	fileSystem := filesystem.NewFileSystem()
+	deviceUtils := devicemanager.NewDeviceUtils(fileSystem, mounter.Exec)
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 

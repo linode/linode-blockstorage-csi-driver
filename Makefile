@@ -128,11 +128,11 @@ cleanup-cluster:
 
 .PHONY: generate-mock
 generate-mock:
-	mockgen -source=pkg/mount-manager/safe-mounter.go -destination=mocks/mock_safe-mounter.go -package=mocks
-	mockgen -source=pkg/mount-manager/device-utils.go -destination=mocks/mock_deviceutils.go -package=mocks
-	mockgen -source=pkg/mount-manager/fs-utils.go -destination=mocks/mock_fsutils.go -package=mocks
-	mockgen -source=pkg/linode-client/linode-client.go -destination=mocks/mock_linodeclient.go -package=mocks
-	mockgen -source=pkg/cryptsetup-client/cryptsetup-client.go -destination=mocks/mock_cryptsetupclient.go -package=mocks
+	mockgen -source=pkg/mount-manager/safe_mounter.go -destination=mocks/mock_safe-mounter.go -package=mocks
+	mockgen -source=pkg/device-manager/device.go -destination=mocks/mock_device.go -package=mocks
+	mockgen -source=pkg/filesystem/filesystem.go -destination=mocks/mock_filesystem.go -package=mocks
+	mockgen -source=pkg/linode-client/linode_client.go -destination=mocks/mock_linodeclient.go -package=mocks
+	mockgen -source=pkg/cryptsetup-client/cryptsetup_client.go -destination=mocks/mock_cryptsetupclient.go -package=mocks
 
 .PHONY: test
 test:

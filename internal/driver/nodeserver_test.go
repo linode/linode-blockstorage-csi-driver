@@ -9,15 +9,16 @@ import (
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 
+	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 func TestNewNodeServer(t *testing.T) {
 	type args struct {
 		linodeDriver *LinodeDriver
 		mounter      *mount.SafeFormatAndMount
-		deviceUtils  mountmanager.DeviceUtils
+		deviceUtils  devicemanager.DeviceUtils
 		client       linodeclient.LinodeClient
 		metadata     Metadata
 		encrypt      Encryption
@@ -33,7 +34,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: &LinodeDriver{},
 				mounter:      &mount.SafeFormatAndMount{},
-				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
+				deviceUtils:  devicemanager.NewDeviceUtils(filesystem.NewFileSystem(), exec.New()),
 				client:       &linodego.Client{},
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
@@ -41,7 +42,7 @@ func TestNewNodeServer(t *testing.T) {
 			want: &NodeServer{
 				driver:      &LinodeDriver{},
 				mounter:     &mount.SafeFormatAndMount{},
-				deviceutils: mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
+				deviceutils: devicemanager.NewDeviceUtils(filesystem.NewFileSystem(), exec.New()),
 				client:      &linodego.Client{},
 				metadata:    Metadata{},
 				encrypt:     Encryption{},
@@ -53,7 +54,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: nil,
 				mounter:      &mount.SafeFormatAndMount{},
-				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
+				deviceUtils:  devicemanager.NewDeviceUtils(filesystem.NewFileSystem(), exec.New()),
 				client:       &linodego.Client{},
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
@@ -66,7 +67,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: &LinodeDriver{},
 				mounter:      nil,
-				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
+				deviceUtils:  devicemanager.NewDeviceUtils(filesystem.NewFileSystem(), exec.New()),
 				client:       &linodego.Client{},
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
@@ -92,7 +93,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: &LinodeDriver{},
 				mounter:      &mount.SafeFormatAndMount{},
-				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
+				deviceUtils:  devicemanager.NewDeviceUtils(filesystem.NewFileSystem(), exec.New()),
 				client:       nil,
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
