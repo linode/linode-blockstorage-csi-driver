@@ -12,6 +12,14 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
+##### **Key points to know in-order to understand the graphs**:
+
+- The y-axis is scaled by 1000. To get the correct number, multiply the decimal by 1000.
+- The example graphs are plotted over a period of 48 hours, due to which the x-axis contains date and time.
+- The spikes you see happened during e2e tests.
+
+---
+
 #### **Controller Create Volume**
 
 - **Create Volume Requests**  
@@ -143,3 +151,15 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 - **Graph**:  
 ![Sidecar Operations Seconds Sum](example-images/sidecar-operations-time-sum.jpg)
 - **Explanation**: This graph tracks the total time consumed by all CSI operations, helping identify potential bottlenecks.
+
+---
+
+### 5. **Missing Metrics/ Future Scope**
+
+#### **Volume Utilization Metrics**:
+- **Volume Size**: Track the size of volumes currently in use to better understand resource consumption.
+- **Potential Implementation**: Metrics could be added to track how much space is being utilized by each volume, ensuring optimal usage and highlighting volumes nearing full capacity.
+
+#### **Node Metrics**:
+- **Node Attachments**: Track the number of volumes attached to each node.
+- **Potential Implementation**: Monitoring node attachments can help track load balancing across nodes.
