@@ -19,6 +19,18 @@ import (
 	"k8s.io/utils/exec"
 )
 
+type Mounter interface {
+	mount.Interface
+}
+
+type Executor interface {
+	exec.Interface
+}
+
+type Command interface {
+	exec.Cmd
+}
+
 func NewSafeMounter() *mount.SafeFormatAndMount {
 	realMounter := mount.New("")
 	realExec := exec.New()

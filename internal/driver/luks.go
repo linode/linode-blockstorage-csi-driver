@@ -86,7 +86,7 @@ func (ctx *LuksContext) validate() error {
 }
 
 type Encryption struct {
-	Exec       Executor
+	Exec       mountmanager.Executor
 	FileSystem mountmanager.FileSystem
 	CryptSetup cryptsetupclient.CryptSetupClient
 }

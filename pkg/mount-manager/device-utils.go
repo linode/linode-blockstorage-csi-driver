@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	klog "k8s.io/klog/v2"
-	"k8s.io/utils/exec"
 )
 
 const (
@@ -47,12 +46,15 @@ type DeviceUtils interface {
 	VerifyDevicePath(devicePaths []string) (string, error)
 }
 
-type deviceUtils struct{}
+type deviceUtils struct {
+	exec Executor
+	fs FileSystem
+}
 
 var _ DeviceUtils = &deviceUtils{}
 
-func NewDeviceUtils() *deviceUtils {
-	return &deviceUtils{}
+func NewDeviceUtils(fs FileSystem, exec Executor) *deviceUtils {
+	return &deviceUtils{fs: fs, exec: exec}
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
@@ -73,14 +75,14 @@ func (m *deviceUtils) GetDiskByIdPaths(deviceName, partition string) []string {
 
 // Returns the first path that exists, or empty string if none exist.
 func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
-	sdBefore, err := filepath.Glob(diskSDPattern)
+	sdBefore, err := m.fs.Glob(diskSDPattern)
 	if err != nil {
 		// Seeing this error means that the diskSDPattern is malformed.
 		klog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
 	}
 	sdBeforeSet := sets.New[string](sdBefore...)
 	// TODO(#69): Verify udevadm works as intended in driver
-	if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
+	if err := udevadmChangeToNewDrives(sdBeforeSet, m.fs, m.exec); err != nil {
 		// udevadm errors should not block disk detachment, log and continue
 		klog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
 	}
@@ -102,15 +104,15 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 // issue has been resolved, this may be removed.
 
 // s1 := Set[string]{} s2 := New[string]()
-func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string]) error {
-	sdAfter, err := filepath.Glob(diskSDPattern)
+func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string], fs FileSystem, exec Executor) error {
+	sdAfter, err := fs.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("error filepath.Glob(\"%s\"): %w", diskSDPattern, err)
 	}
 
 	for _, sd := range sdAfter {
 		if !sdBeforeSet.Has(sd) {
-			return udevadmChangeToDrive(sd)
+			return udevadmChangeToDrive(sd, exec)
 		}
 	}
 
@@ -120,7 +122,7 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string]) error {
 // Calls "udevadm trigger --action=change" on the specified drive.
 // drivePath must be the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToDrive(drivePath string) error {
+func udevadmChangeToDrive(drivePath string, exec Executor) error {
 	klog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)
 
 	// Evaluate symlink, if any
@@ -136,7 +138,7 @@ func udevadmChangeToDrive(drivePath string) error {
 	}
 
 	// Call "udevadm trigger --action=change --property-match=DEVNAME=/dev/sd..."
-	_, err = exec.New().Command(
+	_, err = exec.Command(
 		"udevadm",
 		"trigger",
 		"--action=change",

@@ -123,8 +123,8 @@ func handle(ctx context.Context) error {
 	}
 
 	mounter := mountmanager.NewSafeMounter()
-	deviceUtils := mountmanager.NewDeviceUtils()
 	fileSystem := mountmanager.NewFileSystem()
+	deviceUtils := mountmanager.NewDeviceUtils(fileSystem, mounter.Exec)
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/linode/linodego"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -32,7 +33,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: &LinodeDriver{},
 				mounter:      &mount.SafeFormatAndMount{},
-				deviceUtils:  mountmanager.NewDeviceUtils(),
+				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
 				client:       &linodego.Client{},
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
@@ -40,7 +41,7 @@ func TestNewNodeServer(t *testing.T) {
 			want: &NodeServer{
 				driver:      &LinodeDriver{},
 				mounter:     &mount.SafeFormatAndMount{},
-				deviceutils: mountmanager.NewDeviceUtils(),
+				deviceutils: mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
 				client:      &linodego.Client{},
 				metadata:    Metadata{},
 				encrypt:     Encryption{},
@@ -52,7 +53,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: nil,
 				mounter:      &mount.SafeFormatAndMount{},
-				deviceUtils:  mountmanager.NewDeviceUtils(),
+				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
 				client:       &linodego.Client{},
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
@@ -65,7 +66,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: &LinodeDriver{},
 				mounter:      nil,
-				deviceUtils:  mountmanager.NewDeviceUtils(),
+				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
 				client:       &linodego.Client{},
 				metadata:     Metadata{},
 				encrypt:      Encryption{},
@@ -91,7 +92,7 @@ func TestNewNodeServer(t *testing.T) {
 			args: args{
 				linodeDriver: &LinodeDriver{},
 				mounter:      &mount.SafeFormatAndMount{},
-				deviceUtils:  mountmanager.NewDeviceUtils(),
+				deviceUtils:  mountmanager.NewDeviceUtils(mountmanager.NewFileSystem(), exec.New()),
 				client:       nil,
 				metadata:     Metadata{},
 				encrypt:      Encryption{},

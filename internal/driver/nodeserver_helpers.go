@@ -23,8 +23,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -36,19 +34,6 @@ const (
 	rwPermission                   = os.FileMode(0o755)
 	ownerGroupReadWritePermissions = os.FileMode(0o660)
 )
-
-// TODO: Figure out a better home for these interfaces
-type Mounter interface {
-	mount.Interface
-}
-
-type Executor interface {
-	utilexec.Interface
-}
-
-type Command interface {
-	utilexec.Cmd
-}
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
 // It validates the volume ID, staging target path, and volume capability.

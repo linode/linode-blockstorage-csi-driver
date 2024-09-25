@@ -78,6 +78,36 @@ func (m *MockFileSystem) EXPECT() *MockFileSystemMockRecorder {
 	return m.recorder
 }
 
+// EvalSymlinks mocks base method.
+func (m *MockFileSystem) EvalSymlinks(path string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EvalSymlinks", path)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EvalSymlinks indicates an expected call of EvalSymlinks.
+func (mr *MockFileSystemMockRecorder) EvalSymlinks(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EvalSymlinks", reflect.TypeOf((*MockFileSystem)(nil).EvalSymlinks), path)
+}
+
+// Glob mocks base method.
+func (m *MockFileSystem) Glob(pattern string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Glob", pattern)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Glob indicates an expected call of Glob.
+func (mr *MockFileSystemMockRecorder) Glob(pattern any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Glob", reflect.TypeOf((*MockFileSystem)(nil).Glob), pattern)
+}
+
 // IsNotExist mocks base method.
 func (m *MockFileSystem) IsNotExist(err error) bool {
 	m.ctrl.T.Helper()
