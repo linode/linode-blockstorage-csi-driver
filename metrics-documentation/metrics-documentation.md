@@ -163,5 +163,6 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 - **Potential Implementation**: Metrics could be added to track how much space is being utilized by each volume, ensuring optimal usage and highlighting volumes nearing full capacity.
 
 #### **Node Metrics**:
-- **Node Attachments**: Track the number of volumes attached to each node.
-- **Potential Implementation**: Monitoring node attachments can help track load balancing across nodes.
+- **Node Attachments**: Track the total number of volumes attached to each node.
+- **Node Publish/Unpublish**: Track how often volumes are published (attached) and unpublished (detached) from nodes, giving better visibility into volume mounting and unmounting operations.
+- **Node Stage/Unstage**: Monitor staging and unstaging operations to identify any potential delays or issues when preparing a volume for use on a node.
