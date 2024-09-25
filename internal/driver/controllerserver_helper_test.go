@@ -336,7 +336,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 					RequiredBytes: 15 << 30, // 15 GiB
 				},
 			},
-			expectedName:   "csi-linode-pv-testvolume",
+			expectedName:   "csi-linode-pv-test-volume",
 			expectedSizeGB: 15,
 			expectedSize:   15 << 30,
 			expectedError:  nil,
@@ -349,7 +349,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 					LimitBytes: 20 << 30, // 20 GiB
 				},
 			},
-			expectedName:   "csi-linode-pv-testvolumelimit",
+			expectedName:   "csi-linode-pv-test-volume-limit",
 			expectedSizeGB: 20,
 			expectedSize:   20 << 30,
 			expectedError:  nil,
@@ -362,7 +362,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 					RequiredBytes: 5 << 30, // 5 GiB
 				},
 			},
-			expectedName:   "csi-linode-pv-smallvolume",
+			expectedName:   "csi-linode-pv-small-volume",
 			expectedSizeGB: 10, // Minimum size
 			expectedSize:   10 << 30,
 			expectedError:  nil,
@@ -372,7 +372,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			req: &csi.CreateVolumeRequest{
 				Name: "default-volume",
 			},
-			expectedName:   "csi-linode-pv-defaultvolume",
+			expectedName:   "csi-linode-pv-default-volume",
 			expectedSizeGB: 10, // Minimum size
 			expectedSize:   10 << 30,
 			expectedError:  nil,

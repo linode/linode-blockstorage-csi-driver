@@ -5,8 +5,8 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-create-ext4-filesystem
   labels:
-    all: 
-    quick: 
+    all:
+    ext4fs:
 spec:
   bindings:
     - name: nodes
