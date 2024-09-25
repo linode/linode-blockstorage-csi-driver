@@ -15,7 +15,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 ##### **Key points to know in-order to understand the graphs**:
 
 - The y-axis is scaled by 1000. To get the correct number, multiply the decimal by 1000.
-- The graphs which show total time taken, show time taken in `seconds`.ad
+- The graphs which show total time taken, show time taken in `seconds`.
 - The example graphs are plotted over a period of 48 hours, due to which the x-axis contains date and time.
 - The spikes you see happened during e2e tests.
 
