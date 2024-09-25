@@ -156,6 +156,8 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ### 5. **Missing Metrics/ Future Scope**
 
+---
+
 #### **Volume Utilization Metrics**:
 - **Volume Size**: Track the size of volumes currently in use to better understand resource consumption.
 - **Potential Implementation**: Metrics could be added to track how much space is being utilized by each volume, ensuring optimal usage and highlighting volumes nearing full capacity.
