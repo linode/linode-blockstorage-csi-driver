@@ -5,8 +5,8 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-basic-filesystem
   labels:
-    all: 
-    quick: 
+    all:
+    basic:
 spec:
   bindings:
     - name: nodes

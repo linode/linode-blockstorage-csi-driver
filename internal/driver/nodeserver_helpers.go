@@ -366,19 +366,19 @@ func (ns *NodeServer) closeLuksMountSource(ctx context.Context, volumeID string)
 }
 
 // getMountSource extracts the PVC name from a given input string.
-// The input is expected to be in the format "number-pvcname", e.g., "8934-pvc232323".
+// The input is expected to be in the format "number-pvcname", e.g., "8934-pvc-232323".
 // It returns the PVC name (the part starting with "pvc") or an error if the input format is invalid.
 func (ns *NodeServer) getMountSource(ctx context.Context, input string) (string, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering getMountSources", "input", input)
+	log.V(4).Info("Entering getMountSource", "input", input)
 
-	// Split the input string by "-". example: '8934-pvc232323'
-	parts := strings.Split(input, "-")
+	// Split the input string by "-". example: '8934-pvc-232323'
+	parts := strings.SplitN(input, "-", 2)
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid input format: %s", input)
 	}
 
 	result := parts[1]
-	log.V(4).Info("Exiting getMountSources", "result", result)
+	log.V(4).Info("Exiting getMountSource", "result", result)
 	return result, nil
 }

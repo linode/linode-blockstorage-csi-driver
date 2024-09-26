@@ -5,8 +5,8 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-readonly
   labels:
-    all: 
-    quick: 
+    all:
+    readonlymount:
 spec:
   bindings:
     - name: nodes

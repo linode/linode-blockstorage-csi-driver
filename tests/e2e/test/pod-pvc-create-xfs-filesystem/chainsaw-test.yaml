@@ -5,8 +5,8 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-create-xfs-filesystem
   labels:
-    all: 
-    quick: 
+    all:
+    xfs:
 spec:
   bindings:
     - name: nodes

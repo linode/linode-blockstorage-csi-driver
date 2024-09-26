@@ -36,7 +36,7 @@ spec:
             mountPath: /scripts
       containers:
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v3.0.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
           imagePullPolicy: IfNotPresent
           args:
             - "--default-fstype=ext4"
@@ -51,7 +51,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v3.3.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
           imagePullPolicy: IfNotPresent
           args:
             - "--v=2"
@@ -63,7 +63,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.3.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
           imagePullPolicy: IfNotPresent
           args:
           - "--v=2"
@@ -74,7 +74,7 @@ spec:
           volumeMounts:
           - name: socket-dir
             mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: linode-csi-plugin
+        - name: csi-linode-plugin
           image: linode/linode-blockstorage-csi-driver:latest
           args:
             - "--v=2"

@@ -12,7 +12,7 @@ metadata:
   name: pod-pvc-luks-mov-volume
   labels:
     all:
-    volumemove:
+    luksmove:
 spec:
   bindings:
     - name: lukskey
@@ -122,9 +122,9 @@ spec:
                       nodeAffinity:
                         requiredDuringSchedulingIgnoredDuringExecution:
                           nodeSelectorTerms:
-                          - matchExpressions:
-                            - key: node-role.kubernetes.io/control-plane
-                              operator: DoesNotExist
+                            - matchExpressions:
+                                - key: node-role.kubernetes.io/control-plane
+                                  operator: DoesNotExist
     - name: Rollout restart the statefulset
       try:
         - script:
@@ -132,7 +132,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE
+              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE && \
+              kubectl rollout status statefulset/test-statefulset -n $NAMESPACE --timeout=300s
             check:
               ($error): ~
     - name: Check if Pod is ready and Volume is mounted (On worker node)
@@ -180,7 +181,6 @@ spec:
               ($error): ~
               (contains($stdout, 'TYPE="crypto_LUKS"')): true
 
-              
     # This section moves the volume back to the control plane node and verifies that the pod is ready,
     # the volume is mounted, and that the volume remains a LUKS volume after the move.
     - name: Move the volume back to control plane node
@@ -198,13 +198,13 @@ spec:
                       nodeAffinity:
                         requiredDuringSchedulingIgnoredDuringExecution:
                           nodeSelectorTerms:
-                          - matchExpressions:
-                            - key: node-role.kubernetes.io/control-plane
-                              operator: Exists
+                            - matchExpressions:
+                                - key: node-role.kubernetes.io/control-plane
+                                  operator: Exists
                     tolerations:
-                    - key: "node-role.kubernetes.io/control-plane"
-                      operator: "Exists"
-                      effect: "NoSchedule"
+                      - key: "node-role.kubernetes.io/control-plane"
+                        operator: "Exists"
+                        effect: "NoSchedule"
     - name: Rollout restart the statefulset
       try:
         - script:
@@ -212,7 +212,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE
+              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE && \
+              kubectl rollout status statefulset/test-statefulset -n $NAMESPACE --timeout=300s
             check:
               ($error): ~
     - name: Check if Pod is ready and Volume is mounted (after moving back to control plane node)

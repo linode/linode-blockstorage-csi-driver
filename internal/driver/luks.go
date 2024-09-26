@@ -194,7 +194,8 @@ func (e *Encryption) luksOpen(ctx context.Context, luksCtx *LuksContext, source 
 	// Activate the device using the encryption key
 	log.V(4).Info("Activating luks device using volumekey", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
 	if err := newLuksDevice.Device.ActivateByPassphrase(luksCtx.VolumeName, 0, luksCtx.EncryptionKey, 0); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+		var apiErr *cryptsetup.Error
+		if errors.As(err, &apiErr) && apiErr.Code() == -17 {
 			return "/dev/mapper/" + luksCtx.VolumeName, nil
 		}
 		return "", fmt.Errorf("activating %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
