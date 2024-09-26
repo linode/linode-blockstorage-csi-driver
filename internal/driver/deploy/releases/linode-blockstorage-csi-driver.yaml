@@ -464,7 +464,7 @@ spec:
               name: linode
         image: linode/linode-blockstorage-csi-driver:latest
         imagePullPolicy: Always
-        name: csi-linode-plugin
+        name: linode-csi-plugin
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:
