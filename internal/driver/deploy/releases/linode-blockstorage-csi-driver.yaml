@@ -365,7 +365,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:version-upgrade
+        image: linode/linode-blockstorage-csi-driver:latest
         name: linode-csi-plugin
         volumeMounts:
         - mountPath: /linode-info
@@ -462,7 +462,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:version-upgrade
+        image: linode/linode-blockstorage-csi-driver:latest
         imagePullPolicy: Always
         name: csi-linode-plugin
         securityContext:
