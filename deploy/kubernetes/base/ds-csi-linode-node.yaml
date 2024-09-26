@@ -54,7 +54,7 @@ spec:
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration
-        - name: csi-linode-plugin
+        - name: linode-csi-plugin
           image: linode/linode-blockstorage-csi-driver:latest
           args :
             - "--v=2"
