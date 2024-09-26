@@ -1,0 +1,7 @@
+# Any file that is not a doc *.md file
+src:
+  - "!**/**.md"
+sanity:
+  - "**/**.go"
+  - "go.mod"
+  - "go.sum"
