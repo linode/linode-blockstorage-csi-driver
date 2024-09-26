@@ -54,7 +54,7 @@ spec:
               key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
-        name: linode-csi-plugin
+        name: csi-linode-plugin
         securityContext:
           allowPrivilegeEscalation: true
           capabilities:

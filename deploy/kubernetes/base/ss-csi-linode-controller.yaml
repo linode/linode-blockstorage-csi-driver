@@ -74,7 +74,7 @@ spec:
           volumeMounts:
           - name: socket-dir
             mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: linode-csi-plugin
+        - name: csi-linode-plugin
           image: linode/linode-blockstorage-csi-driver:latest
           args:
             - "--v=2"
