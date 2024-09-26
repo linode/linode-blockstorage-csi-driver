@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	mocks "github.com/linode/linode-blockstorage-csi-driver/mocks"
 	"go.uber.org/mock/gomock"
+
+	mocks "github.com/linode/linode-blockstorage-csi-driver/mocks"
 )
 
 func Test_deviceUtils_GetDiskByIdPaths(t *testing.T) {
@@ -196,8 +197,6 @@ func Test_deviceUtils_VerifyDevicePath(t *testing.T) {
 }
 
 func Test_udevadmChangeToDrive(t *testing.T) {
-	type args struct {
-	}
 	tests := []struct {
 		name      string
 		drivePath string

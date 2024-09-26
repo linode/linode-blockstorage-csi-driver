@@ -19,10 +19,11 @@ import (
 	"path"
 	"strings"
 
-	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"k8s.io/apimachinery/pkg/util/sets"
 	klog "k8s.io/klog/v2"
+
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 const (
