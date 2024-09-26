@@ -51,7 +51,7 @@ type configuration struct {
 
 	// Name of the current node, when running as the node plugin.
 	//
-	// deprecated: This is not needed as the CSI driver now uses the Linode
+	// Deprecated: This is not needed as the CSI driver now uses the Linode
 	// Metadata Service to source information about the current
 	// node/instance. It will be removed in a future change.
 	nodeName string
@@ -69,22 +69,18 @@ func loadConfig() configuration {
 }
 
 func main() {
-	klog.InitFlags(nil)
-	_ = flag.Set("logtostderr", "true")
-	flag.Parse()
-
 	// Create a base context with the logger
 	ctx := context.Background()
 	log := logger.NewLogger(ctx)
 	ctx = context.WithValue(ctx, logger.LoggerKey{}, log)
-	undoMaxprocs, maxprocsError := maxprocs.Set(maxprocs.Logger(func(msg string, keysAndValues ...interface{}) {
-		log.Klogr.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
-	}))
-	defer undoMaxprocs()
 
-	if maxprocsError != nil {
-		log.Error(maxprocsError, "Failed to set GOMAXPROCS")
+	klog.InitFlags(nil)
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		log.Error(err, "Fatal error")
+		os.Exit(0)
 	}
+	flag.Parse()
+	maxProcs(log)
 
 	if err := handle(ctx); err != nil {
 		log.Error(err, "Fatal error")
@@ -92,6 +88,16 @@ func main() {
 	}
 
 	os.Exit(0)
+}
+
+func maxProcs(log *logger.Logger) {
+	undoMaxprocs, maxprocsError := maxprocs.Set(maxprocs.Logger(func(msg string, keysAndValues ...interface{}) {
+		log.Klogr.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
+	}))
+	defer undoMaxprocs()
+	if maxprocsError != nil {
+		log.Error(maxprocsError, "Failed to set GOMAXPROCS")
+	}
 }
 
 func handle(ctx context.Context) error {
@@ -113,7 +119,7 @@ func handle(ctx context.Context) error {
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
 	cloudProvider, err := linodeclient.NewLinodeClient(cfg.linodeToken, uaPrefix, cfg.linodeURL)
 	if err != nil {
-		return fmt.Errorf("failed to set up linode client: %s", err)
+		return fmt.Errorf("failed to set up linode client: %w", err)
 	}
 
 	mounter := mountmanager.NewSafeMounter()
@@ -141,7 +147,7 @@ func handle(ctx context.Context) error {
 		cfg.volumeLabelPrefix,
 		encrypt,
 	); err != nil {
-		return fmt.Errorf("setup driver: %v", err)
+		return fmt.Errorf("setup driver: %w", err)
 	}
 
 	linodeDriver.Run(ctx, cfg.csiEndpoint)

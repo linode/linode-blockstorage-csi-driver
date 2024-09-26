@@ -56,15 +56,15 @@ func NewDeviceUtils() *deviceUtils {
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
-func (m *deviceUtils) GetDiskByIdPaths(deviceName string, partition string) []string {
+func (m *deviceUtils) GetDiskByIdPaths(deviceName, partition string) []string {
 	devicePaths := []string{
 		path.Join(diskByIdPath, diskLinodePrefix+deviceName),
 		path.Join(diskByIdPath, diskScsiLinodePrefix+deviceName),
 	}
 
 	if partition != "" {
-		for i, path := range devicePaths {
-			devicePaths[i] = path + diskPartitionSuffix + partition
+		for i, devicePath := range devicePaths {
+			devicePaths[i] = devicePath + diskPartitionSuffix + partition
 		}
 	}
 
@@ -85,11 +85,11 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 		klog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
 	}
 
-	for _, path := range devicePaths {
-		if pathExists, err := pathExists(path); err != nil {
-			return "", fmt.Errorf("error checking if path exists: %v", err)
+	for _, devicePath := range devicePaths {
+		if pathExists, err := pathExists(devicePath); err != nil {
+			return "", fmt.Errorf("error checking if path exists: %w", err)
 		} else if pathExists {
-			return path, nil
+			return devicePath, nil
 		}
 	}
 
@@ -148,13 +148,13 @@ func udevadmChangeToDrive(drivePath string) error {
 }
 
 // PathExists returns true if the specified path exists.
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
+func pathExists(devicePath string) (bool, error) {
+	_, err := os.Stat(devicePath)
 	if err == nil {
 		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
 	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

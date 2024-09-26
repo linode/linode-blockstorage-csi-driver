@@ -1,19 +1,19 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
 	"testing"
 
-	"context"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
+
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 )
 
 // compareGRPCErrors compares two gRPC errors for equality.
@@ -160,7 +160,7 @@ func Test_getFSTypeAndMountOptions(t *testing.T) {
 			name:             "Valid request - no volume capability set",
 			volumeCapability: nil,
 			wantFsType:       "ext4",
-			wantMountOptions: *new([]string),
+			wantMountOptions: []string(nil),
 		},
 		{
 			name: "Valid request - volume capability set",
@@ -243,7 +243,6 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			// Create gomock controller
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -342,7 +341,6 @@ func TestNodeServer_ensureMountPoint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 

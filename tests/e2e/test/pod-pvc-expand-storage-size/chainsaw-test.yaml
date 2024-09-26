@@ -5,8 +5,9 @@ metadata:
   creationTimestamp: null
   name: pod-pvc-expand-storage-size
   labels:
-    all: 
-    quick: 
+    all:
+    fsblock:
+    expandvol:
 spec:
   bindings:
     - name: nodes

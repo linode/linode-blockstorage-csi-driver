@@ -20,10 +20,9 @@ import (
 	"os"
 	"sync"
 
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
-
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 )
 
 // Defines Non blocking GRPC server interfaces
@@ -70,26 +69,27 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 		grpc.UnaryInterceptor(logGRPC),
 	}
 
-	u, err := url.Parse(endpoint)
+	urlObj, err := url.Parse(endpoint)
 
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
 
 	var addr string
-	if u.Scheme == "unix" {
-		addr = u.Path
-		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+	switch scheme := urlObj.Scheme; scheme {
+	case "unix":
+		addr = urlObj.Path
+		if err = os.Remove(addr); err != nil && !os.IsNotExist(err) {
 			klog.Fatalf("Failed to remove %s, error: %s", addr, err.Error())
 		}
-	} else if u.Scheme == "tcp" {
-		addr = u.Host
-	} else {
-		klog.Fatalf("%v endpoint scheme not supported", u.Scheme)
+	case "tcp":
+		addr = urlObj.Host
+	default:
+		klog.Fatalf("%v endpoint scheme not supported", urlObj.Scheme)
 	}
 
-	klog.V(4).Infof("Start listening with scheme %v, addr %v", u.Scheme, addr)
-	listener, err := net.Listen(u.Scheme, addr)
+	klog.V(4).Infof("Start listening with scheme %v, addr %v", urlObj.Scheme, addr)
+	listener, err := net.Listen(urlObj.Scheme, addr)
 	if err != nil {
 		klog.Fatalf("Failed to listen: %v", err)
 	}
@@ -112,5 +112,4 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	if err := server.Serve(listener); err != nil {
 		klog.Fatalf("Failed to serve: %v", err)
 	}
-
 }

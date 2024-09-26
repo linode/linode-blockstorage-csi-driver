@@ -41,6 +41,7 @@ func (OSFileSystem) Remove(path string) error {
 	return os.Remove(path)
 }
 
+//nolint:gosec // intentional variable to open file
 func (OSFileSystem) OpenFile(name string, flag int, perm os.FileMode) (FileInterface, error) {
 	return os.OpenFile(name, flag, perm)
 }

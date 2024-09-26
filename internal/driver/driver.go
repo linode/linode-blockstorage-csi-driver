@@ -23,13 +23,13 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
+
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 // Name is the name of the driver provided by this package.
@@ -83,7 +83,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	volumeLabelPrefix string,
 	encrypt Encryption,
 ) error {
-	log, ctx, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
+	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
 	defer done()
 
 	log.V(2).Info("Setting up LinodeDriver")
@@ -129,19 +129,19 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	return nil
 }
 
-func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.Context, c csi.ControllerServiceCapability_RPC_Type) error {
+func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.Context, rpcType csi.ControllerServiceCapability_RPC_Type) error {
 	log, _, done := logger.GetLogger(ctx).WithMethod("ValidateControllerServiceRequest")
 	defer done()
 
-	log.V(4).Info("Validating controller service request", "type", c)
+	log.V(4).Info("Validating controller service request", "type", rpcType)
 
-	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
+	if rpcType == csi.ControllerServiceCapability_RPC_UNKNOWN {
 		log.V(4).Info("Unknown controller service capability, skipping validation")
 		return nil
 	}
 
 	for _, cap := range linodeDriver.cscap {
-		if c == cap.GetRpc().Type {
+		if rpcType == cap.GetRpc().GetType() {
 			log.V(4).Info("Controller service request validated successfully")
 			return nil
 		}
@@ -155,7 +155,7 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 	defer done()
 
 	log.V(2).Info("Starting LinodeDriver", "name", linodeDriver.name)
-	if len(linodeDriver.volumeLabelPrefix) > 0 {
+	if linodeDriver.volumeLabelPrefix != "" {
 		log.V(4).Info("BS Volume Prefix", "prefix", linodeDriver.volumeLabelPrefix)
 	}
 
