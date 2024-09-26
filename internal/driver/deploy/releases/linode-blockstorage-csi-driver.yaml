@@ -317,7 +317,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-provisioner:v3.0.0
+        image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
         imagePullPolicy: IfNotPresent
         name: csi-provisioner
         volumeMounts:
@@ -329,7 +329,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-attacher:v3.3.0
+        image: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
         imagePullPolicy: IfNotPresent
         name: csi-attacher
         volumeMounts:
@@ -341,23 +341,18 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-resizer:v1.3.0
+        image: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
         imagePullPolicy: IfNotPresent
         name: csi-resizer
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
       - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --token=$(LINODE_TOKEN)
-        - --url=$(LINODE_API_URL)
-        - --node=$(NODE_NAME)
-        - --bs-prefix=$(LINODE_BS_PREFIX)
         - --v=2
         env:
         - name: CSI_ENDPOINT
           value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
-        - name: LINODE_API_URL
+        - name: LINODE_URL
           value: https://api.linode.com/v4
         - name: LINODE_BS_PREFIX
         - name: NODE_NAME
@@ -370,7 +365,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:latest
+        image: linode/linode-blockstorage-csi-driver:version-upgrade
         name: linode-csi-plugin
         volumeMounts:
         - mountPath: /linode-info
@@ -444,7 +439,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v1.3.0
+        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.12.0
         name: csi-node-driver-registrar
         volumeMounts:
         - mountPath: /csi
@@ -452,15 +447,11 @@ spec:
         - mountPath: /registration
           name: registration-dir
       - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --token=$(LINODE_TOKEN)
-        - --url=$(LINODE_API_URL)
-        - --node=$(NODE_NAME)
         - --v=2
         env:
         - name: CSI_ENDPOINT
           value: unix:///csi/csi.sock
-        - name: LINODE_API_URL
+        - name: LINODE_URL
           value: https://api.linode.com/v4
         - name: NODE_NAME
           valueFrom:
@@ -471,7 +462,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:latest
+        image: linode/linode-blockstorage-csi-driver:version-upgrade
         imagePullPolicy: Always
         name: csi-linode-plugin
         securityContext:
@@ -566,7 +557,7 @@ spec:
           type: Directory
         name: tmp
 ---
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: linodebs.csi.linode.com
