@@ -43,18 +43,19 @@
 
 ### 🛠️ Building the Project
 
-To build the project binaries:
+To build the project binaries in a container(builds are run in a docker container to allow consistent builds regardless of underlying unix/linux systems):
 
 ```sh
-make build
+make docker-build
 ```
 
 ### 🧪 Running Unit Tests
 
-To run the unit tests:
+To run the unit tests, use the Dockerfile.dev that copies the directory into the container allowing us to run make targets:
 
 ```sh
-make test
+export DOCKERFILE=Dockerfile.dev
+make docker-build && make test
 ```
 
 ### 🧪 Create a Development Cluster

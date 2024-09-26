@@ -55,12 +55,21 @@ The above command will create a test cluster, install CSI driver using the test 
 
 ### 🧪 Run E2E Tests
 
-Run the following command to run e2e tests:
+Run the following command to run all e2e tests:
 
 ```sh
 devbox run e2e-test
 ```
 This will run the chainsaw e2e tests under the `e2e/test` directory
+
+We also label our e2e tests. The labels can be found in the `chainsaw-test.yaml` file under `metadata` in each of the individual chainsaw test directories.
+This always users to select and run specific tests.
+For example:
+If you would like to only run the test that creates a luks volume and shuffles it between the CP and worker nodes, you could run
+```sh
+export E2E_SELECTOR=luksmove
+devbox run e2e-test
+```
 
 ### 🧹 Cleanup
 
