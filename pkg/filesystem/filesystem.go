@@ -1,8 +1,9 @@
-package mountmanager
+package filesystem
 
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 type FileInterface interface {
@@ -16,6 +17,8 @@ type FileSystem interface {
 	Stat(name string) (fs.FileInfo, error)
 	Remove(path string) error
 	OpenFile(name string, flag int, perm os.FileMode) (FileInterface, error)
+	Glob(pattern string) ([]string, error)
+	EvalSymlinks(path string) (string, error)
 }
 
 // OSFileSystem implements FileSystemInterface using the os package.
@@ -23,6 +26,14 @@ type OSFileSystem struct{}
 
 func NewFileSystem() FileSystem {
 	return OSFileSystem{}
+}
+
+func (OSFileSystem) Glob(pattern string) ([]string, error) {
+	return filepath.Glob(pattern)
+}
+
+func (OSFileSystem) EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
 }
 
 func (OSFileSystem) IsNotExist(err error) bool {
