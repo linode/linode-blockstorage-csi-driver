@@ -132,7 +132,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE
+              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE && \
+              kubectl rollout status statefulset/test-statefulset -n $NAMESPACE --timeout=300s
             check:
               ($error): ~
     - name: Check if Pod is ready and Volume is mounted (On worker node)
@@ -211,7 +212,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE
+              kubectl rollout restart statefulset test-statefulset -n $NAMESPACE && \
+              kubectl rollout status statefulset/test-statefulset -n $NAMESPACE --timeout=300s
             check:
               ($error): ~
     - name: Check if Pod is ready and Volume is mounted (after moving back to control plane node)

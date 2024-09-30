@@ -12,18 +12,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mountmanager
+package devicemanager
 
 import (
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	klog "k8s.io/klog/v2"
-	"k8s.io/utils/exec"
+
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 const (
@@ -47,12 +47,15 @@ type DeviceUtils interface {
 	VerifyDevicePath(devicePaths []string) (string, error)
 }
 
-type deviceUtils struct{}
+type deviceUtils struct {
+	exec mountmanager.Executor
+	fs   filesystem.FileSystem
+}
 
 var _ DeviceUtils = &deviceUtils{}
 
-func NewDeviceUtils() *deviceUtils {
-	return &deviceUtils{}
+func NewDeviceUtils(fs filesystem.FileSystem, exec mountmanager.Executor) *deviceUtils {
+	return &deviceUtils{fs: fs, exec: exec}
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
@@ -73,20 +76,20 @@ func (m *deviceUtils) GetDiskByIdPaths(deviceName, partition string) []string {
 
 // Returns the first path that exists, or empty string if none exist.
 func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
-	sdBefore, err := filepath.Glob(diskSDPattern)
+	sdBefore, err := m.fs.Glob(diskSDPattern)
 	if err != nil {
 		// Seeing this error means that the diskSDPattern is malformed.
 		klog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
 	}
 	sdBeforeSet := sets.New[string](sdBefore...)
 	// TODO(#69): Verify udevadm works as intended in driver
-	if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
+	if err := udevadmChangeToNewDrives(sdBeforeSet, m.fs, m.exec); err != nil {
 		// udevadm errors should not block disk detachment, log and continue
 		klog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
 	}
 
 	for _, devicePath := range devicePaths {
-		if pathExists, err := pathExists(devicePath); err != nil {
+		if pathExists, err := pathExists(devicePath, m.fs); err != nil {
 			return "", fmt.Errorf("error checking if path exists: %w", err)
 		} else if pathExists {
 			return devicePath, nil
@@ -102,15 +105,15 @@ func (m *deviceUtils) VerifyDevicePath(devicePaths []string) (string, error) {
 // issue has been resolved, this may be removed.
 
 // s1 := Set[string]{} s2 := New[string]()
-func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string]) error {
-	sdAfter, err := filepath.Glob(diskSDPattern)
+func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string], fs filesystem.FileSystem, exec mountmanager.Executor) error {
+	sdAfter, err := fs.Glob(diskSDPattern)
 	if err != nil {
 		return fmt.Errorf("error filepath.Glob(\"%s\"): %w", diskSDPattern, err)
 	}
 
 	for _, sd := range sdAfter {
 		if !sdBeforeSet.Has(sd) {
-			return udevadmChangeToDrive(sd)
+			return udevadmChangeToDrive(sd, fs, exec)
 		}
 	}
 
@@ -120,11 +123,11 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.Set[string]) error {
 // Calls "udevadm trigger --action=change" on the specified drive.
 // drivePath must be the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
-func udevadmChangeToDrive(drivePath string) error {
+func udevadmChangeToDrive(drivePath string, fs filesystem.FileSystem, exec mountmanager.Executor) error {
 	klog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)
 
 	// Evaluate symlink, if any
-	drive, err := filepath.EvalSymlinks(drivePath)
+	drive, err := fs.EvalSymlinks(drivePath)
 	if err != nil {
 		return fmt.Errorf("eval symlinks %q: %w", drivePath, err)
 	}
@@ -136,7 +139,7 @@ func udevadmChangeToDrive(drivePath string) error {
 	}
 
 	// Call "udevadm trigger --action=change --property-match=DEVNAME=/dev/sd..."
-	_, err = exec.New().Command(
+	_, err = exec.Command(
 		"udevadm",
 		"trigger",
 		"--action=change",
@@ -148,12 +151,12 @@ func udevadmChangeToDrive(drivePath string) error {
 }
 
 // PathExists returns true if the specified path exists.
-func pathExists(devicePath string) (bool, error) {
-	_, err := os.Stat(devicePath)
+func pathExists(devicePath string, fs filesystem.FileSystem) (bool, error) {
+	_, err := fs.Stat(devicePath)
 	if err == nil {
 		return true, nil
 	}
-	if os.IsNotExist(err) {
+	if fs.IsNotExist(err) {
 		return false, nil
 	}
 	return false, err
