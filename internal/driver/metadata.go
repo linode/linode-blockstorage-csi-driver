@@ -35,6 +35,9 @@ func GetMetadata(ctx context.Context, client MetadataClient) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
 	log.V(2).Info("Processing request")
+	if client == nil {
+		return Metadata{}, errNilClient
+	}
 
 	log.V(4).Info("Retrieving instance data from metadata service")
 	data, err := client.GetInstance(ctx)
