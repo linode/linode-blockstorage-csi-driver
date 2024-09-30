@@ -134,6 +134,7 @@ generate-mock:
 	mockgen -source=pkg/filesystem/filesystem.go -destination=mocks/mock_filesystem.go -package=mocks
 	mockgen -source=pkg/linode-client/linode_client.go -destination=mocks/mock_linodeclient.go -package=mocks
 	mockgen -source=pkg/cryptsetup-client/cryptsetup_client.go -destination=mocks/mock_cryptsetupclient.go -package=mocks
+	mockgen -source=internal/driver/metadata.go -destination=mocks/mock_metadata.go -package=mocks
 
 .PHONY: test
 test:

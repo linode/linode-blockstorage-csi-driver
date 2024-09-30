@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"os"
 	"testing"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 )
 
 func TestMemoryToBytes(t *testing.T) {
@@ -31,7 +33,7 @@ func TestMemoryToBytes(t *testing.T) {
 func TestGetMetadataFromAPI(t *testing.T) {
 	// Make sure GetMetadataFromAPI fails when it's given a nil client.
 	t.Run("NilClient", func(t *testing.T) {
-		_, err := GetMetadataFromAPI(context.Background(), nil)
+		_, err := GetMetadataFromAPI(context.Background(), nil, filesystem.OSFileSystem{})
 		if err == nil {
 			t.Fatal("should have failed")
 		}

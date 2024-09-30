@@ -55,6 +55,36 @@ func (mr *MockFileInterfaceMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockFileInterface)(nil).Close))
 }
 
+// Read mocks base method.
+func (m *MockFileInterface) Read(arg0 []byte) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Read", arg0)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Read indicates an expected call of Read.
+func (mr *MockFileInterfaceMockRecorder) Read(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockFileInterface)(nil).Read), arg0)
+}
+
+// Write mocks base method.
+func (m *MockFileInterface) Write(arg0 []byte) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Write", arg0)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Write indicates an expected call of Write.
+func (mr *MockFileInterfaceMockRecorder) Write(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockFileInterface)(nil).Write), arg0)
+}
+
 // MockFileSystem is a mock of FileSystem interface.
 type MockFileSystem struct {
 	ctrl     *gomock.Controller
@@ -134,6 +164,21 @@ func (m *MockFileSystem) MkdirAll(path string, perm os.FileMode) error {
 func (mr *MockFileSystemMockRecorder) MkdirAll(path, perm any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MkdirAll", reflect.TypeOf((*MockFileSystem)(nil).MkdirAll), path, perm)
+}
+
+// Open mocks base method.
+func (m *MockFileSystem) Open(name string) (filesystem.FileInterface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Open", name)
+	ret0, _ := ret[0].(filesystem.FileInterface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Open indicates an expected call of Open.
+func (mr *MockFileSystemMockRecorder) Open(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockFileSystem)(nil).Open), name)
 }
 
 // OpenFile mocks base method.
