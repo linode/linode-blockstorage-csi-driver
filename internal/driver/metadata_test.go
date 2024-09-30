@@ -388,7 +388,7 @@ func TestGetNodeMetadata(t *testing.T) {
 			defer func() { NewMetadataClient = oldNewClient }()
 
 			// Execute the function under test
-			metadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem)
+			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem)
 
 			// Check results
 			if tt.expectedErr != "" {
@@ -399,8 +399,8 @@ func TestGetNodeMetadata(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
-				if !reflect.DeepEqual(tt.expectedMetadata, metadata) {
-					t.Errorf("Expected metadata: %+v, got: %+v", tt.expectedMetadata, metadata)
+				if !reflect.DeepEqual(tt.expectedMetadata, nodeMetadata) {
+					t.Errorf("Expected metadata: %+v, got: %+v", tt.expectedMetadata, nodeMetadata)
 				}
 			}
 		})
