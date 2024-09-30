@@ -89,6 +89,7 @@ mgmt-and-capl-cluster: docker-setup mgmt-cluster capl-cluster
 
 .PHONY: capl-cluster
 capl-cluster:
+	@echo "WORKER_NODES is set to $(WORKER_NODES)"
 	# Create a CAPL cluster without CSI driver and wait for it to be ready
 	clusterctl generate cluster $(CLUSTER_NAME) \
 		--kubernetes-version $(K8S_VERSION) \
@@ -168,3 +169,7 @@ release:
 	cp ./internal/driver/deploy/releases/linode-blockstorage-csi-driver-$(IMAGE_VERSION).yaml ./$(RELEASE_DIR)
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
+
+.PHONY: grafana-dashboard
+grafana-dashboard:
+	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=CLUSTER_NAME ./hack/view-metrics.sh --timeout=600s
