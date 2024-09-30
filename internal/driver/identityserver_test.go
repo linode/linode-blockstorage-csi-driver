@@ -140,8 +140,8 @@ func TestIdentityServer_GetPluginCapabilities(t *testing.T) {
 		t.Errorf("IdentityServer.GetPluginCapabilities() unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(gotResponse.Capabilities, wantCapabilities) {
-		t.Errorf("IdentityServer.GetPluginCapabilities() = %v, want %v", gotResponse.Capabilities, wantCapabilities)
+	if !reflect.DeepEqual(gotResponse.GetCapabilities(), wantCapabilities) {
+		t.Errorf("IdentityServer.GetPluginCapabilities() = %v, want %v", gotResponse.GetCapabilities(), wantCapabilities)
 	}
 }
 
@@ -177,8 +177,8 @@ func TestIdentityServer_Probe(t *testing.T) {
 				return
 			}
 
-			if gotResponse.Ready.Value != tt.wantReady {
-				t.Errorf("IdentityServer.Probe() ready = %v, want %v", gotResponse.Ready.Value, tt.wantReady)
+			if gotResponse.GetReady().GetValue() != tt.wantReady {
+				t.Errorf("IdentityServer.Probe() ready = %v, want %v", gotResponse.GetReady().GetValue(), tt.wantReady)
 			}
 		})
 	}
