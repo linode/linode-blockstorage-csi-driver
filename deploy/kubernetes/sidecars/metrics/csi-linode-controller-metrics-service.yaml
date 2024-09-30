@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: csi-linode-controller-metrics-10248
+  namespace: kube-system
+  labels:
+    app: csi-linode-controller
+    service: csi-linode-controller-metrics-10248
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '10248'
+    prometheus.io/path: '/metrics'
+spec:
+  selector:
+    app: csi-linode-controller
+  ports:
+    - name: metrics-10248
+      port: 10248
+      targetPort: 10248
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: csi-linode-controller-metrics-10249
+  namespace: kube-system
+  labels:
+    app: csi-linode-controller
+    service: csi-linode-controller-metrics-10249
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '10249'
+    prometheus.io/path: '/metrics'
+spec:
+  selector:
+    app: csi-linode-controller
+  ports:
+    - name: metrics-10249
+      port: 10249
+      targetPort: 10249
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: csi-linode-controller-metrics-10250
+  namespace: kube-system
+  labels:
+    app: csi-linode-controller
+    service: csi-linode-controller-metrics-10250
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '10250'
+    prometheus.io/path: '/metrics'
+spec:
+  selector:
+    app: csi-linode-controller
+  ports:
+    - name: metrics-10250
+      port: 10250
+      targetPort: 10250
+      protocol: TCP

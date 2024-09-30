@@ -172,4 +172,4 @@ release:
 
 .PHONY: grafana-dashboard
 grafana-dashboard:
-	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=CLUSTER_NAME ./hack/view-metrics.sh --timeout=600s
+	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=CLUSTER_NAME ./hack/install-monitoring-tools.sh --timeout=600s

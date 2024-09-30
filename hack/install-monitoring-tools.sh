@@ -36,7 +36,7 @@ echo "Updating Helm repositories..."
 helm repo update
 
 # Create service to export the metrics for Prometheus to scrape from the sidecars
-kubectl apply -f csi-linode-controller-metrics-service.yaml
+kubectl apply -f deploy/kubernetes/sidecars/metrics/csi-linode-controller-metrics-service.yaml
 
 # Create a namespace for monitoring tools
 echo "Creating namespace '${NAMESPACE}'..."
