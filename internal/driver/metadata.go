@@ -8,9 +8,9 @@ import (
 	"strconv"
 
 	metadata "github.com/linode/go-metadata"
-	"github.com/linode/linodego"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
@@ -84,7 +84,7 @@ var errNilClient = errors.New("nil client")
 
 // GetMetadataFromAPI attempts to retrieve metadata about the current
 // node/instance directly from the Linode API.
-func GetMetadataFromAPI(ctx context.Context, client *linodego.Client, fs filesystem.FileSystem) (Metadata, error) {
+func GetMetadataFromAPI(ctx context.Context, client linodeclient.LinodeClient, fs filesystem.FileSystem) (Metadata, error) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
 	defer done()
 
