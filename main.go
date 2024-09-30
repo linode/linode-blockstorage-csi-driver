@@ -130,12 +130,9 @@ func handle(ctx context.Context) error {
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
-	metadata, err := driver.GetMetadata(ctx)
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, fileSystem)
 	if err != nil {
-		log.Error(err, "Metadata service not available, falling back to API")
-		if metadata, err = driver.GetMetadataFromAPI(ctx, cloudProvider); err != nil {
-			return fmt.Errorf("get metadata from api: %w", err)
-		}
+		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(
@@ -143,7 +140,7 @@ func handle(ctx context.Context) error {
 		cloudProvider,
 		mounter,
 		deviceUtils,
-		metadata,
+		nodeMetadata,
 		driver.Name,
 		vendorVersion,
 		cfg.volumeLabelPrefix,

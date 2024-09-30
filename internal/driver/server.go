@@ -23,6 +23,8 @@ import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // Defines Non blocking GRPC server interfaces
@@ -66,7 +68,7 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 
 func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(logGRPC),
+		grpc.UnaryInterceptor(logger.LogGRPC),
 	}
 
 	urlObj, err := url.Parse(endpoint)
