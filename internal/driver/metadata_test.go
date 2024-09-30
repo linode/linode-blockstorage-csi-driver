@@ -269,3 +269,140 @@ func TestGetMetadataFromAPI(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNodeMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCloudProvider := mocks.NewMockLinodeClient(ctrl)
+	mockFileSystem := mocks.NewMockFileSystem(ctrl)
+	mockMetadataClient := mocks.NewMockMetadataClient(ctrl)
+
+	tests := []struct {
+		name               string
+		setupMocks         func()
+		expectedMetadata   Metadata
+		expectedErr        string
+		metadataClientFunc func(context.Context) (MetadataClient, error)
+	}{
+		{
+			name: "Successful retrieval from metadata service",
+			setupMocks: func() {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(&metadata.InstanceData{
+					ID:     123,
+					Label:  "test-instance",
+					Region: "us-east",
+					Specs: metadata.InstanceSpecsData{
+						Memory: 2048,
+					},
+				}, nil)
+			},
+			expectedMetadata: Metadata{
+				ID:     123,
+				Label:  "test-instance",
+				Region: "us-east",
+				Memory: 2 << 30, // 2 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+		},
+		{
+			name: "Failure to create metadata client, successful retrieval from API",
+			setupMocks: func() {
+				mockFile := mocks.NewMockFileInterface(ctrl)
+				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
+				mockFileSystem.EXPECT().Open(LinodeIDPath).Return(mockFile, nil)
+				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
+					return copy(p, "456"), io.EOF
+				})
+				mockFile.EXPECT().Close().Return(nil)
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(456)).Return(&linodego.Instance{
+					ID:     456,
+					Label:  "api-instance",
+					Region: "eu-west",
+					Specs:  &linodego.InstanceSpec{Memory: 4096},
+				}, nil)
+			},
+			expectedMetadata: Metadata{
+				ID:     456,
+				Label:  "api-instance",
+				Region: "eu-west",
+				Memory: 4 << 30, // 4 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return nil, errors.New("failed to create metadata client")
+			},
+		},
+		{
+			name: "Failure from metadata service, successful retrieval from API",
+			setupMocks: func() {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+
+				mockFile := mocks.NewMockFileInterface(ctrl)
+				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
+				mockFileSystem.EXPECT().Open(LinodeIDPath).Return(mockFile, nil)
+				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
+					return copy(p, "789"), io.EOF
+				})
+				mockFile.EXPECT().Close().Return(nil)
+
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(789)).Return(&linodego.Instance{
+					ID:     789,
+					Label:  "fallback-instance",
+					Region: "ap-south",
+					Specs:  &linodego.InstanceSpec{Memory: 8192},
+				}, nil)
+			},
+			expectedMetadata: Metadata{
+				ID:     789,
+				Label:  "fallback-instance",
+				Region: "ap-south",
+				Memory: 8 << 30, // 8 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+		},
+		{
+			name: "Failure from both metadata service and API",
+			setupMocks: func() {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, errors.New("file not found"))
+			},
+			expectedErr: "failed to get metadata from API: stat /linode-info/linode-id: file not found",
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup mocks
+			tt.setupMocks()
+
+			// Override the metadata.NewClient function for testing
+			oldNewClient := NewMetadataClient
+			NewMetadataClient = tt.metadataClientFunc
+			defer func() { NewMetadataClient = oldNewClient }()
+
+			// Execute the function under test
+			metadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem)
+
+			// Check results
+			if tt.expectedErr != "" {
+				if err == nil || err.Error() != tt.expectedErr {
+					t.Errorf("Expected error: %v, got: %v", tt.expectedErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if !reflect.DeepEqual(tt.expectedMetadata, metadata) {
+					t.Errorf("Expected metadata: %+v, got: %+v", tt.expectedMetadata, metadata)
+				}
+			}
+		})
+	}
+}

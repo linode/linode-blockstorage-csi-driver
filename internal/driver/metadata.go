@@ -27,12 +27,20 @@ type MetadataClient interface {
 	GetInstance(ctx context.Context) (*metadata.InstanceData, error)
 }
 
+var NewMetadataClient = func(ctx context.Context) (MetadataClient, error) {
+	return metadata.NewClient(ctx)
+}
+
+// GetNodeMetadata retrieves metadata about the current node/instance.
+// It first attempts to use the Linode Metadata Service, and if that fails,
+// it falls back to using the Linode API. This function ensures that valid
+// metadata is obtained before returning.
 func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
 	// Step 1: Attempt to create the metadata client
 	log.V(4).Info("Attempting to create metadata client")
-	linodeMetadataClient, err := metadata.NewClient(ctx)
+	linodeMetadataClient, err := NewMetadataClient(ctx)
 	if err != nil {
 		log.Error(err, "Failed to create metadata client")
 		linodeMetadataClient = nil
