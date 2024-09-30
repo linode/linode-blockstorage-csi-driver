@@ -132,14 +132,14 @@ func handle(ctx context.Context) error {
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
 	// create metadata service for CSI driver to get node metadata
-	linodeMetadataClient ,err := metadata.NewClient(ctx)
+	linodeMetadataClient, err := metadata.NewClient(ctx)
 	if err != nil {
 		log.Error(err, "Failed to create new metadata client")
 	}
-	metadata, err := driver.GetMetadata(ctx, linodeMetadataClient)
+	nodeMetadata, err := driver.GetMetadata(ctx, linodeMetadataClient)
 	if err != nil {
 		log.Error(err, "Metadata service not available, falling back to API")
-		if metadata, err = driver.GetMetadataFromAPI(ctx, cloudProvider, fileSystem); err != nil {
+		if nodeMetadata, err = driver.GetMetadataFromAPI(ctx, cloudProvider, fileSystem); err != nil {
 			return fmt.Errorf("get metadata from api: %w", err)
 		}
 	}
@@ -149,7 +149,7 @@ func handle(ctx context.Context) error {
 		cloudProvider,
 		mounter,
 		deviceUtils,
-		metadata,
+		nodeMetadata,
 		driver.Name,
 		vendorVersion,
 		cfg.volumeLabelPrefix,

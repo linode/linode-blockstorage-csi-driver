@@ -21,9 +21,10 @@ import (
 	"sync"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // Defines Non blocking GRPC server interfaces

@@ -10,10 +10,11 @@ import (
 	"testing"
 
 	metadata "github.com/linode/go-metadata"
-	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	"github.com/linode/linodego"
 	"go.uber.org/mock/gomock"
+
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 )
 
 func TestMemoryToBytes(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 type FileInterface interface {
 	Read([]byte) (int, error)
-  	Write([]byte) (int, error)
+	Write([]byte) (int, error)
 	Close() error
 }
 
@@ -55,6 +55,7 @@ func (OSFileSystem) Remove(path string) error {
 	return os.Remove(path)
 }
 
+//nolint:gosec // intentional variable to open file
 func (OSFileSystem) Open(name string) (FileInterface, error) {
 	return os.Open(name)
 }

@@ -12,7 +12,6 @@ import (
 
 func TestLogGRPC(t *testing.T) {
 	type args struct {
-		ctx     context.Context
 		req     interface{}
 		info    *grpc.UnaryServerInfo
 		handler grpc.UnaryHandler
@@ -26,7 +25,6 @@ func TestLogGRPC(t *testing.T) {
 		{
 			name: "Successful GRPC call",
 			args: args{
-				ctx: context.Background(),
 				req: "test request",
 				info: &grpc.UnaryServerInfo{
 					FullMethod: "/test.Service/TestMethod",
@@ -41,7 +39,6 @@ func TestLogGRPC(t *testing.T) {
 		{
 			name: "GRPC call with error",
 			args: args{
-				ctx: context.Background(),
 				req: "test request",
 				info: &grpc.UnaryServerInfo{
 					FullMethod: "/test.Service/TestMethod",
@@ -56,7 +53,7 @@ func TestLogGRPC(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := LogGRPC(tt.args.ctx, tt.args.req, tt.args.info, tt.args.handler)
+			got, err := LogGRPC(context.Background(), tt.args.req, tt.args.info, tt.args.handler)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LogGRPC() error = %v, wantErr %v", err, tt.wantErr)
 				return
