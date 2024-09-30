@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
@@ -66,7 +67,7 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 
 func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(logGRPC),
+		grpc.UnaryInterceptor(logger.LogGRPC),
 	}
 
 	urlObj, err := url.Parse(endpoint)
