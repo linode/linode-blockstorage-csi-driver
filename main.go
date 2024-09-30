@@ -21,7 +21,6 @@ import (
 	"os"
 
 	"github.com/ianschenck/envflag"
-	"github.com/linode/go-metadata"
 	"github.com/linode/linodego"
 	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
@@ -131,17 +130,9 @@ func handle(ctx context.Context) error {
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
-	// create metadata service for CSI driver to get node metadata
-	linodeMetadataClient, err := metadata.NewClient(ctx)
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, fileSystem)
 	if err != nil {
-		log.Error(err, "Failed to create new metadata client")
-	}
-	nodeMetadata, err := driver.GetMetadata(ctx, linodeMetadataClient)
-	if err != nil {
-		log.Error(err, "Metadata service not available, falling back to API")
-		if nodeMetadata, err = driver.GetMetadataFromAPI(ctx, cloudProvider, fileSystem); err != nil {
-			return fmt.Errorf("get metadata from api: %w", err)
-		}
+		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(

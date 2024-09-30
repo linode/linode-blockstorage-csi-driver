@@ -27,6 +27,51 @@ type MetadataClient interface {
 	GetInstance(ctx context.Context) (*metadata.InstanceData, error)
 }
 
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem) (Metadata, error) {
+	log := logger.GetLogger(ctx)
+
+	// Step 1: Attempt to create the metadata client
+	log.V(4).Info("Attempting to create metadata client")
+	linodeMetadataClient, err := metadata.NewClient(ctx)
+	if err != nil {
+		log.Error(err, "Failed to create metadata client")
+		linodeMetadataClient = nil
+	}
+
+	// Step 2: Try to get metadata
+	var nodeMetadata Metadata
+	if linodeMetadataClient != nil {
+		log.V(4).Info("Attempting to get metadata from metadata service")
+		nodeMetadata, err = GetMetadata(ctx, linodeMetadataClient)
+		if err != nil {
+			log.Error(err, "Failed to get metadata from metadata service")
+		}
+	}
+
+	// Step 3: Fall back to API if necessary
+	if linodeMetadataClient == nil || err != nil {
+		log.V(4).Info("Falling back to API for metadata")
+		nodeMetadata, err = GetMetadataFromAPI(ctx, cloudProvider, fileSystem)
+		if err != nil {
+			return Metadata{}, fmt.Errorf("failed to get metadata from API: %w", err)
+		}
+	}
+
+	// Step 4: Verify we have valid metadata
+	if nodeMetadata.ID == 0 {
+		return Metadata{}, errors.New("failed to obtain valid node metadata")
+	}
+
+	log.V(4).Info("Successfully obtained node metadata",
+		"ID", nodeMetadata.ID,
+		"Label", nodeMetadata.Label,
+		"Region", nodeMetadata.Region,
+		"Memory", nodeMetadata.Memory,
+	)
+
+	return nodeMetadata, nil
+}
+
 // GetMetadata retrieves information about the current node/instance from the
 // Linode Metadata Service. If the Metadata Service is unavailable, or this
 // function otherwise returns a non-nil error, callers should call
