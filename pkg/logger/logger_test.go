@@ -70,59 +70,50 @@ func TestLogGRPC(t *testing.T) {
 
 func TestLogger_WithMethod(t *testing.T) {
 	tests := []struct {
-		name              string
-		method            string
-		wantLoggerNotNil  bool
-		wantContextNotNil bool
-		wantFuncNotNil    bool
+		name   string
+		method string
 	}{
 		{
-			name:              "WithMethod with valid input",
-			method:            "TestMethod",
-			wantLoggerNotNil:  true,
-			wantContextNotNil: true,
-			wantFuncNotNil:    true,
+			name:   "WithMethod with valid input",
+			method: "TestMethod",
 		},
 		{
-			name:              "WithMethod with empty method",
-			method:            "",
-			wantLoggerNotNil:  true,
-			wantContextNotNil: true,
-			wantFuncNotNil:    true,
+			name:   "WithMethod with empty method",
+			method: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := NewLogger(context.Background())
-			got, got1, got2 := l.WithMethod(tt.method)
+			logger, ctx, done := l.WithMethod(tt.method)
 
-			if (got != nil) != tt.wantLoggerNotNil {
-				t.Errorf("Logger.WithMethod() got = %v, want not nil: %v", got, tt.wantLoggerNotNil)
+			if logger == nil {
+				t.Error("Logger.WithMethod() returned nil logger")
 			}
-			if (got1 != nil) != tt.wantContextNotNil {
-				t.Errorf("Logger.WithMethod() got1 = %v, want not nil: %v", got1, tt.wantContextNotNil)
+			if ctx == nil {
+				t.Error("Logger.WithMethod() returned nil context")
 			}
-			if (got2 != nil) != tt.wantFuncNotNil {
-				t.Errorf("Logger.WithMethod() got2 = %p, want not nil: %v", got2, tt.wantFuncNotNil)
+			if done == nil {
+				t.Error("Logger.WithMethod() returned nil function")
 			}
 
 			// Check if the context contains the logger
-			if got1 != nil {
-				contextLogger, ok := got1.Value(LoggerKey{}).(*Logger)
-				if !ok || contextLogger != got {
-					t.Errorf("Logger.WithMethod() context does not contain the correct logger")
+			if ctx != nil {
+				contextLogger, ok := ctx.Value(LoggerKey{}).(*Logger)
+				if !ok || contextLogger != logger {
+					t.Error("Logger.WithMethod() context does not contain the correct logger")
 				}
 			}
 
 			// Call the returned function and check if it doesn't panic
-			if got2 != nil {
+			if done != nil {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
 							t.Errorf("Logger.WithMethod() returned function panicked: %v", r)
 						}
 					}()
-					got2()
+					done()
 				}()
 			}
 		})
