@@ -10,7 +10,7 @@ require (
 	github.com/linode/go-metadata v0.2.0
 	github.com/linode/linodego v1.40.0
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
-	go.uber.org/automaxprocs v1.5.3
+	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.4.0
 	golang.org/x/net v0.29.0
 	golang.org/x/sys v0.25.0
