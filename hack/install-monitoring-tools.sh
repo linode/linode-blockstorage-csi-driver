@@ -11,10 +11,10 @@ echo "Checking for worker nodes..."
 ALL_NODES=$(kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name)
 
 # Get control-plane nodes (assuming 'control-plane' in the name)
-CONTROL_PLANE_NODES=$(echo "${ALL_NODES}" | grep "control-plane")
+CONTROL_PLANE_NODES=$(echo "${ALL_NODES}" | grep "control-plane" || true)
 
 # Get worker nodes (nodes not containing 'control-plane' in the name)
-WORKER_NODES=$(echo "${ALL_NODES}" | grep -v "control-plane")
+WORKER_NODES=$(echo "${ALL_NODES}" | grep -v "control-plane" || true)
 
 if [ -z "${WORKER_NODES}" ]; then
   echo "No worker nodes found. Untainting control-plane node(s) to allow scheduling of Prometheus and Grafana pods..."
@@ -36,7 +36,7 @@ echo "Updating Helm repositories..."
 helm repo update
 
 # Create service to export the metrics for Prometheus to scrape from the sidecars
-kubectl apply -f deploy/kubernetes/sidecars/metrics/csi-linode-controller-metrics-service.yaml
+kubectl apply -f observability/metrics/csi-linode-controller-metrics-service.yaml
 
 # Create a namespace for monitoring tools
 echo "Creating namespace '${NAMESPACE}'..."
@@ -94,7 +94,7 @@ GRAFANA_POD=$(kubectl get pods --namespace ${NAMESPACE} -l "app.kubernetes.io/na
 
 # Port-forward Grafana service
 echo "Port-forwarding Grafana service on port ${GRAFANA_PORT}..."
-kubectl port-forward --namespace ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:${GRAFANA_PORT} &
+nohup kubectl port-forward --namespace ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:${GRAFANA_PORT} > port-forward.log 2>&1 &
 PORT_FORWARD_PID=$!
 
 # Give port-forward some time to start
@@ -107,6 +107,6 @@ echo "Please open http://localhost:${GRAFANA_PORT} in your web browser."
 echo "Grafana admin username: admin"
 echo "Grafana admin password: admin"
 
-# Wait for user to terminate the script
-echo "Press [Ctrl+C] to stop port-forwarding and exit."
-wait ${PORT_FORWARD_PID}
+echo "To stop the port-forwarding, run: kill ${PORT_FORWARD_PID}"
+
+exit 0

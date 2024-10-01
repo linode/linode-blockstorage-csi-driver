@@ -26,6 +26,8 @@
   - [Creating a Development Cluster](docs/development-setup.md#️-creating-a-development-cluster)
   - [Running E2E Tests](docs/testing.md)
   - [Contributing](docs/contributing.md)
+- [Observability](docs/observability.md)
+  - [Metrics](docs/metrics-documentation.md)
 - [License](#license)
 - [Disclaimers](#-disclaimers)
 - [Community](#-join-us-on-slack)
