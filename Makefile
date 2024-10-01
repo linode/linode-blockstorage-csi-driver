@@ -191,7 +191,6 @@ release:
 #####################################################################
 .PHONY: grafana-dashboard
 grafana-dashboard:
-	@echo "Installing Grafana Dashboard..."
 	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=$(CLUSTER_NAME) \
 		GRAFANA_PORT=$(GRAFANA_PORT) \
 		GRAFANA_USERNAME=$(GRAFANA_USERNAME) \
