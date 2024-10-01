@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"math"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
@@ -312,6 +313,11 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		if errParse != nil {
 			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
 				"invalid starting token: %q", startingToken)
+		}
+
+		if startingPage < math.MinInt || startingPage > math.MaxInt {
+			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
+				"starting token out of bounds: %q", startingToken)
 		}
 
 		listOpts.Page = int(startingPage)
