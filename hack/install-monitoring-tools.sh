@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/bin/bash
+
+set -euf -o pipefail
 
 GRAFANA_PORT=3000
 GRAFANA_POD=""
