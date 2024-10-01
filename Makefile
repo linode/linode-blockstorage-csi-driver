@@ -104,7 +104,7 @@ generate-capl-cluster-manifests:
 create-capl-cluster:
 	# Create a CAPL cluster without CSI driver and wait for it to be ready
 	kubectl apply -f capl-cluster-manifests.yaml
-	kubectl wait --for=condition=ControlPlaneReady  cluster/$(CLUSTER_NAME) --timeout=600s
+	kubectl wait --for=condition=ControlPlaneReady  cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
 	clusterctl get kubeconfig $(CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 
