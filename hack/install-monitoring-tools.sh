@@ -42,7 +42,7 @@ kubectl apply -f observability/metrics/csi-linode-controller-metrics-service.yam
 
 # Create a namespace for monitoring tools
 echo "Creating namespace '${NAMESPACE}'..."
-kubectl create namespace ${NAMESPACE} || true
+kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
 # Install or Upgrade Prometheus
 echo "Installing or upgrading Prometheus..."
