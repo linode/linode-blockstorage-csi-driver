@@ -31,7 +31,7 @@ fi
 # Add Helm repositories if not already added
 echo "Adding Helm repositories for Prometheus and Grafana..."
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
-helm repo add grafana https://grafana.github.io/helm-charts || true
+helm repo add grafana https://grafana.github.io/helm-charts
 
 # Update Helm repositories
 echo "Updating Helm repositories..."
