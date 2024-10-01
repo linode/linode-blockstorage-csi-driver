@@ -23,12 +23,10 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 const (
@@ -36,19 +34,6 @@ const (
 	rwPermission                   = os.FileMode(0o755)
 	ownerGroupReadWritePermissions = os.FileMode(0o660)
 )
-
-// TODO: Figure out a better home for these interfaces
-type Mounter interface {
-	mount.Interface
-}
-
-type Executor interface {
-	utilexec.Interface
-}
-
-type Command interface {
-	utilexec.Cmd
-}
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
 // It validates the volume ID, staging target path, and volume capability.
@@ -206,7 +191,7 @@ func (ns *NodeServer) findDevicePath(ctx context.Context, key linodevolumes.Lino
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
-func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs mountmanager.FileSystem) (bool, error) {
+func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs filesystem.FileSystem) (bool, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering ensureMountPoint", "path", path)
 
@@ -236,7 +221,7 @@ func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs moun
 // The function creates the target directory, creates a file to bind mount the block device to,
 // and mounts the volume using the provided mount options.
 // It returns a CSI NodePublishVolumeResponse and an error if the operation fails.
-func (ns *NodeServer) nodePublishVolumeBlock(ctx context.Context, req *csi.NodePublishVolumeRequest, mountOptions []string, fs mountmanager.FileSystem) (*csi.NodePublishVolumeResponse, error) {
+func (ns *NodeServer) nodePublishVolumeBlock(ctx context.Context, req *csi.NodePublishVolumeRequest, mountOptions []string, fs filesystem.FileSystem) (*csi.NodePublishVolumeResponse, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering nodePublishVolumeBlock", "req", req, "mountOptions", mountOptions)
 

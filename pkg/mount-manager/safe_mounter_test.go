@@ -15,15 +15,21 @@ limitations under the License.
 package mountmanager
 
 import (
-	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
+	"testing"
 )
 
-func NewSafeMounter() *mount.SafeFormatAndMount {
-	realMounter := mount.New("")
-	realExec := exec.New()
-	return &mount.SafeFormatAndMount{
-		Interface: realMounter,
-		Exec:      realExec,
+func TestNewSafeMounter(t *testing.T) {
+	safeMounter := NewSafeMounter()
+
+	if safeMounter == nil {
+		t.Fatalf("Expected non-nil SafeFormatAndMount, got nil")
+	}
+
+	if safeMounter.Interface == nil {
+		t.Error("Expected non-nil Interface, got nil")
+	}
+
+	if safeMounter.Exec == nil {
+		t.Error("Expected non-nil Exec, got nil")
 	}
 }

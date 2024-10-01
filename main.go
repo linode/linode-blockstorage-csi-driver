@@ -27,6 +27,8 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
+	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -123,17 +125,14 @@ func handle(ctx context.Context) error {
 	}
 
 	mounter := mountmanager.NewSafeMounter()
-	deviceUtils := mountmanager.NewDeviceUtils()
-	fileSystem := mountmanager.NewFileSystem()
+	fileSystem := filesystem.NewFileSystem()
+	deviceUtils := devicemanager.NewDeviceUtils(fileSystem, mounter.Exec)
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
-	metadata, err := driver.GetMetadata(ctx)
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, fileSystem)
 	if err != nil {
-		log.Error(err, "Metadata service not available, falling back to API")
-		if metadata, err = driver.GetMetadataFromAPI(ctx, cloudProvider); err != nil {
-			return fmt.Errorf("get metadata from api: %w", err)
-		}
+		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(
@@ -141,7 +140,7 @@ func handle(ctx context.Context) error {
 		cloudProvider,
 		mounter,
 		deviceUtils,
-		metadata,
+		nodeMetadata,
 		driver.Name,
 		vendorVersion,
 		cfg.volumeLabelPrefix,

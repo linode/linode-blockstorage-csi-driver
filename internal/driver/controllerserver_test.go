@@ -4,14 +4,452 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
+	"go.uber.org/mock/gomock"
 
+	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 )
+
+func TestCreateVolume(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.CreateVolumeRequest
+		resp                    *csi.CreateVolumeResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "createhappypath",
+			req: &csi.CreateVolumeRequest{
+				Name: "createhappypath",
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+				},
+			},
+			resp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      "1-",
+					CapacityBytes: 10 << 30,
+					AccessibleTopology: []*csi.Topology{
+						{
+							Segments: map[string]string{
+								VolumeTopologyRegion: "",
+							},
+						},
+					},
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
+				m.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10}, nil)
+				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1, Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "createapierror",
+			req: &csi.CreateVolumeRequest{
+				Name: "createapierror",
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+				},
+			},
+			resp: &csi.CreateVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
+				m.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("volume creation failed"))
+			},
+			expectedError: errInternal("create volume: volume creation failed"),
+		},
+		{
+			name: "incorrectsize",
+			req: &csi.CreateVolumeRequest{
+				Name: "incorrectsize",
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+				},
+			},
+			resp: &csi.CreateVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
+				m.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1002, Size: 20}, nil) // pass 20GB instead of 10
+			},
+			expectedError: errAlreadyExists("volume 1002 already exists with size 20"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			returnedResp, err := s.CreateVolume(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("CreateVolume error = %v, wantErr %v", err, tt.expectedError)
+			} else if returnedResp.GetVolume() != nil && tt.resp.GetVolume() != nil {
+				if returnedResp.GetVolume().GetCapacityBytes() != tt.resp.GetVolume().GetCapacityBytes() {
+					t.Errorf("expected capacity: %+v, got: %+v", tt.resp.GetVolume().GetCapacityBytes(), returnedResp.GetVolume().GetCapacityBytes())
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteVolume(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.DeleteVolumeRequest
+		resp                    *csi.DeleteVolumeResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "deletehappypath",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: "1001",
+			},
+			resp: &csi.DeleteVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().DeleteVolume(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "deleteapierror",
+			req: &csi.DeleteVolumeRequest{
+				VolumeId: "1001",
+			},
+			resp: &csi.DeleteVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().DeleteVolume(gomock.Any(), gomock.Any()).Return(fmt.Errorf("volume deletion failed"))
+			},
+			expectedError: errInternal("delete volume 597150807: volume deletion failed"), // 597150807 comes from converting 1001 string using hashStringToInt function
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			_, err := s.DeleteVolume(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("DeleteVolume error = %+v, wantErr %+v", err, tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestControllerPublishVolume(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.ControllerPublishVolumeRequest
+		resp                    *csi.ControllerPublishVolumeResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "publishsuccess",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1003",
+				NodeId:   "1003",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				Readonly: false,
+			},
+			resp: &csi.ControllerPublishVolumeResponse{
+				PublishContext: map[string]string{
+					"devicePath": "/dev/sda",
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1001, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 1001, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1001, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			_, err := s.ControllerPublishVolume(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("ControllerPublishVolume error: %+v, wantErr %+v", err, tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestControllerUnPublishVolume(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.ControllerUnpublishVolumeRequest
+		resp                    *csi.ControllerUnpublishVolumeResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "unpublishsuccess",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "1003",
+				NodeId:   "1003",
+			},
+			resp: &csi.ControllerUnpublishVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().DetachVolume(gomock.Any(), 630706045).Return(nil)
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			_, err := s.ControllerUnpublishVolume(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("ControllerUnpublishVolume error: %+v, wantErr %+v", err, tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestValidateVolumeCapabilities(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.ValidateVolumeCapabilitiesRequest
+		resp                    *csi.ValidateVolumeCapabilitiesResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "validatecapabilities",
+			req: &csi.ValidateVolumeCapabilitiesRequest{
+				VolumeId: "1003",
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+				},
+			},
+			resp: &csi.ValidateVolumeCapabilitiesResponse{
+				Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{
+							AccessMode: &csi.VolumeCapability_AccessMode{
+								Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+							},
+						},
+					},
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			_, err := s.ValidateVolumeCapabilities(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("ValidateVolumeCapabilities error %+v, wantErr %+v", err, tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestControllerGetCapabilities(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.ControllerGetCapabilitiesRequest
+		resp                    *csi.ControllerGetCapabilitiesResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "getcapabilities",
+			req:  &csi.ControllerGetCapabilitiesRequest{},
+			resp: &csi.ControllerGetCapabilitiesResponse{
+				Capabilities: []*csi.ControllerServiceCapability{
+					{
+						Type: &csi.ControllerServiceCapability_Rpc{
+							Rpc: &csi.ControllerServiceCapability_RPC{
+								Type: csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			_, err := s.ControllerGetCapabilities(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("ControllerGetCapabilities error: %+v, wantErr %+v", err, tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestControllerExpandVolume(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.ControllerExpandVolumeRequest
+		resp                    *csi.ControllerExpandVolumeResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "expandvolume",
+			req: &csi.ControllerExpandVolumeRequest{
+				VolumeId: "1003",
+				CapacityRange: &csi.CapacityRange{
+					LimitBytes: 20 << 30, // 20 GiB
+				},
+			},
+			resp: &csi.ControllerExpandVolumeResponse{
+				CapacityBytes:         10 << 30,
+				NodeExpansionRequired: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().ResizeVolume(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			ns := &NodeServer{
+				driver: &LinodeDriver{},
+			}
+			s := &ControllerServer{
+				client: mockClient,
+				driver: ns.driver,
+			}
+			_, err := s.ControllerExpandVolume(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("ControllerExpandVolume error: %+v, wantErr %+v", err, tt.expectedError)
+			}
+		})
+	}
+}
 
 //nolint:gocognit // As simple as possible.
 func TestListVolumes(t *testing.T) {

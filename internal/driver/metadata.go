@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	metadata "github.com/linode/go-metadata"
-	"github.com/linode/linodego"
 
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
@@ -23,20 +23,73 @@ type Metadata struct {
 	Memory uint   // Amount of memory the instance has, in bytes.
 }
 
+type MetadataClient interface {
+	GetInstance(ctx context.Context) (*metadata.InstanceData, error)
+}
+
+var NewMetadataClient = func(ctx context.Context) (MetadataClient, error) {
+	return metadata.NewClient(ctx)
+}
+
+// GetNodeMetadata retrieves metadata about the current node/instance.
+// It first attempts to use the Linode Metadata Service, and if that fails,
+// it falls back to using the Linode API. This function ensures that valid
+// metadata is obtained before returning.
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem) (Metadata, error) {
+	log := logger.GetLogger(ctx)
+
+	// Step 1: Attempt to create the metadata client
+	log.V(4).Info("Attempting to create metadata client")
+	linodeMetadataClient, err := NewMetadataClient(ctx)
+	if err != nil {
+		log.Error(err, "Failed to create metadata client")
+		linodeMetadataClient = nil
+	}
+
+	// Step 2: Try to get metadata
+	var nodeMetadata Metadata
+	if linodeMetadataClient != nil {
+		log.V(4).Info("Attempting to get metadata from metadata service")
+		nodeMetadata, err = GetMetadata(ctx, linodeMetadataClient)
+		if err != nil {
+			log.Error(err, "Failed to get metadata from metadata service")
+		}
+	}
+
+	// Step 3: Fall back to API if necessary
+	if linodeMetadataClient == nil || err != nil {
+		log.V(4).Info("Falling back to API for metadata")
+		nodeMetadata, err = GetMetadataFromAPI(ctx, cloudProvider, fileSystem)
+		if err != nil {
+			return Metadata{}, fmt.Errorf("failed to get metadata from API: %w", err)
+		}
+	}
+
+	// Step 4: Verify we have valid metadata
+	if nodeMetadata.ID == 0 {
+		return Metadata{}, errors.New("failed to obtain valid node metadata")
+	}
+
+	log.V(4).Info("Successfully obtained node metadata",
+		"ID", nodeMetadata.ID,
+		"Label", nodeMetadata.Label,
+		"Region", nodeMetadata.Region,
+		"Memory", nodeMetadata.Memory,
+	)
+
+	return nodeMetadata, nil
+}
+
 // GetMetadata retrieves information about the current node/instance from the
 // Linode Metadata Service. If the Metadata Service is unavailable, or this
 // function otherwise returns a non-nil error, callers should call
 // [GetMetadataFromAPI].
-func GetMetadata(ctx context.Context) (Metadata, error) {
+func GetMetadata(ctx context.Context, client MetadataClient) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
 	log.V(2).Info("Processing request")
-
-	log.V(4).Info("Creating new metadata client")
-	client, err := metadata.NewClient(ctx)
-	if err != nil {
-		log.Error(err, "Failed to create new metadata client")
-		return Metadata{}, fmt.Errorf("new metadata client: %w", err)
+	if client == nil {
+		return Metadata{}, errNilClient
 	}
 
 	log.V(4).Info("Retrieving instance data from metadata service")
@@ -87,7 +140,7 @@ var errNilClient = errors.New("nil client")
 
 // GetMetadataFromAPI attempts to retrieve metadata about the current
 // node/instance directly from the Linode API.
-func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata, error) {
+func GetMetadataFromAPI(ctx context.Context, client linodeclient.LinodeClient, fs filesystem.FileSystem) (Metadata, error) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
 	defer done()
 
@@ -98,12 +151,12 @@ func GetMetadataFromAPI(ctx context.Context, client *linodego.Client) (Metadata,
 	}
 
 	log.V(4).Info("Checking LinodeIDPath", "path", LinodeIDPath)
-	if _, err := os.Stat(LinodeIDPath); err != nil {
+	if _, err := fs.Stat(LinodeIDPath); err != nil {
 		return Metadata{}, fmt.Errorf("stat %s: %w", LinodeIDPath, err)
 	}
 
 	log.V(4).Info("Opening LinodeIDPath", "path", LinodeIDPath)
-	fileObj, err := os.Open(LinodeIDPath)
+	fileObj, err := fs.Open(LinodeIDPath)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("open: %w", err)
 	}

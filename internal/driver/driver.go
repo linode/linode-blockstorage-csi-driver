@@ -27,9 +27,9 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
 
+	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 // Name is the name of the driver provided by this package.
@@ -76,7 +76,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	ctx context.Context,
 	linodeClient linodeclient.LinodeClient,
 	mounter *mount.SafeFormatAndMount,
-	deviceUtils mountmanager.DeviceUtils,
+	deviceUtils devicemanager.DeviceUtils,
 	metadata Metadata,
 	name,
 	vendorVersion,

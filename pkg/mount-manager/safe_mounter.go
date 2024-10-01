@@ -4,9 +4,7 @@ Copyright 2018 The Kubernetes Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,22 +12,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package driver
+package mountmanager
 
 import (
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
-func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	klog.V(3).Infof("GRPC call: %s", info.FullMethod)
-	klog.V(5).Infof("GRPC request: %+v", req)
-	resp, err := handler(ctx, req)
-	if err != nil {
-		klog.Errorf("GRPC error: %v", err)
-	} else {
-		klog.V(5).Infof("GRPC response: %+v", resp)
+type Mounter interface {
+	mount.Interface
+}
+
+type Executor interface {
+	exec.Interface
+}
+
+type Command interface {
+	exec.Cmd
+}
+
+func NewSafeMounter() *mount.SafeFormatAndMount {
+	realMounter := mount.New("")
+	realExec := exec.New()
+	return &mount.SafeFormatAndMount{
+		Interface: realMounter,
+		Exec:      realExec,
 	}
-	return resp, err
 }

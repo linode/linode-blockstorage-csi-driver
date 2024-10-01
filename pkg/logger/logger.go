@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
 
@@ -53,4 +54,17 @@ func GetLogger(ctx context.Context) *Logger {
 		return logger
 	}
 	return NewLogger(ctx)
+}
+
+func LogGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	logger := GetLogger(ctx)
+	logger.V(3).Info("GRPC call", "method", info.FullMethod)
+	logger.V(5).Info("GRPC request", "request", req)
+	resp, err := handler(ctx, req)
+	if err != nil {
+		logger.Error(err, "GRPC error")
+	} else {
+		logger.V(5).Info("GRPC response", "response", resp)
+	}
+	return resp, err
 }

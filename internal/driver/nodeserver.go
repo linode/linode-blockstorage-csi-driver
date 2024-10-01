@@ -25,16 +25,17 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/mount-utils"
 
+	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 type NodeServer struct {
 	driver      *LinodeDriver
 	mounter     *mount.SafeFormatAndMount
-	deviceutils mountmanager.DeviceUtils
+	deviceutils devicemanager.DeviceUtils
 	client      linodeclient.LinodeClient
 	metadata    Metadata
 	encrypt     Encryption
@@ -46,7 +47,7 @@ type NodeServer struct {
 
 var _ csi.NodeServer = &NodeServer{}
 
-func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils mountmanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
+func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
 	log := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new NodeServer")
@@ -104,7 +105,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		log.V(4).Info("Volume will be mounted as read-only", "volumeID", volumeID)
 	}
 
-	fs := mountmanager.NewFileSystem()
+	fs := filesystem.NewFileSystem()
 	// publish block volume
 	if req.GetVolumeCapability().GetBlock() != nil {
 		log.V(4).Info("Publishing volume as block volume", "volumeID", volumeID)
@@ -202,7 +203,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// Check if staging target path is a valid mount point.
 	log.V(4).Info("Ensuring staging target path is a valid mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
-	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), mountmanager.NewFileSystem())
+	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), filesystem.NewFileSystem())
 	if err != nil {
 		return nil, err
 	}

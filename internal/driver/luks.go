@@ -33,6 +33,7 @@ import (
 	utilexec "k8s.io/utils/exec"
 
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
@@ -86,12 +87,12 @@ func (ctx *LuksContext) validate() error {
 }
 
 type Encryption struct {
-	Exec       Executor
-	FileSystem mountmanager.FileSystem
+	Exec       mountmanager.Executor
+	FileSystem filesystem.FileSystem
 	CryptSetup cryptsetupclient.CryptSetupClient
 }
 
-func NewLuksEncryption(executor utilexec.Interface, fileSystem mountmanager.FileSystem, cryptSetup cryptsetupclient.CryptSetupClient) Encryption {
+func NewLuksEncryption(executor mountmanager.Executor, fileSystem filesystem.FileSystem, cryptSetup cryptsetupclient.CryptSetupClient) Encryption {
 	return Encryption{
 		Exec:       executor,
 		FileSystem: fileSystem,

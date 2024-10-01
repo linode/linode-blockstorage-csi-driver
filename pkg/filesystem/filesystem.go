@@ -1,11 +1,14 @@
-package mountmanager
+package filesystem
 
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 type FileInterface interface {
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
 	Close() error
 }
 
@@ -16,6 +19,9 @@ type FileSystem interface {
 	Stat(name string) (fs.FileInfo, error)
 	Remove(path string) error
 	OpenFile(name string, flag int, perm os.FileMode) (FileInterface, error)
+	Open(name string) (FileInterface, error)
+	Glob(pattern string) ([]string, error)
+	EvalSymlinks(path string) (string, error)
 }
 
 // OSFileSystem implements FileSystemInterface using the os package.
@@ -23,6 +29,14 @@ type OSFileSystem struct{}
 
 func NewFileSystem() FileSystem {
 	return OSFileSystem{}
+}
+
+func (OSFileSystem) Glob(pattern string) ([]string, error) {
+	return filepath.Glob(pattern)
+}
+
+func (OSFileSystem) EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
 }
 
 func (OSFileSystem) IsNotExist(err error) bool {
@@ -39,6 +53,11 @@ func (OSFileSystem) Stat(name string) (fs.FileInfo, error) {
 
 func (OSFileSystem) Remove(path string) error {
 	return os.Remove(path)
+}
+
+//nolint:gosec // intentional variable to open file
+func (OSFileSystem) Open(name string) (FileInterface, error) {
+	return os.Open(name)
 }
 
 //nolint:gosec // intentional variable to open file
