@@ -65,6 +65,10 @@ HELM_VERSION         ?= "v0.2.1"
 CAPL_VERSION         ?= "v0.6.3"
 CONTROLPLANE_NODES   ?= 1
 WORKER_NODES         ?= 0
+GRAFANA_PORT ?= 3000
+GRAFANA_USERNAME ?= admin
+GRAFANA_PASSWORD ?= admin
+DATA_RETENTION_PERIOD ?= 15d  # Prometheus data retention period
 
 .PHONY: build
 build:
@@ -182,6 +186,15 @@ release:
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
 
+#####################################################################
+# Grafana Dashboard Installation
+#####################################################################
 .PHONY: grafana-dashboard
 grafana-dashboard:
-	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=$(CLUSTER_NAME) ./hack/install-monitoring-tools.sh --timeout=600s
+	@echo "Installing Grafana Dashboard..."
+	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=$(CLUSTER_NAME) \
+		GRAFANA_PORT=$(GRAFANA_PORT) \
+		GRAFANA_USERNAME=$(GRAFANA_USERNAME) \
+		GRAFANA_PASSWORD=$(GRAFANA_PASSWORD) \
+		DATA_RETENTION_PERIOD=$(DATA_RETENTION_PERIOD) \
+		./hack/install-monitoring-tools.sh --timeout=600s

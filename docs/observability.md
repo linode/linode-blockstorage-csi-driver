@@ -64,6 +64,12 @@ kill <PID>
 ```
 Replace `<PID>` with the process ID provided by the script during the setup.
 
+If you do not have access to the script output, run:
+```bash
+ps -ef | grep 'kubectl port-forward' | grep -v grep
+```
+This will give you details about the process and also the `PID`. 
+
 ## Customizing the Setup
 
 - **Namespace**: The default namespace for the observability tools is `monitoring`. You can modify this by editing the `install-monitoring-tools.sh` script and changing the `NAMESPACE` variable.

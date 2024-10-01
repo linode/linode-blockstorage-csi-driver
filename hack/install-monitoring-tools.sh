@@ -2,8 +2,17 @@
 
 set -euf -o pipefail
 
-GRAFANA_PORT=3000
-GRAFANA_POD=""
+# Redundant default values to ensure that the script doesn't fail if executed without make
+DEFAULT_GRAFANA_PORT=3000
+DEFAULT_GRAFANA_USERNAME="admin"
+DEFAULT_GRAFANA_PASSWORD="admin"
+DEFAULT_DATA_RETENTION_PERIOD="15d"
+
+# Configuration Variables (Environment Variables)
+GRAFANA_PORT=${GRAFANA_PORT:-$DEFAULT_GRAFANA_PORT}
+GRAFANA_USERNAME=${GRAFANA_USERNAME:-$DEFAULT_GRAFANA_USERNAME}
+GRAFANA_PASSWORD=${GRAFANA_PASSWORD:-$DEFAULT_GRAFANA_PASSWORD}
+DATA_RETENTION_PERIOD=${DATA_RETENTION_PERIOD:-$DEFAULT_DATA_RETENTION_PERIOD}
 NAMESPACE="monitoring"
 
 # Determine if worker nodes exist
@@ -81,7 +90,7 @@ kubectl delete configmap grafana-dashboard \
 echo "Creating or updating Grafana dashboard ConfigMap from local file..."
 
 kubectl create configmap grafana-dashboard \
-  --from-file=dashboard.json=docs/dashboard.json \
+  --from-file=dashboard.json=observability/metrics/dashboard.json \
   --namespace ${NAMESPACE} \
   --dry-run=client -o yaml | kubectl apply -f -
 
