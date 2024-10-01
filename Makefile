@@ -181,3 +181,7 @@ release:
 	cp ./internal/driver/deploy/releases/linode-blockstorage-csi-driver-$(IMAGE_VERSION).yaml ./$(RELEASE_DIR)
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
+
+.PHONY: grafana-dashboard
+grafana-dashboard:
+	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=CLUSTER_NAME ./hack/install-monitoring-tools.sh --timeout=600s
