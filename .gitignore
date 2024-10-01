@@ -25,6 +25,8 @@ _output
 _testmain.go
 linode-blockstorage-csi-driver
 test-cluster-kubeconfig.yaml
+capl-cluster-manifests.yaml
+csi-manifests.yaml
 
 *.exe
 *.test
