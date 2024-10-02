@@ -47,6 +47,11 @@ type NodeServer struct {
 	csi.UnimplementedNodeServer
 }
 
+const (
+	successTrue  = "true"
+	successFalse = "false"
+)
+
 var _ csi.NodeServer = &NodeServer{}
 
 var (
@@ -119,9 +124,15 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
+	success := successTrue
+
 	// Validate the request object
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodePublishVolumeRequest(ctx, req); err != nil {
+		success = successFalse
+		// Record failure metric before returning
+		nodePublishTotal.WithLabelValues(success).Inc()
+		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -136,7 +147,14 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// publish block volume
 	if req.GetVolumeCapability().GetBlock() != nil {
 		log.V(4).Info("Publishing volume as block volume", "volumeID", volumeID)
-		return ns.nodePublishVolumeBlock(ctx, req, options, fs)
+		response, err := ns.nodePublishVolumeBlock(ctx, req, options, fs)
+		if err != nil {
+			success = successFalse
+		}
+		// Record success or failure metric
+		nodePublishTotal.WithLabelValues(success).Inc()
+		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+		return response, err
 	}
 
 	targetPath := req.GetTargetPath()
@@ -145,11 +163,15 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	log.V(4).Info("Ensuring target path is a valid mount point", "volumeID", volumeID, "targetPath", targetPath)
 	notMnt, err := ns.ensureMountPoint(ctx, targetPath, fs)
 	if err != nil {
+		success = successFalse
+		nodePublishTotal.WithLabelValues(success).Inc()
+		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 	if !notMnt {
 		log.V(4).Info("Target path is already a mount point", "volumeID", volumeID, "targetPath", targetPath)
-		// TODO(#95): check if mount is compatible. Return OK if it is, or appropriate error.
+		nodePublishTotal.WithLabelValues(success).Inc()
+		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -158,13 +180,15 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// Mount stagingTargetPath to targetPath
 	log.V(4).Info("Mounting volume", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath, "targetPath", targetPath, "options", options)
 	err = ns.mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
-	success := "true"
+
 	if err != nil {
-		success = "false"
+		success = successFalse
+		nodePublishTotal.WithLabelValues(success).Inc()
+		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
 
-	// Record metrics
+	// Record success metrics
 	nodePublishTotal.WithLabelValues(success).Inc()
 	nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 

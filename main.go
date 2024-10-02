@@ -18,13 +18,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/ianschenck/envflag"
 	"github.com/linode/linodego"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
-	"net/http"
-	"os"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
@@ -152,9 +154,18 @@ func handle(ctx context.Context) error {
 
 	// Start the HTTP server to expose /metrics endpoint
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		server := &http.Server{
+			Addr:              ":8081", // Define the address and port
+			Handler:           mux,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       15 * time.Second,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
 		log.V(2).Info("Metrics endpoint exposed", "endpoint", "/metrics")
-		if err := http.ListenAndServe(":8081", nil); err != nil {
+		if err := server.ListenAndServe(); err != nil {
 			log.Error(err, "Failed to start metrics HTTP server")
 		}
 	}()
