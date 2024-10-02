@@ -522,7 +522,7 @@ func TestListVolumes(t *testing.T) {
 				},
 			}
 
-			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
+			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{StartingToken: "10"})
 			switch {
 			case (err != nil && !tt.throwErr):
 				t.Fatal("failed to list volumes:", err)
