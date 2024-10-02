@@ -25,6 +25,10 @@ github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133 h1:h6FO/Da7rdYq
 github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133/go.mod h1:pyYc5lldRtL0l5YitYVv1dLKuC0qhMfAfiR7BLsN2pA=
 github.com/jarcoal/httpmock v1.3.1 h1:iUx3whfZWVf3jT01hQTO/Eo5sAYtB2/rqaUuOtpInww=
 github.com/jarcoal/httpmock v1.3.1/go.mod h1:3yb8rc4BI7TCBhFY8ng0gjuLKJNquuDNiPaZjnENuYg=
+github.com/klauspost/compress v1.17.9 h1:6KIumPrER1LHsvBVuDa0r5xaG0Es51mhhB9BQB2qeMA=
+github.com/klauspost/compress v1.17.9/go.mod h1:Di0epgTjJY877eYKx5yC51cX2A2Vl2ibi7bDH9ttBbw=
+github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
+github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/linode/go-metadata v0.2.0 h1:hlWzkYLa80ikA0NmFX2hcwhcnWFol8F3UIvJnOgdKw4=
 github.com/linode/go-metadata v0.2.0/go.mod h1:XraDbSwms0+CtA7/Qh7agkSvGDc6H0s782kpX9MdMu0=
 github.com/linode/linodego v1.41.0 h1:GcP7JIBr9iLRJ9FwAtb9/WCT1DuPJS/xUApapfdjtiY=
