@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"errors"
+	"math"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -308,12 +309,16 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	}
 
 	if startingToken != "" {
-		startingPage, errParse := strconv.ParseInt(startingToken, 10, 64)
+		startingPage, errParse := strconv.ParseInt(startingToken, 10, 0)
 		if errParse != nil {
 			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
 				"invalid starting token: %q", startingToken)
 		}
 
+		if startingPage < math.MinInt || startingPage > math.MaxInt {
+			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
+				"starting token out of bounds: %q", startingToken)
+		}
 		listOpts.Page = int(startingPage)
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
