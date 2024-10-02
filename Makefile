@@ -132,6 +132,8 @@ mgmt-cluster:
 .PHONY: cleanup-cluster
 cleanup-cluster:
 	-kubectl delete cluster --all
+	-kubectl delete linodefirewalls --all
+	-kubectl delete lvpc --all
 	-kind delete cluster -n capl
 	-rm -f luks.key
 

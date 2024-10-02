@@ -99,7 +99,6 @@ jobs:
         run: devbox run e2e-test
 
       - name: Run CSI-Sanity Tests
-        if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'sanity') }}
         run: devbox run csi-sanity-test
 
       - name: run upstream E2E Tests
