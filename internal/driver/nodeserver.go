@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"k8s.io/mount-utils"
 
@@ -46,6 +48,30 @@ type NodeServer struct {
 }
 
 var _ csi.NodeServer = &NodeServer{}
+
+var (
+	nodePublishTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "csi_node_publish_total",
+			Help: "Total number of NodePublishVolume calls",
+		},
+		[]string{"success"},
+	)
+
+	nodePublishDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "csi_node_publish_duration_seconds",
+			Help:    "Duration of NodePublishVolume calls",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"success"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(nodePublishTotal)
+	prometheus.MustRegister(nodePublishDuration)
+}
 
 func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
 	log := logger.GetLogger(ctx)
@@ -86,6 +112,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
 
+	start := time.Now()
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID)
 
@@ -131,9 +158,15 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// Mount stagingTargetPath to targetPath
 	log.V(4).Info("Mounting volume", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath, "targetPath", targetPath, "options", options)
 	err = ns.mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
+	success := "true"
 	if err != nil {
+		success = "false"
 		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
+
+	// Record metrics
+	nodePublishTotal.WithLabelValues(success).Inc()
+	nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodePublishVolumeResponse{}, nil
