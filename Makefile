@@ -189,13 +189,25 @@ release:
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
 
 #####################################################################
-# Grafana Dashboard Installation
+# Grafana Dashboard Installation End to End installation
 #####################################################################
 .PHONY: grafana-dashboard
-grafana-dashboard:
-	KUBECONFIG=test-cluster-kubeconfig.yaml NODE_NAME=$(CLUSTER_NAME) \
-		GRAFANA_PORT=$(GRAFANA_PORT) \
-		GRAFANA_USERNAME=$(GRAFANA_USERNAME) \
-		GRAFANA_PASSWORD=$(GRAFANA_PASSWORD) \
-		DATA_RETENTION_PERIOD=$(DATA_RETENTION_PERIOD) \
-		./hack/install-monitoring-tools.sh --timeout=600s
+grafana-dashboard: install-prometheus install-grafana setup-dashboard
+
+#####################################################################
+# Monitoring Tools Installation
+#####################################################################
+.PHONY: install-prometheus
+install-prometheus:
+	KUBECONFIG=test-cluster-kubeconfig.yaml DATA_RETENTION_PERIOD=$(DATA_RETENTION_PERIOD) \
+		./hack/install-prometheus.sh --timeout=600s
+
+.PHONY: install-grafana
+install-grafana:
+	KUBECONFIG=test-cluster-kubeconfig.yaml GRAFANA_PORT=$(GRAFANA_PORT) \
+		GRAFANA_USERNAME=$(GRAFANA_USERNAME) GRAFANA_PASSWORD=$(GRAFANA_PASSWORD) \
+		./hack/install-grafana.sh --timeout=600s
+
+.PHONY: setup-dashboard
+setup-dashboard:
+	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-dashboard.sh --namespace=monitoring --dashboard-file=observability/metrics/dashboard.json
