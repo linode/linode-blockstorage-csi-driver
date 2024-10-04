@@ -212,6 +212,22 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 	return cs.createLinodeVolume(ctx, label, sizeGB, tags, accessibilityRequirements)
 }
 
+// Helper function to extract region from topology
+func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
+	topologies := requirements.GetPreferred()
+	if len(topologies) == 0 {
+		topologies = requirements.GetRequisite()
+	}
+
+	if len(topologies) > 0 {
+		if value, ok := topologies[0].GetSegments()[VolumeTopologyRegion]; ok {
+			return value
+		}
+	}
+
+	return ""
+}
+
 // createLinodeVolume creates a new Linode volume with the specified label, size, and tags.
 // It returns the created volume or an error if the creation fails.
 func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
@@ -221,16 +237,8 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 	// Get the region from req.AccessibilityRequirements if it exists. Fall back to the controller's metadata region if not specified.
 	region := cs.metadata.Region
 	if accessibilityRequirements != nil {
-		if len(accessibilityRequirements.GetPreferred()) > 0 {
-			segments := accessibilityRequirements.GetPreferred()[0].GetSegments()
-			if value, ok := segments[VolumeTopologyRegion]; ok {
-				region = value
-			}
-		} else if len(accessibilityRequirements.GetRequisite()) > 0 {
-			segments := accessibilityRequirements.GetRequisite()[0].GetSegments()
-			if value, ok := segments[VolumeTopologyRegion]; ok {
-				region = value
-			}
+		if topologyRegion := getRegionFromTopology(accessibilityRequirements); topologyRegion != "" {
+			region = topologyRegion
 		}
 	}
 
