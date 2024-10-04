@@ -87,7 +87,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo)
+	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo, req.GetAccessibilityRequirements())
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
