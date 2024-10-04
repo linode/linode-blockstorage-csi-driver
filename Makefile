@@ -62,7 +62,7 @@ CLUSTER_NAME         ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
 K8S_VERSION          ?= "v1.29.1"
 CAPI_VERSION         ?= "v1.6.3"
 HELM_VERSION         ?= "v0.2.1"
-CAPL_VERSION         ?= "v0.6.3"
+CAPL_VERSION         ?= "v0.6.4"
 CONTROLPLANE_NODES   ?= 1
 WORKER_NODES         ?= 0
 
