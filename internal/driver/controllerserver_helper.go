@@ -540,11 +540,6 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{volCap})
 	}
 
-	// check if the volume context contains the region
-	if _, ok := req.GetVolumeContext()[VolumeTopologyRegion]; !ok {
-		return 0, 0, errInternal("volume context in the request does not contain the region")
-	}
-
 	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
 	return linodeID, volumeID, nil
 }
@@ -580,9 +575,9 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 		return "", errVolumeAttached(volumeID, instance.ID)
 	}
 
-	// check if the volume and instance are in the same region
-	if instance.Region != volContext[VolumeTopologyRegion] {
-		return "", errInternal("volume %d is in region %s, while the instance is located in %s", volumeID, volContext[VolumeTopologyRegion], instance.Region)
+	// check if the volume and instance are in the same region only if the volume context is provided
+	if volContext != nil && instance.Region != volContext[VolumeTopologyRegion] {
+		return "", errRegionMismatch(volContext[VolumeTopologyRegion], instance.Region)
 	}
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
