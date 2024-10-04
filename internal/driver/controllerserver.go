@@ -76,9 +76,6 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Create volume context
-	volContext := cs.createVolumeContext(ctx, req)
-
 	// Attempt to retrieve information about a source volume if the request includes a content source.
 	// This is important for scenarios where the volume is being cloned from an existing one.
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, req.GetVolumeContentSource())
@@ -91,6 +88,9 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
+
+	// Create volume context
+	volContext := cs.createVolumeContext(ctx, req, vol)
 
 	// Prepare and return response
 	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, req.GetVolumeContentSource())

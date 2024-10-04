@@ -418,7 +418,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
-func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest) map[string]string {
+func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest, vol *linodego.Volume) map[string]string {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createVolumeContext()", "req", req)
 	defer log.V(4).Info("Exiting createVolumeContext()")
@@ -431,6 +431,8 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 		volumeContext[LuksCipherAttribute] = req.GetParameters()[LuksCipherAttribute]
 		volumeContext[LuksKeySizeAttribute] = req.GetParameters()[LuksKeySizeAttribute]
 	}
+
+	volumeContext[VolumeTopologyRegion] = vol.Region
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext
@@ -476,9 +478,6 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
 	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
-
-	// Add the volume's region to the volume context for reference in controller publish volume requests.
-	volContext[VolumeTopologyRegion] = vol.Region
 
 	key := linodevolumes.CreateLinodeVolumeKey(vol.ID, vol.Label)
 	resp := &csi.CreateVolumeResponse{

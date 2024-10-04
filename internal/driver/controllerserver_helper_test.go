@@ -135,6 +135,9 @@ func TestPrepareCreateVolumeResponse(t *testing.T) {
 }
 
 func TestCreateVolumeContext(t *testing.T) {
+	vol := &linodego.Volume{
+		Region: "us-east",
+	}
 	tests := []struct {
 		name           string
 		req            *csi.CreateVolumeRequest
@@ -146,7 +149,9 @@ func TestCreateVolumeContext(t *testing.T) {
 				Name:       "test-volume",
 				Parameters: map[string]string{},
 			},
-			expectedResult: map[string]string{},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
 		},
 		{
 			name: "Encrypted volume with all parameters",
@@ -163,6 +168,7 @@ func TestCreateVolumeContext(t *testing.T) {
 				PublishInfoVolumeName:  "encrypted-volume",
 				LuksCipherAttribute:    "aes-xts-plain64",
 				LuksKeySizeAttribute:   "512",
+				VolumeTopologyRegion:   "us-east",
 			},
 		},
 		// IMPORTANT:Now sure if we want this behavior, but it's what the code currently does.
@@ -179,6 +185,7 @@ func TestCreateVolumeContext(t *testing.T) {
 				PublishInfoVolumeName:  "partial-encrypted-volume",
 				LuksCipherAttribute:    "",
 				LuksKeySizeAttribute:   "",
+				VolumeTopologyRegion:   "us-east",
 			},
 		},
 		{
@@ -191,7 +198,9 @@ func TestCreateVolumeContext(t *testing.T) {
 					LuksKeySizeAttribute:   "512",
 				},
 			},
-			expectedResult: map[string]string{},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
 		},
 	}
 
@@ -199,7 +208,7 @@ func TestCreateVolumeContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cs := &ControllerServer{}
 			ctx := context.Background()
-			result := cs.createVolumeContext(ctx, tt.req)
+			result := cs.createVolumeContext(ctx, tt.req, vol)
 
 			if !reflect.DeepEqual(result, tt.expectedResult) {
 				t.Errorf("createVolumeContext() = %v, want %v", result, tt.expectedResult)
@@ -560,6 +569,9 @@ func TestValidateControllerPublishVolumeRequest(t *testing.T) {
 						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 					},
 				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
 			},
 			expectedNodeID: 12345,
 			expectedVolID:  67890,
@@ -697,6 +709,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 			volumeID: 123,
 			linode: &linodego.Instance{
 				ID: 456,
+				Region: "us-east",
 			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
