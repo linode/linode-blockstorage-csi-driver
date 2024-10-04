@@ -25,7 +25,6 @@ spec:
             - --csi-address=$(ADDRESS)
             - --v=2
             - --metrics-address={{ .Values.csiProvisioner.metrics.address }}
-            - --metrics-port={{ .Values.csiProvisioner.metrics.port }}
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -44,7 +43,6 @@ spec:
             - --v=2
             - --csi-address=$(ADDRESS)
             - --metrics-address={{ .Values.csiAttacher.metrics.address }}
-            - --metrics-port={{ .Values.csiAttacher.metrics.port }}
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -63,7 +61,6 @@ spec:
             - --v=2
             - --csi-address=$(ADDRESS)
             - --metrics-address={{ .Values.csiResizer.metrics.address }}
-            - --metrics-port={{ .Values.csiResizer.metrics.port }}
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock

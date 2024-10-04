@@ -32,7 +32,7 @@ csiProvisioner:
   tag: v5.1.0
   pullPolicy: IfNotPresent
   metrics:
-    address: "0.0.0.0"
+    address: "0.0.0.0:10248"
     port: 10248  # Metrics port for csi-provisioner
 
 csiAttacher:
@@ -40,7 +40,7 @@ csiAttacher:
   tag: v4.7.0
   pullPolicy: IfNotPresent
   metrics:
-    address: "0.0.0.0"
+    address: "0.0.0.0:10249"
     port: 10249  # Metrics port for csi-attacher
 
 csiResizer:
@@ -48,7 +48,7 @@ csiResizer:
   tag: v1.12.0
   pullPolicy: IfNotPresent
   metrics:
-    address: "0.0.0.0"
+    address: "0.0.0.0:10250"
     port: 10250  # Metrics port for csi-resizer
 
 csiLinodePlugin:
