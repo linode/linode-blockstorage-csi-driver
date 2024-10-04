@@ -708,7 +708,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 			name:     "Volume found but not attached",
 			volumeID: 123,
 			linode: &linodego.Instance{
-				ID: 456,
+				ID:     456,
 				Region: "us-east",
 			},
 			setupMocks: func() {
