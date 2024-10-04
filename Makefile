@@ -64,7 +64,7 @@ CAPI_VERSION         ?= "v1.6.3"
 HELM_VERSION         ?= "v0.2.1"
 CAPL_VERSION         ?= "v0.6.4"
 CONTROLPLANE_NODES   ?= 1
-WORKER_NODES         ?= 0
+WORKER_NODES         ?= 1
 
 .PHONY: build
 build:
@@ -104,8 +104,10 @@ generate-capl-cluster-manifests:
 create-capl-cluster:
 	# Create a CAPL cluster without CSI driver and wait for it to be ready
 	kubectl apply -f capl-cluster-manifests.yaml
-	kubectl wait --for=condition=ControlPlaneReady  cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=NodeHealthy=true machines --all --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > test-cluster-kubeconfig.yaml
+	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl wait --for=condition=Ready nodes --all --timeout=600s
 	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
 
 .PHONY: generate-csi-driver-manifests
