@@ -314,51 +314,36 @@ spec:
         - --volume-name-uuid-length=16
         - --csi-address=$(ADDRESS)
         - --v=2
-        - --metrics-address=0.0.0.0:10248
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
         image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
         imagePullPolicy: IfNotPresent
         name: csi-provisioner
-        ports:
-        - containerPort: 10248
-          name: metrics
-          protocol: TCP
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
       - args:
         - --v=2
         - --csi-address=$(ADDRESS)
-        - --metrics-address=0.0.0.0:10249
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
         image: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
         imagePullPolicy: IfNotPresent
         name: csi-attacher
-        ports:
-        - containerPort: 10249
-          name: metrics
-          protocol: TCP
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
       - args:
         - --v=2
         - --csi-address=$(ADDRESS)
-        - --metrics-address=0.0.0.0:10250
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
         image: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
         imagePullPolicy: IfNotPresent
         name: csi-resizer
-        ports:
-        - containerPort: 10250
-          name: metrics
-          protocol: TCP
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
@@ -380,7 +365,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:latest
+        image: linode/linode-blockstorage-csi-driver:metrics-endpoint
         name: csi-linode-plugin
         volumeMounts:
         - mountPath: /linode-info
@@ -477,7 +462,7 @@ spec:
             secretKeyRef:
               key: token
               name: linode
-        image: linode/linode-blockstorage-csi-driver:latest
+        image: linode/linode-blockstorage-csi-driver:metrics-endpoint
         imagePullPolicy: Always
         name: csi-linode-plugin
         securityContext:
