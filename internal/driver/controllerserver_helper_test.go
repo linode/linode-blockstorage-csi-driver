@@ -217,6 +217,16 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		client: mockClient,
 	}
 
+	topology := &csi.TopologyRequirement{
+		Preferred: []*csi.Topology{
+			{
+				Segments: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+			},
+		},
+	}
+
 	testCases := []struct {
 		name           string
 		volumeName     string
@@ -302,7 +312,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo)
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo, topology)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
@@ -654,10 +664,14 @@ func TestGetAndValidateVolume(t *testing.T) {
 		client: mockClient,
 	}
 
+	volContext := map[string]string{
+		VolumeTopologyRegion: "us-east",
+	}
+
 	testCases := []struct {
 		name           string
 		volumeID       int
-		linodeID       int
+		linode         *linodego.Instance
 		setupMocks     func()
 		expectedResult string
 		expectedError  error
@@ -665,7 +679,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume found and attached to correct instance",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:             123,
@@ -679,7 +695,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume found but not attached",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:       123,
@@ -692,7 +710,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume found but attached to different instance",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:       123,
@@ -705,7 +725,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume not found",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, &linodego.Error{
 					Code:    http.StatusNotFound,
@@ -718,7 +740,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "API error",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, errors.New("API error"))
 			},
@@ -731,7 +755,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linodeID)
+			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linode, volContext)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
