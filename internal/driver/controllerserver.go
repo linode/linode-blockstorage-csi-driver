@@ -154,9 +154,15 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return resp, err
 	}
 
+	// Retrieve and validate the instance associated with the Linode ID
+	instance, err := cs.getInstance(ctx, linodeID)
+	if err != nil {
+		return resp, err
+	}
+
 	// Check if the volume exists and is valid.
 	// If the volume is already attached to the specified instance, it returns its device path.
-	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, linodeID)
+	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance, req.GetVolumeContext())
 	if err != nil {
 		return resp, err
 	}
@@ -167,12 +173,6 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 				devicePathKey: devicePath,
 			},
 		}, nil
-	}
-
-	// Retrieve and validate the instance associated with the Linode ID
-	instance, err := cs.getInstance(ctx, linodeID)
-	if err != nil {
-		return resp, err
 	}
 
 	// Check if the instance can accommodate the volume attachment

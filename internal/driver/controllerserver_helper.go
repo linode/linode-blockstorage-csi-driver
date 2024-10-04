@@ -533,18 +533,29 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{volCap})
 	}
 
+	// check if the volume context contains the region
+	if _, ok := req.GetVolumeContext()[VolumeTopologyRegion]; !ok {
+		return 0, 0, errInternal("volume context in the request does not contain the region")
+	}
+
 	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
 	return linodeID, volumeID, nil
 }
 
-// getAndValidateVolume retrieves the volume by its ID and checks if it is
-// attached to the specified Linode instance. If the volume is found and
-// already attached to the instance, it returns its device path.
-// If the volume is not found or attached to a different instance, it
-// returns an appropriate error.
-func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, linodeID int) (string, error) {
+// getAndValidateVolume retrieves the volume by its ID and run checks.
+//
+// It performs the following checks:
+//  1. If the volume is found and already attached to the specified Linode instance,
+//     it returns the device path of the volume.
+//  2. If the volume is not found, it returns an error indicating that the volume does not exist.
+//  3. If the volume is attached to a different instance, it returns an error indicating
+//     that the volume is already attached elsewhere.
+//
+// Additionally, it checks if the volume and instance are in the same region based on
+// the provided volume context. If they are not in the same region, it returns an internal error.
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance, volContext map[string]string) (string, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", linodeID)
+	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
@@ -555,14 +566,19 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, 
 	}
 
 	if volume.LinodeID != nil {
-		if *volume.LinodeID == linodeID {
+		if *volume.LinodeID == instance.ID {
 			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
 			return volume.FilesystemPath, nil
 		}
-		return "", errVolumeAttached(volumeID, linodeID)
+		return "", errVolumeAttached(volumeID, instance.ID)
 	}
 
-	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", linodeID)
+	// check if the volume and instance are in the same region
+	if instance.Region != volContext[VolumeTopologyRegion] {
+		return "", errInternal("volume %d is in region %s, while the instance is located in %s", volumeID, volContext[VolumeTopologyRegion], instance.Region)
+	}
+
+	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
 }
 
