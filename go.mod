@@ -12,10 +12,10 @@ require (
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.4.0
-	golang.org/x/net v0.29.0
-	golang.org/x/sys v0.25.0
-	google.golang.org/grpc v1.67.0
-	google.golang.org/protobuf v1.34.2
+	golang.org/x/net v0.30.0
+	golang.org/x/sys v0.26.0
+	google.golang.org/grpc v1.67.1
+	google.golang.org/protobuf v1.35.1
 	k8s.io/apimachinery v0.31.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.31.1
@@ -30,7 +30,7 @@ require (
 	github.com/opencontainers/runc v1.1.14 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
