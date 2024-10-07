@@ -5,6 +5,9 @@ apiToken: ""
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
 
+# enable: This variable must be set to true to get metrics
+enable_metrics: false
+
 # (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""
 
