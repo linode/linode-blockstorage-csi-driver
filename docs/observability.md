@@ -11,6 +11,42 @@ Ensure the following tools are installed on your local machine:
 
 You should also have access to the Kubernetes cluster's kubeconfig file (`test-cluster-kubeconfig.yaml`), which will be used for running the make target.
 
+Here’s a more detailed explanation of the steps for opting in to the metrics for the CSI driver. The commands involve first deleting the existing CSI driver and then reinstalling it with metrics enabled:
+
+---
+
+## Steps to Opt-In for the CSI Driver Metrics
+
+To enable the metrics collection for the Linode CSI driver, follow the steps below. These steps involve exporting a new Helm template with metrics enabled, deleting the current CSI driver release, and applying the newly generated configuration.
+
+### 1. Export the Helm Template for the CSI Driver with Metrics Enabled
+
+First, you need to generate a new Helm template for the Linode CSI driver with the `enable_metrics` flag set to `true`. This ensures that the CSI driver is configured to expose its metrics.
+
+```bash
+helm template linode-csi-driver \
+  --set apiToken="${LINODE_API_TOKEN}" \
+  --set region="${REGION}" \
+  --set enable_metrics=true \
+  helm-chart/csi-driver --namespace kube-system > csi.yaml
+```
+
+### 2. Delete the Existing Release of the CSI Driver
+
+Before applying the new configuration, you need to delete the current release of the Linode CSI driver. This step is necessary because the default CSI driver installation does not have metrics enabled, and Helm doesn’t handle changes to some components gracefully without a clean reinstall.
+
+```bash
+kubectl delete -f csi.yaml --namespace kube-system
+```
+
+### 3. Apply the Newly Generated Template
+
+Once the old CSI driver installation is deleted, you can apply the newly generated template that includes the metrics configuration.
+
+```bash
+kubectl apply -f csi.yaml
+```
+
 ## Steps to Install the Grafana Dashboard
 
 ### 1. Build and Set Up the Cluster (Optional)
@@ -21,44 +57,36 @@ make mgmt-and-capl-cluster
 This command creates a management cluster and CAPL (Cluster API for Linode) cluster, installs the Linode CSI driver, and applies the necessary configurations to expose the CSI metrics.
 
 ### 2. Run the Grafana Dashboard Setup
-The make target `grafana-dashboard` will install Prometheus and Grafana in a Kubernetes namespace (`monitoring` by default) and configure a Grafana dashboard from a local JSON file. To execute this setup, run:
+The `grafana-dashboard` make target combines the installation of Prometheus, Grafana, and the dashboard configuration. It ensures that Prometheus is installed and connected to Grafana, and that a pre-configured dashboard is applied. To execute this setup, run:
 
 ```bash
 make grafana-dashboard
 ```
 
-### 3. What Happens During the Setup?
+#### What Happens During the Setup?
 
-- **Node Scheduling**: The script checks whether worker nodes exist in the cluster. If no worker nodes are found, it untaints the control-plane nodes to allow Prometheus and Grafana to be scheduled.
+This target combines three separate make targets:
+1. **`install-prometheus`**: Installs Prometheus using a Helm chart in the `monitoring` namespace. Prometheus is configured to scrape metrics from the CSI driver and other services.
+2. **`install-grafana`**: Installs Grafana using a Helm chart in the `monitoring` namespace, with Prometheus as its data source.
+3. **`setup-dashboard`**: Sets up a pre-configured Grafana dashboard by applying a ConfigMap containing the dashboard JSON (`observability/metrics/dashboard.json`).
 
-- **Helm Repository Setup**: Helm repositories for Prometheus and Grafana are added if not already present.
+### 3. Accessing the Grafana Dashboard
 
-- **Prometheus Installation**: The `prometheus` Helm chart is installed (or upgraded) in the monitoring namespace. It scrapes metrics from the CSI driver and other services.
+Once the setup is complete, you can access the Grafana dashboard through the configured LoadBalancer service. After the setup script runs, the external IP of the LoadBalancer is printed, and you can access Grafana by opening the following URL in your browser:
 
-- **Grafana Installation**: The `grafana` Helm chart is installed (or upgraded) in the same namespace, with Prometheus set as the data source.
-
-- **Dashboard ConfigMap**: The script uploads the Grafana dashboard configuration stored locally in `docs/dashboard.json` into a Kubernetes ConfigMap, ensuring the dashboard is automatically loaded into Grafana.
-
-- **Port Forwarding**: The script port-forwards the Grafana service to `localhost:3000`, allowing you to access the Grafana dashboard on your local machine.
-
-### 4. Accessing the Grafana Dashboard
-
-Once the setup is complete, open your web browser and navigate to:
 ```
-http://localhost:3000
+http://<LoadBalancer-EXTERNAL-IP>
 ```
 
 Log in using the following credentials:
 - Username: `admin`
 - Password: `admin`
 
-These details can be customized via the `install-monitoring-tools.sh` script if needed. 
+These credentials can be customized via environment variables in the `install-monitoring-tools.sh` script if needed.
 
-To understand the graphs and the metrics, go through the [Metrics Documentation](metrics-documentation.md).
+### 4. Stopping the Port Forwarding (if used)
 
-### 5. Stopping the Port Forwarding
-
-To stop the Grafana port forwarding, run:
+If you are using port forwarding instead of a LoadBalancer, and you wish to stop the forwarding, run:
 ```bash
 kill <PID>
 ```
@@ -68,15 +96,45 @@ If you do not have access to the script output, run:
 ```bash
 ps -ef | grep 'kubectl port-forward' | grep -v grep
 ```
-This will give you details about the process and also the `PID`. 
+This will give you details about the process and also the `PID`.
 
 ## Customizing the Setup
 
-- **Namespace**: The default namespace for the observability tools is `monitoring`. You can modify this by editing the `install-monitoring-tools.sh` script and changing the `NAMESPACE` variable.
+- **Namespace**: The default namespace for the observability tools is `monitoring`. You can modify this by passing the `--namespace` flag or editing the `install-monitoring-tools.sh` script and changing the `NAMESPACE` variable.
 
-- **Grafana Dashboard Configuration**: The dashboard configuration is stored in `docs/dashboard.json`. To apply a different dashboard, replace the contents of this file before running the make target.
+- **Grafana Dashboard Configuration**: The default dashboard configuration is stored in `observability/metrics/dashboard.json`. To apply a different dashboard, replace the contents of this file before running the `make grafana-dashboard` target.
 
 - **Prometheus Data Source**: The default data source is Prometheus, as defined in the Helm chart configuration. If you wish to use a different data source, modify the `helm upgrade` command in `install-monitoring-tools.sh`.
+
+## Makefile Targets
+
+### `install-prometheus`
+Installs Prometheus in the `monitoring` namespace using a Helm chart. Prometheus scrapes metrics from the CSI driver and other services in the cluster.
+
+```bash
+make install-prometheus
+```
+
+### `install-grafana`
+Installs Grafana in the `monitoring` namespace using a Helm chart. Prometheus is set as the data source for Grafana.
+
+```bash
+make install-grafana
+```
+
+### `setup-dashboard`
+Sets up the pre-configured Grafana dashboard by applying a ConfigMap containing the dashboard JSON. This ConfigMap is created from the `observability/metrics/dashboard.json` file.
+
+```bash
+make setup-dashboard
+```
+
+### `grafana-dashboard`
+This is a combined target that installs Prometheus, Grafana, and configures the Grafana dashboard. It runs the `install-prometheus`, `install-grafana`, and `setup-dashboard` targets sequentially.
+
+```bash
+make grafana-dashboard
+```
 
 ## Troubleshooting
 
@@ -88,3 +146,7 @@ kubectl logs <grafana-pod-name> -n monitoring
 ```
 
 This setup provides a quick and easy way to enable observability using Grafana dashboards, ensuring that you have visibility into your Kubernetes cluster and CSI driver operations.
+
+---
+
+This updated documentation reflects the newly structured make targets for easier installation and management of Prometheus, Grafana, and the dashboard configuration. Let me know if you'd like further adjustments!
