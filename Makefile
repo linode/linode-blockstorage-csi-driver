@@ -191,7 +191,7 @@ release:
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
 
 #####################################################################
-# Grafana Dashboard Installation End to End installation
+# Grafana Dashboard End to End Installation
 #####################################################################
 .PHONY: grafana-dashboard
 grafana-dashboard: install-prometheus install-grafana setup-dashboard
