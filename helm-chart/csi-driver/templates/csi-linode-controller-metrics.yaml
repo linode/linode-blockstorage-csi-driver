@@ -1,11 +1,13 @@
+{{- if .Values.enable_metrics }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: csi-linode-controller-metrics-10248
+  name: csi-provisioner-metrics
   namespace: kube-system
   labels:
     app: csi-linode-controller
-    service: csi-linode-controller-metrics-10248
+    service: csi-provisioner-metrics
   annotations:
     prometheus.io/scrape: 'true'
     prometheus.io/port: '10248'
@@ -22,11 +24,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: csi-linode-controller-metrics-10249
+  name: csi-attacher-metrics
   namespace: kube-system
   labels:
     app: csi-linode-controller
-    service: csi-linode-controller-metrics-10249
+    service: csi-attacher-metrics
   annotations:
     prometheus.io/scrape: 'true'
     prometheus.io/port: '10249'
@@ -43,11 +45,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: csi-linode-controller-metrics-10250
+  name: csi-resizer-metrics
   namespace: kube-system
   labels:
     app: csi-linode-controller
-    service: csi-linode-controller-metrics-10250
+    service: csi-resizer-metrics
   annotations:
     prometheus.io/scrape: 'true'
     prometheus.io/port: '10250'
@@ -60,3 +62,4 @@ spec:
       port: 10250
       targetPort: 10250
       protocol: TCP
+{{- end }}

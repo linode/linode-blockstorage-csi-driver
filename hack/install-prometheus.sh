@@ -39,10 +39,6 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 echo "Updating Helm repositories..."
 helm repo update
 
-# Create service to export the metrics for Prometheus to scrape from the sidecars
-echo "Applying CSI Linode Controller Metrics Service..."
-kubectl apply -f observability/metrics/csi-linode-controller-metrics-service.yaml || true
-
 # Create a namespace for monitoring tools
 echo "Creating namespace '${NAMESPACE}'..."
 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
