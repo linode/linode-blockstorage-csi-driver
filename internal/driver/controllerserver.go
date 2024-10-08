@@ -78,7 +78,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Attempt to retrieve information about a source volume if the request includes a content source.
 	// This is important for scenarios where the volume is being cloned from an existing one.
-	sourceVolInfo, err := cs.getContentSourceVolume(ctx, req.GetVolumeContentSource())
+	sourceVolInfo, err := cs.getContentSourceVolume(ctx, req)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}

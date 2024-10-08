@@ -131,10 +131,11 @@ func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, ins
 
 // getContentSourceVolume retrieves information about the Linode volume to clone from.
 // It returns a LinodeVolumeKey if a valid source volume is found, or an error if the source is invalid.
-func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (volKey *linodevolumes.LinodeVolumeKey, err error) {
+func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, req *csi.CreateVolumeRequest) (volKey *linodevolumes.LinodeVolumeKey, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to get content source volume")
 
+	contentSource := req.GetVolumeContentSource()
 	if contentSource == nil {
 		return volKey, nil // Return nil if no content source is provided
 	}
@@ -167,9 +168,17 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
 	}
 
-	// Check if the volume's region matches the server's metadata region
-	if volumeData.Region != cs.metadata.Region {
+	// Check if the source volume's region matches the server's metadata region
+	// If no topology is specified, the source volume must be in the same region as the server's metadata region
+	if req.GetAccessibilityRequirements() == nil && volumeData.Region != cs.metadata.Region {
 		return nil, errRegionMismatch(volumeData.Region, cs.metadata.Region)
+	}
+
+	// If a topology is specified, the source volume must be in the same region as the specified topology
+	if req.GetAccessibilityRequirements() != nil {
+		if volumeData.Region != req.GetAccessibilityRequirements().GetPreferred()[0].GetSegments()[VolumeTopologyRegion] {
+			return nil, errRegionMismatch(volumeData.Region, req.GetAccessibilityRequirements().GetPreferred()[0].GetSegments()[VolumeTopologyRegion])
+		}
 	}
 
 	log.V(4).Info("Content source volume", "volumeData", volumeData)

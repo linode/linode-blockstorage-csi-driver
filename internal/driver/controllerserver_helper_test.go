@@ -839,7 +839,7 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 	}
 }
 
-func TestAttemptGetContentSourceVolume(t *testing.T) {
+func TestGetContentSourceVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -853,22 +853,26 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		contentSource  *csi.VolumeContentSource
+		req            *csi.CreateVolumeRequest
 		setupMocks     func()
 		expectedResult *linodevolumes.LinodeVolumeKey
 		expectedError  error
 	}{
 		{
-			name:           "Nil content source",
-			contentSource:  nil,
+			name: "Nil content source",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: nil,
+			},
 			setupMocks:     func() {},
 			expectedResult: nil,
 			expectedError:  errNilSource,
 		},
 		{
 			name: "Invalid content source type",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Snapshot{},
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Snapshot{},
+				},
 			},
 			setupMocks:     func() {},
 			expectedResult: nil,
@@ -876,9 +880,11 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Nil volume",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: nil,
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: nil,
+					},
 				},
 			},
 			setupMocks:     func() {},
@@ -887,10 +893,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Invalid volume ID",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "test-volume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "test-volume",
+						},
 					},
 				},
 			},
@@ -900,10 +908,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Valid content source, matching region",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "123-testvolume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "123-testvolume",
+						},
 					},
 				},
 			},
@@ -921,10 +931,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Valid content source, mismatched region",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "456-othervolume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "456-othervolume",
+						},
 					},
 				},
 			},
@@ -939,10 +951,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "API error",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "789-errorvolume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "789-errorvolume",
+						},
 					},
 				},
 			},
@@ -958,7 +972,7 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.getContentSourceVolume(context.Background(), tc.contentSource)
+			result, err := cs.getContentSourceVolume(context.Background(), tc.req)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
