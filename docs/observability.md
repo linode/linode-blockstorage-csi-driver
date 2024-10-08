@@ -70,6 +70,44 @@ This target combines three separate make targets:
 2. **`install-grafana`**: Installs Grafana using a Helm chart in the `monitoring` namespace, with Prometheus as its data source.
 3. **`setup-dashboard`**: Sets up a pre-configured Grafana dashboard by applying a ConfigMap containing the dashboard JSON (`observability/metrics/dashboard.json`).
 
+#### Customizing the Setup
+
+You can customize the retention period, Grafana admin username, and password by passing the appropriate environment variables to the `make` command:
+
+- **Data Retention Period**: You can set the Prometheus data retention period by passing the `DATA_RETENTION_PERIOD` environment variable when running `make grafana-dashboard`. For example, to set a retention period of 15 days:
+
+  ```bash
+  DATA_RETENTION_PERIOD=15d make grafana-dashboard
+  ```
+
+  This will ensure that the `install-prometheus` target applies the specified retention period during the Prometheus installation.
+
+- **Grafana Admin Username**: To customize the admin username for Grafana, use the `GRAFANA_USERNAME` environment variable. For example, to set the username to `myadmin`:
+
+  ```bash
+  GRAFANA_USERNAME=myadmin make grafana-dashboard
+  ```
+
+  This will ensure that the `install-grafana` target installs Grafana with the specified admin username.
+
+- **Grafana Admin Password**: You can set a custom admin password for Grafana by passing the `GRAFANA_PASSWORD` environment variable. For example, to set the password to `mypassword`:
+
+  ```bash
+  GRAFANA_PASSWORD=mypassword make grafana-dashboard
+  ```
+
+  This will ensure that the `install-grafana` target installs Grafana with the specified admin password.
+
+### Example:
+
+To set a retention period of 30 days, and change the Grafana admin username to `user` and password to `password`, you would run:
+
+```bash
+DATA_RETENTION_PERIOD=30d GRAFANA_USERNAME=user GRAFANA_PASSWORD=password make grafana-dashboard
+```
+
+These environment variables are passed to the respective make targets (`install-prometheus` and `install-grafana`) to ensure the correct configurations are applied during the setup.
+
 ### 3. Accessing the Grafana Dashboard
 
 Once the setup is complete, you can access the Grafana dashboard through the configured LoadBalancer service. After the setup script runs, the external IP of the LoadBalancer is printed, and you can access Grafana by opening the following URL in your browser:
