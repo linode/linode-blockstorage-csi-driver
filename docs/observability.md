@@ -72,41 +72,38 @@ This target combines three separate make targets:
 
 #### Customizing the Setup
 
-You can customize the retention period, Grafana admin username, and password by passing the appropriate environment variables to the `make` command:
+Sure! Here's a more concise, table-like version of the documentation for customizing the Grafana dashboard setup:
 
-- **Data Retention Period**: You can set the Prometheus data retention period by passing the `DATA_RETENTION_PERIOD` environment variable when running `make grafana-dashboard`. For example, to set a retention period of 15 days:
+---
 
-  ```bash
-  DATA_RETENTION_PERIOD=15d make grafana-dashboard
-  ```
+### 2. Run the Grafana Dashboard Setup
 
-  This will ensure that the `install-prometheus` target applies the specified retention period during the Prometheus installation.
-
-- **Grafana Admin Username**: To customize the admin username for Grafana, use the `GRAFANA_USERNAME` environment variable. For example, to set the username to `myadmin`:
-
-  ```bash
-  GRAFANA_USERNAME=myadmin make grafana-dashboard
-  ```
-
-  This will ensure that the `install-grafana` target installs Grafana with the specified admin username.
-
-- **Grafana Admin Password**: You can set a custom admin password for Grafana by passing the `GRAFANA_PASSWORD` environment variable. For example, to set the password to `mypassword`:
-
-  ```bash
-  GRAFANA_PASSWORD=mypassword make grafana-dashboard
-  ```
-
-  This will ensure that the `install-grafana` target installs Grafana with the specified admin password.
-
-### Example:
-
-To set a retention period of 30 days, and change the Grafana admin username to `user` and password to `password`, you would run:
+The `grafana-dashboard` target installs Prometheus, Grafana, and applies the dashboard configuration. To run the setup:
 
 ```bash
-DATA_RETENTION_PERIOD=30d GRAFANA_USERNAME=user GRAFANA_PASSWORD=password make grafana-dashboard
+make grafana-dashboard
 ```
 
-These environment variables are passed to the respective make targets (`install-prometheus` and `install-grafana`) to ensure the correct configurations are applied during the setup.
+#### Customizing the Setup
+
+You can customize various aspects of the setup by passing environment variables when running the `make grafana-dashboard` command. Use the following variables:
+
+| **Variable**           | **Description**                          | **Example**                 |
+|------------------------|------------------------------------------|-----------------------------|
+| `DATA_RETENTION_PERIOD` | Sets the data retention period for Prometheus. | `DATA_RETENTION_PERIOD=30d` |
+| `GRAFANA_USERNAME`      | Sets the Grafana admin username.         | `GRAFANA_USERNAME=myadmin`  |
+| `GRAFANA_PASSWORD`      | Sets the Grafana admin password.         | `GRAFANA_PASSWORD=password` |
+### Example
+
+To set a retention period of 30 days, and customize the Grafana admin credentials:
+
+```bash
+DATA_RETENTION_PERIOD=30d GRAFANA_USERNAME=user GRAFANA_PASSWORD=securepass make grafana-dashboard
+```
+
+These variables customize the respective make targets: `install-prometheus` for Prometheus configuration and `install-grafana` for Grafana configuration.
+
+---
 
 ### 3. Accessing the Grafana Dashboard
 
