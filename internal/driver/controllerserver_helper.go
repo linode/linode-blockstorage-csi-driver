@@ -244,7 +244,8 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
 	// Get the region from req.AccessibilityRequirements if it exists. Fall back to the controller's metadata region if not specified.
-	region := cs.metadata.Region
+	// region := cs.metadata.Region
+	var region string // JUST FOR TESTING WILL BE REMOVED
 	if accessibilityRequirements != nil {
 		if topologyRegion := getRegionFromTopology(accessibilityRequirements); topologyRegion != "" {
 			region = topologyRegion
