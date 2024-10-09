@@ -246,6 +246,7 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 	region := cs.metadata.Region
 	if accessibilityRequirements != nil {
 		if topologyRegion := getRegionFromTopology(accessibilityRequirements); topologyRegion != "" {
+			log.V(4).Info("Using region from topology", "region", topologyRegion)
 			region = topologyRegion
 		}
 	}

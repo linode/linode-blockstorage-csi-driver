@@ -23,6 +23,7 @@ spec:
         - --volume-name-prefix=pvc
         - --volume-name-uuid-length=16
         - --csi-address=$(ADDRESS)
+        - --feature-gates=Topology=true
         - --v=2
         env:
         - name: ADDRESS

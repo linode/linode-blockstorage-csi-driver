@@ -16,3 +16,21 @@ metadata:
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Retain
 allowVolumeExpansion: true
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: linode-block-storage-topology-aware
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: linode-block-storage-topology-aware-retain
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer

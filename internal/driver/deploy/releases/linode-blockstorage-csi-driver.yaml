@@ -17,6 +17,24 @@ metadata:
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Retain
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: linode-block-storage-topology-aware-retain
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: linode-block-storage-topology-aware
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -313,6 +331,7 @@ spec:
         - --volume-name-prefix=pvc
         - --volume-name-uuid-length=16
         - --csi-address=$(ADDRESS)
+        - --feature-gates=Topology=true
         - --v=2
         env:
         - name: ADDRESS

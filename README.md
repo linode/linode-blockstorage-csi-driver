@@ -18,6 +18,7 @@
   - [Creating a PersistentVolumeClaim](docs/usage.md#creating-a-persistentvolumeclaim)
   - [Encrypted Drives using LUKS](docs/encrypted-drives.md)
   - [Adding Tags to Created Volumes](docs/volume-tags.md)
+  - [Topology-Aware Provisioning](docs/topology-aware-provisioning.md)
 - [Development Setup](docs/development-setup.md)
   - [Prerequisites](docs/development-setup.md#-prerequisites)
   - [Setting Up the Local Development Environment](docs/development-setup.md#-setting-up-the-local-development-environment)
