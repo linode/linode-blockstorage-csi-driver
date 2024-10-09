@@ -583,8 +583,8 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 		return "", errVolumeAttached(volumeID, instance.ID)
 	}
 
-	// check if the volume and instance are in the same region only if the volume context is provided
-	if volContext != nil && instance.Region != volContext[VolumeTopologyRegion] {
+	// check if the volume and instance are in the same region
+	if instance.Region != volContext[VolumeTopologyRegion] {
 		return "", errRegionMismatch(volContext[VolumeTopologyRegion], instance.Region)
 	}
 
