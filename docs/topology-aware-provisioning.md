@@ -71,10 +71,9 @@ This example demonstrates how to set up topology-aware provisioning using the Li
 
 #### Provisioning Process
 
-1. CO determines required topology based on application needs and cluster layout.
-2. CO includes `TopologyRequirement` in `CreateVolume` call.
+1. CO (Kubernetes) determines required topology based on application needs (pod scheduled region) and cluster layout.
+2. external-provisioner gathers topology requirements from CO and includes `TopologyRequirement` in `CreateVolume` call.
 3. CSI driver creates volume satisfying topology requirements.
 4. Driver returns actual topology of created volume.
-5. CO uses this information to schedule workloads on nodes with matching topology.
 
 By leveraging topology-aware provisioning, CSI drivers ensure optimal volume placement within the infrastructure, improving performance, availability, and data locality.
