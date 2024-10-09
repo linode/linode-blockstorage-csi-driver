@@ -23,7 +23,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"k8s.io/mount-utils"
 
@@ -32,6 +31,7 @@ import (
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
 )
 
 type NodeServer struct {
@@ -47,36 +47,7 @@ type NodeServer struct {
 	csi.UnimplementedNodeServer
 }
 
-const (
-	successTrue  = "true"
-	successFalse = "false"
-)
-
 var _ csi.NodeServer = &NodeServer{}
-
-var (
-	nodePublishTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "csi_node_publish_total",
-			Help: "Total number of NodePublishVolume calls",
-		},
-		[]string{"success"},
-	)
-
-	nodePublishDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "csi_node_publish_duration_seconds",
-			Help:    "Duration of NodePublishVolume calls",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"success"},
-	)
-)
-
-func init() {
-	prometheus.MustRegister(nodePublishTotal)
-	prometheus.MustRegister(nodePublishDuration)
-}
 
 func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
 	log := logger.GetLogger(ctx)
@@ -116,23 +87,23 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
-
+	log.V(4).Info("Node Publish Volume Function called")
 	start := time.Now()
 	volumeID := req.GetVolumeId()
-	log.V(2).Info("Processing request", "volumeID", volumeID)
+	log.V(4).Info("Processing request", "volumeID", volumeID)
 
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
-	success := successTrue
+	success := metrics.SuccessTrue
 
 	// Validate the request object
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodePublishVolumeRequest(ctx, req); err != nil {
-		success = successFalse
+		success = metrics.SuccessFalse
 		// Record failure metric before returning
-		nodePublishTotal.WithLabelValues(success).Inc()
-		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+		metrics.NodePublishTotal.WithLabelValues(success).Inc()
+		metrics.NodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -149,11 +120,11 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		log.V(4).Info("Publishing volume as block volume", "volumeID", volumeID)
 		response, err := ns.nodePublishVolumeBlock(ctx, req, options, fs)
 		if err != nil {
-			success = successFalse
+			success = metrics.SuccessFalse
 		}
 		// Record success or failure metric
-		nodePublishTotal.WithLabelValues(success).Inc()
-		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+		metrics.NodePublishTotal.WithLabelValues(success).Inc()
+		metrics.NodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return response, err
 	}
 
@@ -163,15 +134,15 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	log.V(4).Info("Ensuring target path is a valid mount point", "volumeID", volumeID, "targetPath", targetPath)
 	notMnt, err := ns.ensureMountPoint(ctx, targetPath, fs)
 	if err != nil {
-		success = successFalse
-		nodePublishTotal.WithLabelValues(success).Inc()
-		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+		success = metrics.SuccessFalse
+		metrics.NodePublishTotal.WithLabelValues(success).Inc()
+		metrics.NodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 	if !notMnt {
 		log.V(4).Info("Target path is already a mount point", "volumeID", volumeID, "targetPath", targetPath)
-		nodePublishTotal.WithLabelValues(success).Inc()
-		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+		metrics.NodePublishTotal.WithLabelValues(success).Inc()
+		metrics.NodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -182,17 +153,17 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	err = ns.mounter.Mount(stagingTargetPath, targetPath, "ext4", options)
 
 	if err != nil {
-		success = successFalse
-		nodePublishTotal.WithLabelValues(success).Inc()
-		nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+		success = metrics.SuccessFalse
+		metrics.NodePublishTotal.WithLabelValues(success).Inc()
+		metrics.NodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
 
 	// Record success metrics
-	nodePublishTotal.WithLabelValues(success).Inc()
-	nodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
+	metrics.NodePublishTotal.WithLabelValues(success).Inc()
+	metrics.NodePublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 
-	log.V(2).Info("Successfully completed", "volumeID", volumeID)
+	log.V(4).Info("Successfully completed", "volumeID", volumeID)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
