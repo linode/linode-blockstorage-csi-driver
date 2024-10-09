@@ -69,6 +69,15 @@ spec:
 
 This example demonstrates how to set up topology-aware provisioning using the Linode Block Storage CSI Driver. The StorageClass defines the provisioner and reclaim policy, while the PersistentVolumeClaim requests storage from this class. The Pod specification shows how to use the PVC and includes a node selector for region-specific deployment.
 
+> [!IMPORTANT]
+> To enable topology-aware provisioning, make sure to pass the following argument to the csi-provisioner sidecar:
+> ```
+> --feature-gates=CSINodeInfo=true
+> ```
+> This enables the CSINodeInfo feature gate, which is required for topology-aware provisioning to function correctly.
+> 
+> Note: This feature is enabled by default in release v0.8.6 and later versions.
+
 #### Provisioning Process
 
 1. CO (Kubernetes) determines required topology based on application needs (pod scheduled region) and cluster layout.
