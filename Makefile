@@ -65,6 +65,10 @@ HELM_VERSION         ?= "v0.2.1"
 CAPL_VERSION         ?= "v0.6.4"
 CONTROLPLANE_NODES   ?= 1
 WORKER_NODES         ?= 1
+GRAFANA_PORT ?= 3000
+GRAFANA_USERNAME ?= admin
+GRAFANA_PASSWORD ?= admin
+DATA_RETENTION_PERIOD ?= 15d  # Prometheus data retention period
 
 .PHONY: build
 build:
@@ -185,3 +189,27 @@ release:
 	cp ./internal/driver/deploy/releases/linode-blockstorage-csi-driver-$(IMAGE_VERSION).yaml ./$(RELEASE_DIR)
 	sed -e 's/appVersion: "latest"/appVersion: "$(IMAGE_VERSION)"/g' ./helm-chart/csi-driver/Chart.yaml
 	tar -czvf ./$(RELEASE_DIR)/helm-chart-$(IMAGE_VERSION).tgz -C ./helm-chart/csi-driver .
+
+#####################################################################
+# Grafana Dashboard End to End Installation
+#####################################################################
+.PHONY: grafana-dashboard
+grafana-dashboard: install-prometheus install-grafana setup-dashboard
+
+#####################################################################
+# Monitoring Tools Installation
+#####################################################################
+.PHONY: install-prometheus
+install-prometheus:
+	KUBECONFIG=test-cluster-kubeconfig.yaml DATA_RETENTION_PERIOD=$(DATA_RETENTION_PERIOD) \
+		./hack/install-prometheus.sh --timeout=600s
+
+.PHONY: install-grafana
+install-grafana:
+	KUBECONFIG=test-cluster-kubeconfig.yaml GRAFANA_PORT=$(GRAFANA_PORT) \
+		GRAFANA_USERNAME=$(GRAFANA_USERNAME) GRAFANA_PASSWORD=$(GRAFANA_PASSWORD) \
+		./hack/install-grafana.sh --timeout=600s
+
+.PHONY: setup-dashboard
+setup-dashboard:
+	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-dashboard.sh --namespace=monitoring --dashboard-file=observability/metrics/dashboard.json

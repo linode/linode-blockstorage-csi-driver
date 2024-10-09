@@ -18,118 +18,144 @@ spec:
         role: csi-linode
     spec:
       containers:
-      - args:
-        - --default-fstype=ext4
-        - --volume-name-prefix=pvc
-        - --volume-name-uuid-length=16
-        - --csi-address=$(ADDRESS)
-        - --feature-gates=Topology=true
-        - --v=2
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: {{ .Values.csiProvisioner.image }}:{{ .Values.csiProvisioner.tag }}
-        imagePullPolicy: {{ .Values.csiProvisioner.pullPolicy }}
-        name: csi-provisioner
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      - args:
-        - --v=2
-        - --csi-address=$(ADDRESS)
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: {{ .Values.csiAttacher.image }}:{{ .Values.csiAttacher.tag }}
-        imagePullPolicy: {{ .Values.csiAttacher.pullPolicy }}
-        name: csi-attacher
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      - args:
-        - --v=2
-        - --csi-address=$(ADDRESS)
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: {{ .Values.csiResizer.image }}:{{ .Values.csiResizer.tag }}
-        imagePullPolicy: {{ .Values.csiResizer.pullPolicy }}
-        name: csi-resizer
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      - args:
-        - --v=2
-        env:
-        - name: CSI_ENDPOINT
-          value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
-        - name: LINODE_URL
-          value: https://api.linode.com/v4
-        - name: LINODE_VOLUME_LABEL_PREFIX
-          value: {{ .Values.volumeLabelPrefix | default "" | quote }}
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: spec.nodeName
-        - name: LINODE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
-              key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
-        image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
-        name: csi-linode-plugin
-        volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      hostNetwork: true
+        - args:
+            - --default-fstype=ext4
+            - --volume-name-prefix=pvc
+            - --volume-name-uuid-length=16
+            - --csi-address=$(ADDRESS)
+            - --feature-gates=Topology=true
+            - --v=2
+            {{- if .Values.enable_metrics}}
+            - --metrics-address={{ .Values.csiProvisioner.metrics.address }}
+            {{- end }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: {{ .Values.csiProvisioner.image }}:{{ .Values.csiProvisioner.tag }}
+          imagePullPolicy: {{ .Values.csiProvisioner.pullPolicy }}
+          name: csi-provisioner
+          {{- if .Values.enable_metrics}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.csiProvisioner.metrics.port }}
+              protocol: TCP
+          {{- end}}
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - args:
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            {{- if .Values.enable_metrics }}
+            - --metrics-address={{ .Values.csiAttacher.metrics.address }}
+            {{- end }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: {{ .Values.csiAttacher.image }}:{{ .Values.csiAttacher.tag }}
+          imagePullPolicy: {{ .Values.csiAttacher.pullPolicy }}
+          name: csi-attacher
+          {{- if .Values.enable_metrics}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.csiAttacher.metrics.port }}
+              protocol: TCP
+          {{- end}}
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - args:
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            {{- if .Values.enable_metrics }}
+            - --metrics-address={{ .Values.csiResizer.metrics.address }}
+            {{- end }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: {{ .Values.csiResizer.image }}:{{ .Values.csiResizer.tag }}
+          imagePullPolicy: {{ .Values.csiResizer.pullPolicy }}
+          name: csi-resizer
+          {{- if .Values.enable_metrics}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.csiResizer.metrics.port }}
+              protocol: TCP
+          {{- end}}
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+        - args:
+            - --v=2
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: LINODE_URL
+              value: https://api.linode.com/v4
+            - name: LINODE_VOLUME_LABEL_PREFIX
+              value: {{ .Values.volumeLabelPrefix | default "" | quote }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: LINODE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
+                  key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
+          image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
+          name: csi-linode-plugin
+          volumeMounts:
+            - mountPath: /linode-info
+              name: linode-info
+            - mountPath: /scripts
+              name: get-linode-id
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
       initContainers:
-      - command:
-        - /scripts/get-linode-id.sh
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: spec.nodeName
-        image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
-        securityContext:
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-            - SYS_ADMIN
-          privileged: true
-        name: init
-        volumeMounts:
-        - mountPath: /dev
-          name: dev
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
+        - command:
+            - /scripts/get-linode-id.sh
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+          name: init
+          volumeMounts:
+            - mountPath: /dev
+              name: dev
+            - mountPath: /linode-info
+              name: linode-info
+            - mountPath: /scripts
+              name: get-linode-id
       serviceAccount: csi-controller-sa
       tolerations:
-      - effect: NoSchedule
-        operator: Exists
-      - key: CriticalAddonsOnly
-        operator: Exists
-      - effect: NoExecute
-        operator: Exists
+        - effect: NoSchedule
+          operator: Exists
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
       volumes:
-      - emptyDir: {}
-        name: socket-dir
-      - emptyDir: {}
-        name: linode-info
-      - configMap:
-          defaultMode: 493
+        - emptyDir: {}
+          name: socket-dir
+        - emptyDir: {}
+          name: linode-info
+        - configMap:
+            defaultMode: 493
+            name: get-linode-id
           name: get-linode-id
-        name: get-linode-id
-      - hostPath:
-          path: /dev
-          type: Directory
-        name: dev
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev
