@@ -972,7 +972,7 @@ func TestGetContentSourceVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.getContentSourceVolume(context.Background(), tc.req)
+			result, err := cs.getContentSourceVolume(context.Background(), tc.req.GetVolumeContentSource(), tc.req.GetAccessibilityRequirements())
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)

@@ -98,11 +98,11 @@ jobs:
       - name: Run E2E Tests
         run: devbox run e2e-test
 
-      # - name: Run CSI-Sanity Tests
-      #   run: devbox run csi-sanity-test
+      - name: Run CSI-Sanity Tests
+        run: devbox run csi-sanity-test
 
-      # TEMPORARY: run upstream E2E Tests
       - name: run upstream E2E Tests
+        if: github.ref == 'refs/heads/main'
         run: devbox run upstream-e2e-tests
 
       - name: Cleanup Resources

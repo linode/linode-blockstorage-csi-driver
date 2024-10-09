@@ -76,15 +76,18 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
+	contentSource := req.GetVolumeContentSource()
+	accessibilityRequirements := req.GetAccessibilityRequirements()
+
 	// Attempt to retrieve information about a source volume if the request includes a content source.
 	// This is important for scenarios where the volume is being cloned from an existing one.
-	sourceVolInfo, err := cs.getContentSourceVolume(ctx, req)
+	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo, req.GetAccessibilityRequirements())
+	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo, accessibilityRequirements)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
@@ -93,7 +96,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volContext := cs.createVolumeContext(ctx, req, vol)
 
 	// Prepare and return response
-	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, req.GetVolumeContentSource())
+	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, contentSource)
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
