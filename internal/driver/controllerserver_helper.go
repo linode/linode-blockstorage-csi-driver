@@ -167,17 +167,16 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
 	}
 
-	// Check if the source volume's region matches the server's metadata region
-	// If no topology is specified, the source volume must be in the same region as the server's metadata region
-	if accessibilityRequirements == nil && volumeData.Region != cs.metadata.Region {
-		return nil, errRegionMismatch(volumeData.Region, cs.metadata.Region)
+	// Check if the source volume's region matches the required region
+	requiredRegion := cs.metadata.Region
+	if accessibilityRequirements != nil {
+		if topologyRegion := getRegionFromTopology(accessibilityRequirements); topologyRegion != "" {
+			requiredRegion = topologyRegion
+		}
 	}
 
-	// If a topology is specified, the source volume must be in the same region as the specified topology
-	if accessibilityRequirements != nil {
-		if volumeData.Region != accessibilityRequirements.GetPreferred()[0].GetSegments()[VolumeTopologyRegion] {
-			return nil, errRegionMismatch(volumeData.Region, accessibilityRequirements.GetPreferred()[0].GetSegments()[VolumeTopologyRegion])
-		}
+	if volumeData.Region != requiredRegion {
+		return nil, errRegionMismatch(volumeData.Region, requiredRegion)
 	}
 
 	log.V(4).Info("Content source volume", "volumeData", volumeData)
