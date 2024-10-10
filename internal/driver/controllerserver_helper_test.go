@@ -1122,3 +1122,91 @@ func TestGetInstance(t *testing.T) {
 		})
 	}
 }
+
+func Test_getRegionFromTopology(t *testing.T) {
+	tests := []struct {
+		name         string
+		requirements *csi.TopologyRequirement
+		want         string
+	}{
+		{
+			name:         "Nil requirements",
+			requirements: nil,
+			want:         "",
+		},
+		{
+			name: "Empty preferred",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{},
+			},
+			want: "",
+		},
+		{
+			name: "Single preferred topology with region",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "us-east",
+						},
+					},
+				},
+			},
+			want: "us-east",
+		},
+		{
+			name: "Multiple preferred topologies",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "us-east",
+						},
+					},
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "us-west",
+						},
+					},
+				},
+			},
+			want: "us-east",
+		},
+		{
+			name: "Preferred topology without region",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							"some-key": "some-value",
+						},
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "Empty preferred, non-empty requisite",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{},
+				Requisite: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "eu-west",
+						},
+					},
+				},
+			},
+			want: "eu-west",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getRegionFromTopology(tt.requirements)
+			if got != tt.want {
+				t.Errorf("getRegionFromTopology() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
