@@ -135,6 +135,9 @@ func TestPrepareCreateVolumeResponse(t *testing.T) {
 }
 
 func TestCreateVolumeContext(t *testing.T) {
+	vol := &linodego.Volume{
+		Region: "us-east",
+	}
 	tests := []struct {
 		name           string
 		req            *csi.CreateVolumeRequest
@@ -146,7 +149,9 @@ func TestCreateVolumeContext(t *testing.T) {
 				Name:       "test-volume",
 				Parameters: map[string]string{},
 			},
-			expectedResult: map[string]string{},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
 		},
 		{
 			name: "Encrypted volume with all parameters",
@@ -163,6 +168,7 @@ func TestCreateVolumeContext(t *testing.T) {
 				PublishInfoVolumeName:  "encrypted-volume",
 				LuksCipherAttribute:    "aes-xts-plain64",
 				LuksKeySizeAttribute:   "512",
+				VolumeTopologyRegion:   "us-east",
 			},
 		},
 		// IMPORTANT:Now sure if we want this behavior, but it's what the code currently does.
@@ -179,6 +185,7 @@ func TestCreateVolumeContext(t *testing.T) {
 				PublishInfoVolumeName:  "partial-encrypted-volume",
 				LuksCipherAttribute:    "",
 				LuksKeySizeAttribute:   "",
+				VolumeTopologyRegion:   "us-east",
 			},
 		},
 		{
@@ -191,7 +198,9 @@ func TestCreateVolumeContext(t *testing.T) {
 					LuksKeySizeAttribute:   "512",
 				},
 			},
-			expectedResult: map[string]string{},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
 		},
 	}
 
@@ -199,7 +208,7 @@ func TestCreateVolumeContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cs := &ControllerServer{}
 			ctx := context.Background()
-			result := cs.createVolumeContext(ctx, tt.req)
+			result := cs.createVolumeContext(ctx, tt.req, vol)
 
 			if !reflect.DeepEqual(result, tt.expectedResult) {
 				t.Errorf("createVolumeContext() = %v, want %v", result, tt.expectedResult)
@@ -215,6 +224,16 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 	mockClient := mocks.NewMockLinodeClient(ctrl)
 	cs := &ControllerServer{
 		client: mockClient,
+	}
+
+	topology := &csi.TopologyRequirement{
+		Preferred: []*csi.Topology{
+			{
+				Segments: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+			},
+		},
 	}
 
 	testCases := []struct {
@@ -302,7 +321,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo)
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo, topology)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
@@ -550,6 +569,9 @@ func TestValidateControllerPublishVolumeRequest(t *testing.T) {
 						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 					},
 				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
 			},
 			expectedNodeID: 12345,
 			expectedVolID:  67890,
@@ -654,10 +676,14 @@ func TestGetAndValidateVolume(t *testing.T) {
 		client: mockClient,
 	}
 
+	volContext := map[string]string{
+		VolumeTopologyRegion: "us-east",
+	}
+
 	testCases := []struct {
 		name           string
 		volumeID       int
-		linodeID       int
+		linode         *linodego.Instance
 		setupMocks     func()
 		expectedResult string
 		expectedError  error
@@ -665,7 +691,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume found and attached to correct instance",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:             123,
@@ -679,7 +707,10 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume found but not attached",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID:     456,
+				Region: "us-east",
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:       123,
@@ -692,7 +723,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume found but attached to different instance",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:       123,
@@ -705,7 +738,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "Volume not found",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, &linodego.Error{
 					Code:    http.StatusNotFound,
@@ -718,7 +753,9 @@ func TestGetAndValidateVolume(t *testing.T) {
 		{
 			name:     "API error",
 			volumeID: 123,
-			linodeID: 456,
+			linode: &linodego.Instance{
+				ID: 456,
+			},
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, errors.New("API error"))
 			},
@@ -731,7 +768,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linodeID)
+			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linode, volContext)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
@@ -802,7 +839,7 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 	}
 }
 
-func TestAttemptGetContentSourceVolume(t *testing.T) {
+func TestGetContentSourceVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -816,22 +853,26 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		contentSource  *csi.VolumeContentSource
+		req            *csi.CreateVolumeRequest
 		setupMocks     func()
 		expectedResult *linodevolumes.LinodeVolumeKey
 		expectedError  error
 	}{
 		{
-			name:           "Nil content source",
-			contentSource:  nil,
+			name: "Nil content source",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: nil,
+			},
 			setupMocks:     func() {},
 			expectedResult: nil,
 			expectedError:  errNilSource,
 		},
 		{
 			name: "Invalid content source type",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Snapshot{},
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Snapshot{},
+				},
 			},
 			setupMocks:     func() {},
 			expectedResult: nil,
@@ -839,9 +880,11 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Nil volume",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: nil,
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: nil,
+					},
 				},
 			},
 			setupMocks:     func() {},
@@ -850,10 +893,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Invalid volume ID",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "test-volume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "test-volume",
+						},
 					},
 				},
 			},
@@ -863,10 +908,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Valid content source, matching region",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "123-testvolume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "123-testvolume",
+						},
 					},
 				},
 			},
@@ -884,10 +931,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "Valid content source, mismatched region",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "456-othervolume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "456-othervolume",
+						},
 					},
 				},
 			},
@@ -902,10 +951,12 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		},
 		{
 			name: "API error",
-			contentSource: &csi.VolumeContentSource{
-				Type: &csi.VolumeContentSource_Volume{
-					Volume: &csi.VolumeContentSource_VolumeSource{
-						VolumeId: "789-errorvolume",
+			req: &csi.CreateVolumeRequest{
+				VolumeContentSource: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "789-errorvolume",
+						},
 					},
 				},
 			},
@@ -921,7 +972,7 @@ func TestAttemptGetContentSourceVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.getContentSourceVolume(context.Background(), tc.contentSource)
+			result, err := cs.getContentSourceVolume(context.Background(), tc.req.GetVolumeContentSource(), tc.req.GetAccessibilityRequirements())
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
@@ -1067,6 +1118,94 @@ func TestGetInstance(t *testing.T) {
 
 			if !reflect.DeepEqual(tc.expectedInstance, instance) {
 				t.Errorf("expected instance %+v, got %+v", tc.expectedInstance, instance)
+			}
+		})
+	}
+}
+
+func Test_getRegionFromTopology(t *testing.T) {
+	tests := []struct {
+		name         string
+		requirements *csi.TopologyRequirement
+		want         string
+	}{
+		{
+			name:         "Nil requirements",
+			requirements: nil,
+			want:         "",
+		},
+		{
+			name: "Empty preferred",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{},
+			},
+			want: "",
+		},
+		{
+			name: "Single preferred topology with region",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "us-east",
+						},
+					},
+				},
+			},
+			want: "us-east",
+		},
+		{
+			name: "Multiple preferred topologies",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "us-east",
+						},
+					},
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "us-west",
+						},
+					},
+				},
+			},
+			want: "us-east",
+		},
+		{
+			name: "Preferred topology without region",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							"some-key": "some-value",
+						},
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "Empty preferred, non-empty requisite",
+			requirements: &csi.TopologyRequirement{
+				Preferred: []*csi.Topology{},
+				Requisite: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "eu-west",
+						},
+					},
+				},
+			},
+			want: "eu-west",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getRegionFromTopology(tt.requirements)
+			if got != tt.want {
+				t.Errorf("getRegionFromTopology() = %v, want %v", got, tt.want)
 			}
 		})
 	}
