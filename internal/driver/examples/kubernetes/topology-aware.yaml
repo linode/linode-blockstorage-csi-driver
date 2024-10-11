@@ -3,7 +3,7 @@ allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: linode-block-storage-topology-aware
+  name: linode-block-storage-wait-for-consumer
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
@@ -18,7 +18,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: linode-block-storage-topology-aware
+  storageClassName: linode-block-storage-wait-for-consumer
 ---
 apiVersion: v1
 kind: Pod

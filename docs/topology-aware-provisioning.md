@@ -18,7 +18,7 @@ allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: linode-block-storage-topology-aware
+  name: linode-block-storage-wait-for-consumer
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
@@ -33,7 +33,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: linode-block-storage-topology-aware
+  storageClassName: linode-block-storage-wait-for-consumer
 ```
 
 > **Important**: The `volumeBindingMode: WaitForFirstConsumer` setting is crucial for topology-aware provisioning. It delays volume binding and creation until a pod using the PVC is created. This allows the system to consider the pod's scheduling requirements and node assignment when selecting the most appropriate storage location, ensuring optimal data locality and performance.

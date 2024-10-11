@@ -1,9 +1,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: linode-block-storage-topology-aware
+  name: linode-block-storage-wait-for-consumer
   namespace: {{ required ".Values.namespace required" .Values.namespace }}
-{{- if eq .Values.defaultStorageClass "linode-block-storage-topology-aware" }}
+{{- if eq .Values.defaultStorageClass "linode-block-storage-wait-for-consumer" }}
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 {{- end }}
