@@ -15,10 +15,15 @@ limitations under the License.
 package driver
 
 import (
+	"context"
+	"errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"sync"
+	"time"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -45,13 +50,15 @@ func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
 
 // NonBlocking server
 type nonBlockingGRPCServer struct {
-	wg     sync.WaitGroup
-	server *grpc.Server
+	wg            sync.WaitGroup
+	server        *grpc.Server
+	metricsServer *http.Server
 }
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	s.wg.Add(1)
 	go s.serve(endpoint, ids, cs, ns)
+	go s.startMetricsServer("8081")
 }
 
 func (s *nonBlockingGRPCServer) Wait() {
@@ -60,10 +67,17 @@ func (s *nonBlockingGRPCServer) Wait() {
 
 func (s *nonBlockingGRPCServer) Stop() {
 	s.server.GracefulStop()
+	err := s.metricsServer.Shutdown(context.Background())
+	if err != nil {
+		klog.Errorf("failed to stop metrics server: %v", err)
+	}
 }
 
 func (s *nonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
+	if err := s.metricsServer.Close(); err != nil {
+		klog.Errorf("failed to force stop metrics server: %v", err)
+	}
 }
 
 func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
@@ -113,5 +127,26 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 
 	if err := server.Serve(listener); err != nil {
 		klog.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+func (s *nonBlockingGRPCServer) startMetricsServer(addr string) {
+	defer s.wg.Done()
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	s.metricsServer = &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	klog.V(4).Infof("Starting metrics server at %s", addr)
+	if err := s.metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		klog.Fatalf("Failed to serve metrics: %v", err)
 	}
 }
