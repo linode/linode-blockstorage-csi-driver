@@ -5,8 +5,10 @@ apiToken: ""
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
 
-# (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this
-# driver.
+# enable: This variable must be set to true to get metrics
+enable_metrics: false
+
+# (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""
 
 # Default namespace is "kube-system" but it can be set to another namespace
@@ -22,27 +24,35 @@ namespace: kube-system
 # "linode-block-storage" or left as an empty string
 defaultStorageClass: linode-block-storage-retain
 
-# set these value to a comma seperated string if you'd like to add tags to the created volumes
+# set these value to a comma separated string if you'd like to add tags to the created volumes
 # volumeTags:
 #  - example
 #  - test
 
 # Images - Default
-
 csiProvisioner:
   image: registry.k8s.io/sig-storage/csi-provisioner
   tag: v5.1.0
   pullPolicy: IfNotPresent
+  metrics:
+    address: "0.0.0.0:10248"
+    port: 10248  # Metrics port for csi-provisioner
 
 csiAttacher:
   image: registry.k8s.io/sig-storage/csi-attacher
   tag: v4.7.0
   pullPolicy: IfNotPresent
+  metrics:
+    address: "0.0.0.0:10249"
+    port: 10249  # Metrics port for csi-attacher
 
 csiResizer:
   image: registry.k8s.io/sig-storage/csi-resizer
   tag: v1.12.0
   pullPolicy: IfNotPresent
+  metrics:
+    address: "0.0.0.0:10250"
+    port: 10250  # Metrics port for csi-resizer
 
 csiLinodePlugin:
   image: linode/linode-blockstorage-csi-driver

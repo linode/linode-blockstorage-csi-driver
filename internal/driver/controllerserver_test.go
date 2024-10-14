@@ -200,6 +200,9 @@ func TestControllerPublishVolume(t *testing.T) {
 						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 					},
 				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
 				Readonly: false,
 			},
 			resp: &csi.ControllerPublishVolumeResponse{
@@ -208,11 +211,11 @@ func TestControllerPublishVolume(t *testing.T) {
 				},
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1003, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
 				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
-				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1001, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
-				m.EXPECT().ListInstanceDisks(gomock.Any(), 1001, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
-				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1001, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1003, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 1003, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 			},
 			expectedError: nil,

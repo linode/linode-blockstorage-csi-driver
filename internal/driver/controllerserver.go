@@ -76,24 +76,27 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Create volume context
-	volContext := cs.createVolumeContext(ctx, req)
+	contentSource := req.GetVolumeContentSource()
+	accessibilityRequirements := req.GetAccessibilityRequirements()
 
 	// Attempt to retrieve information about a source volume if the request includes a content source.
 	// This is important for scenarios where the volume is being cloned from an existing one.
-	sourceVolInfo, err := cs.getContentSourceVolume(ctx, req.GetVolumeContentSource())
+	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo)
+	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo, accessibilityRequirements)
 	if err != nil {
 		return &csi.CreateVolumeResponse{}, err
 	}
 
+	// Create volume context
+	volContext := cs.createVolumeContext(ctx, req, vol)
+
 	// Prepare and return response
-	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, req.GetVolumeContentSource())
+	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, contentSource)
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
@@ -154,9 +157,15 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return resp, err
 	}
 
+	// Retrieve and validate the instance associated with the Linode ID
+	instance, err := cs.getInstance(ctx, linodeID)
+	if err != nil {
+		return resp, err
+	}
+
 	// Check if the volume exists and is valid.
 	// If the volume is already attached to the specified instance, it returns its device path.
-	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, linodeID)
+	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance, req.GetVolumeContext())
 	if err != nil {
 		return resp, err
 	}
@@ -167,12 +176,6 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 				devicePathKey: devicePath,
 			},
 		}, nil
-	}
-
-	// Retrieve and validate the instance associated with the Linode ID
-	instance, err := cs.getInstance(ctx, linodeID)
-	if err != nil {
-		return resp, err
 	}
 
 	// Check if the instance can accommodate the volume attachment

@@ -131,7 +131,7 @@ func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, ins
 
 // getContentSourceVolume retrieves information about the Linode volume to clone from.
 // It returns a LinodeVolumeKey if a valid source volume is found, or an error if the source is invalid.
-func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource) (volKey *linodevolumes.LinodeVolumeKey, err error) {
+func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource, accessibilityRequirements *csi.TopologyRequirement) (volKey *linodevolumes.LinodeVolumeKey, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to get content source volume")
 
@@ -167,9 +167,16 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
 	}
 
-	// Check if the volume's region matches the server's metadata region
-	if volumeData.Region != cs.metadata.Region {
-		return nil, errRegionMismatch(volumeData.Region, cs.metadata.Region)
+	// Check if the source volume's region matches the required region
+	requiredRegion := cs.metadata.Region
+	if accessibilityRequirements != nil {
+		if topologyRegion := getRegionFromTopology(accessibilityRequirements); topologyRegion != "" {
+			requiredRegion = topologyRegion
+		}
+	}
+
+	if volumeData.Region != requiredRegion {
+		return nil, errRegionMismatch(volumeData.Region, requiredRegion)
 	}
 
 	log.V(4).Info("Content source volume", "volumeData", volumeData)
@@ -179,7 +186,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 // attemptCreateLinodeVolume creates a Linode volume while ensuring idempotency.
 // It checks for existing volumes with the same label and either returns the existing
 // volume or creates a new one, optionally cloning from a source volume.
-func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *linodevolumes.LinodeVolumeKey) (*linodego.Volume, error) {
+func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
@@ -209,18 +216,43 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 		return cs.cloneLinodeVolume(ctx, label, sourceVolume.VolumeID)
 	}
 
-	return cs.createLinodeVolume(ctx, label, sizeGB, tags)
+	return cs.createLinodeVolume(ctx, label, sizeGB, tags, accessibilityRequirements)
+}
+
+// Helper function to extract region from topology
+func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
+	topologies := requirements.GetPreferred()
+	if len(topologies) == 0 {
+		topologies = requirements.GetRequisite()
+	}
+
+	if len(topologies) > 0 {
+		if value, ok := topologies[0].GetSegments()[VolumeTopologyRegion]; ok {
+			return value
+		}
+	}
+
+	return ""
 }
 
 // createLinodeVolume creates a new Linode volume with the specified label, size, and tags.
 // It returns the created volume or an error if the creation fails.
-func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string) (*linodego.Volume, error) {
+func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
+	// Get the region from req.AccessibilityRequirements if it exists. Fall back to the controller's metadata region if not specified.
+	region := cs.metadata.Region
+	if accessibilityRequirements != nil {
+		if topologyRegion := getRegionFromTopology(accessibilityRequirements); topologyRegion != "" {
+			log.V(4).Info("Using region from topology", "region", topologyRegion)
+			region = topologyRegion
+		}
+	}
+
 	// Prepare the volume creation request with region, label, and size.
 	volumeReq := linodego.VolumeCreateOptions{
-		Region: cs.metadata.Region,
+		Region: region,
 		Label:  label,
 		Size:   sizeGB,
 	}
@@ -394,7 +426,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
-func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest) map[string]string {
+func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest, vol *linodego.Volume) map[string]string {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createVolumeContext()", "req", req)
 	defer log.V(4).Info("Exiting createVolumeContext()")
@@ -408,18 +440,20 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 		volumeContext[LuksKeySizeAttribute] = req.GetParameters()[LuksKeySizeAttribute]
 	}
 
+	volumeContext[VolumeTopologyRegion] = vol.Region
+
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext
 }
 
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
-func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, sourceInfo *linodevolumes.LinodeVolumeKey) (*linodego.Volume, error) {
+func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", tags)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
-	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, sourceInfo)
+	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, sourceInfo, accessibilityRequirements)
 	if err != nil {
 		return nil, err
 	}
@@ -518,14 +552,20 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 	return linodeID, volumeID, nil
 }
 
-// getAndValidateVolume retrieves the volume by its ID and checks if it is
-// attached to the specified Linode instance. If the volume is found and
-// already attached to the instance, it returns its device path.
-// If the volume is not found or attached to a different instance, it
-// returns an appropriate error.
-func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, linodeID int) (string, error) {
+// getAndValidateVolume retrieves the volume by its ID and run checks.
+//
+// It performs the following checks:
+//  1. If the volume is found and already attached to the specified Linode instance,
+//     it returns the device path of the volume.
+//  2. If the volume is not found, it returns an error indicating that the volume does not exist.
+//  3. If the volume is attached to a different instance, it returns an error indicating
+//     that the volume is already attached elsewhere.
+//
+// Additionally, it checks if the volume and instance are in the same region based on
+// the provided volume context. If they are not in the same region, it returns an internal error.
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance, volContext map[string]string) (string, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", linodeID)
+	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
@@ -536,14 +576,19 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID, 
 	}
 
 	if volume.LinodeID != nil {
-		if *volume.LinodeID == linodeID {
+		if *volume.LinodeID == instance.ID {
 			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
 			return volume.FilesystemPath, nil
 		}
-		return "", errVolumeAttached(volumeID, linodeID)
+		return "", errVolumeAttached(volumeID, instance.ID)
 	}
 
-	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", linodeID)
+	// check if the volume and instance are in the same region
+	if instance.Region != volContext[VolumeTopologyRegion] {
+		return "", errRegionMismatch(volContext[VolumeTopologyRegion], instance.Region)
+	}
+
+	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
 }
 
