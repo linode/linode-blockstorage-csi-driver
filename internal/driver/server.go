@@ -58,7 +58,7 @@ type nonBlockingGRPCServer struct {
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	s.wg.Add(1)
 	go s.serve(endpoint, ids, cs, ns)
-	go s.startMetricsServer("8081")
+	go s.startMetricsServer(":8081")
 }
 
 func (s *nonBlockingGRPCServer) Wait() {
