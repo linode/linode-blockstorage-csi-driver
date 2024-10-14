@@ -87,10 +87,10 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
-	log.V(4).Info("Node Publish Volume Function called")
+
 	start := time.Now()
 	volumeID := req.GetVolumeId()
-	log.V(4).Info("Processing request", "volumeID", volumeID)
+	log.V(2).Info("Processing request", "volumeID", volumeID)
 
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
@@ -171,6 +171,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
 
+	start := time.Now()
 	targetPath := req.GetTargetPath()
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID, "targetPath", targetPath)
@@ -178,15 +179,25 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
+	success := metrics.SuccessTrue
+
 	// Validate request object
 	log.V(4).Info("Validating request", "volumeID", volumeID, "targetPath", targetPath)
 	if err := validateNodeUnpublishVolumeRequest(ctx, req); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeUnpublishTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnpublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
 	// Unmount the target path and delete the remaining directory
 	log.V(4).Info("Unmounting and deleting target path", "volumeID", volumeID, "targetPath", targetPath)
 	if err := mount.CleanupMountPoint(targetPath, ns.mounter.Interface, true /* bind mount */); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeUnpublishTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnpublishDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", targetPath, err)
 	}
 
@@ -198,21 +209,32 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
 	defer done()
 
+	start := time.Now()
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID)
 
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
+	success := metrics.SuccessTrue
+
 	// Before to start, validate the request object (NodeStageVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeStageVolumeRequest(ctx, req); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeStageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeStageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
 	// Get the LinodeVolumeKey which we need to find the device path
 	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
 	if err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeStageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeStageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -226,6 +248,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log.V(4).Info("Finding device path", "volumeID", volumeID)
 	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeStageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeStageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -233,6 +259,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log.V(4).Info("Ensuring staging target path is a valid mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
 	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), filesystem.NewFileSystem())
 	if err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeStageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeStageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -259,6 +289,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// If LUKS is enabled, format the device accordingly
 	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", req.GetStagingTargetPath())
 	if err := ns.mountVolume(ctx, devicePath, req); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeStageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeStageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -270,6 +304,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
 	defer done()
 
+	start := time.Now()
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
@@ -277,22 +312,36 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
+	success := metrics.SuccessTrue
+
 	// Validate req (NodeUnstageVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	err := validateNodeUnstageVolumeRequest(ctx, req)
 	if err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeUnstageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
 	log.V(4).Info("Unmounting staging target path", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	err = mount.CleanupMountPoint(stagingTargetPath, ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeUnstageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errInternal("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err)
 	}
 
 	// If LUKS volume is used, close the LUKS device
 	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	if err := ns.closeLuksMountSource(ctx, volumeID); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeUnstageVolumeTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, fmt.Errorf("closing luks to unstage volume %s: %w", volumeID, err)
 	}
 
@@ -304,12 +353,19 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
 	defer done()
 
+	start := time.Now()
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID)
+
+	success := metrics.SuccessTrue
 
 	// Validate req (NodeExpandVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeExpandTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, err
 	}
 
@@ -320,15 +376,27 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	if err != nil {
 		// Node volume expansion is not supported yet. To meet the spec, we need to implement this.
 		// For now, we'll return a not found error.
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeExpandTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errNotFound("volume not found: %v", err)
 	}
 	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
 	if err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeExpandTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errInternal("marshal json filter: %v", err)
 	}
 
 	log.V(4).Info("Listing volumes", "volumeID", volumeID)
 	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
+		success = metrics.SuccessFalse
+		// Record failure metric before returning
+		metrics.NodeExpandTotal.WithLabelValues(success).Inc()
+		metrics.NodeUnstageVolumeDuration.WithLabelValues(success).Observe(time.Since(start).Seconds())
 		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
 

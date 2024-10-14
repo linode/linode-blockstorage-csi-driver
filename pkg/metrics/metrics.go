@@ -27,7 +27,7 @@ var (
 		[]string{"success"},
 	)
 
-	nodeUnpublishTotal = prometheus.NewCounterVec(
+	NodeUnpublishTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "csi_node_unpublish_total",
 			Help: "Total number of NodeUnpublishVolume calls",
@@ -35,7 +35,7 @@ var (
 		[]string{"success"},
 	)
 
-	nodeUnpublishDuration = prometheus.NewHistogramVec(
+	NodeUnpublishDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "csi_node_unpublish_duration_seconds",
 			Help:    "Duration of NodeUnpublishVolume calls",
@@ -44,7 +44,7 @@ var (
 		[]string{"success"},
 	)
 
-	nodeStageVolumeTotal = prometheus.NewCounterVec(
+	NodeStageVolumeTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "csi_node_stage_volume_total",
 			Help: "Total number of NodeStageVolume calls",
@@ -52,7 +52,7 @@ var (
 		[]string{"success"},
 	)
 
-	nodeStageVolumeDuration = prometheus.NewHistogramVec(
+	NodeStageVolumeDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "csi_node_stage_volume_duration_seconds",
 			Help:    "Duration of NodeStageVolume calls",
@@ -61,7 +61,7 @@ var (
 		[]string{"success"},
 	)
 
-	nodeUnstageVolumeTotal = prometheus.NewCounterVec(
+	NodeUnstageVolumeTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "csi_node_unstage_volume_total",
 			Help: "Total number of NodeUnstageVolume calls",
@@ -69,7 +69,7 @@ var (
 		[]string{"success"},
 	)
 
-	nodeUnstageVolumeDuration = prometheus.NewHistogramVec(
+	NodeUnstageVolumeDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "csi_node_unstage_volume_duration_seconds",
 			Help:    "Duration of NodeUnstageVolume calls",
@@ -78,18 +78,18 @@ var (
 		[]string{"success"},
 	)
 
-	nodeExtendTotal = prometheus.NewCounterVec(
+	NodeExpandTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "csi_node_extend_total",
-			Help: "Total number of NodeExtendVolume calls",
+			Name: "csi_node_expand_total",
+			Help: "Total number of NodeExpandVolume calls",
 		},
 		[]string{"success"},
 	)
 
-	nodeExtendDuration = prometheus.NewHistogramVec(
+	NodeExpandDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "csi_node_extend_duration_seconds",
-			Help:    "Duration of NodeExtendVolume calls",
+			Name:    "csi_node_expand_duration_seconds",
+			Help:    "Duration of NodeExpandVolume calls",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"success"},
@@ -99,12 +99,12 @@ var (
 func init() {
 	prometheus.MustRegister(NodePublishTotal)
 	prometheus.MustRegister(NodePublishDuration)
-	prometheus.MustRegister(nodeUnpublishTotal)
-	prometheus.MustRegister(nodeUnpublishDuration)
-	prometheus.MustRegister(nodeStageVolumeTotal)
-	prometheus.MustRegister(nodeStageVolumeDuration)
-	prometheus.MustRegister(nodeUnstageVolumeTotal)
-	prometheus.MustRegister(nodeUnstageVolumeDuration)
-	prometheus.MustRegister(nodeExtendTotal)
-	prometheus.MustRegister(nodeExtendDuration)
+	prometheus.MustRegister(NodeUnpublishTotal)
+	prometheus.MustRegister(NodeUnpublishDuration)
+	prometheus.MustRegister(NodeStageVolumeTotal)
+	prometheus.MustRegister(NodeStageVolumeDuration)
+	prometheus.MustRegister(NodeUnstageVolumeTotal)
+	prometheus.MustRegister(NodeUnstageVolumeDuration)
+	prometheus.MustRegister(NodeExpandTotal)
+	prometheus.MustRegister(NodeExpandDuration)
 }
