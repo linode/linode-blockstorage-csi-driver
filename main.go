@@ -18,11 +18,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/ianschenck/envflag"
 	"github.com/linode/linodego"
 	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
-	"os"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
