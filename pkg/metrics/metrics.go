@@ -1,8 +1,9 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Constants representing success or failure states as strings for the metrics labels.
