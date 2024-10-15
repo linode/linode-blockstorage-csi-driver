@@ -41,7 +41,6 @@ For more information about Kubernetes CSI, refer to the [Kubernetes CSI](https:/
 
 ## ⚠️ Disclaimers
 
-- **Version Compatibility**: Until this driver has reached v1.0.0, it may not maintain compatibility between driver versions.
 - **Volume Size Constraints**:
   - Requests for Persistent Volumes with a require_size less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10Gi) in accordance with the CSI specification.
   - The upper-limit size constraint (`limit_bytes`) will also be honored, so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
