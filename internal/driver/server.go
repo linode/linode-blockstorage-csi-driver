@@ -69,14 +69,14 @@ func (s *nonBlockingGRPCServer) Stop() {
 	s.server.GracefulStop()
 	err := s.metricsServer.Shutdown(context.Background())
 	if err != nil {
-		klog.Errorf("failed to stop metrics server: %v", err)
+		klog.Errorf("Failed to stop metrics server: %v", err)
 	}
 }
 
 func (s *nonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
 	if err := s.metricsServer.Close(); err != nil {
-		klog.Errorf("failed to force stop metrics server: %v", err)
+		klog.Errorf("Failed to force stop metrics server: %v", err)
 	}
 }
 
