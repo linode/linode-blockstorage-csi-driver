@@ -189,7 +189,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", targetPath, err)
 	}
 
-	//Record success metric
+	// Record success metric
 	metrics.RecordMetrics(metrics.NodeUnpublishTotal, metrics.NodeUnpublishDuration, success, start)
 
 	log.V(2).Info("Successfully completed", "volumeID", volumeID, "targetPath", targetPath)

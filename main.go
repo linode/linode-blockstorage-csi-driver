@@ -57,6 +57,12 @@ type configuration struct {
 	// Metadata Service to source information about the current
 	// node/instance. It will be removed in a future change.
 	nodeName string
+
+	// Flag to enable metrics
+	enableMetrics string
+
+	// Flag to specify the port on which the http server will run
+	metricsAddress string
 }
 
 func loadConfig() configuration {
@@ -66,6 +72,8 @@ func loadConfig() configuration {
 	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", linodego.APIHost, "Linode API URL")
 	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
 	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
+	envflag.StringVar(&cfg.enableMetrics, "ENABLE_METRICS", "", "This flag conditionally runs the metrics servers")
+	envflag.StringVar(&cfg.metricsAddress, "METRICS_ADDRESS", "", "This flag specifies the port on which the metrics https server will run")
 	envflag.Parse()
 	return cfg
 }
@@ -145,6 +153,8 @@ func handle(ctx context.Context) error {
 		vendorVersion,
 		cfg.volumeLabelPrefix,
 		encrypt,
+		cfg.enableMetrics,
+		cfg.metricsAddress,
 	); err != nil {
 		return fmt.Errorf("setup driver: %w", err)
 	}
