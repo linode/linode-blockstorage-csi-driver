@@ -1,4 +1,4 @@
-{{- if .Values.enable_metrics }}
+{{- if .Values.enableMetrics}}
 ---
 apiVersion: v1
 kind: Service
