@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -44,7 +43,7 @@ type NonBlockingGRPCServer interface {
 	// Stops the service forcefully
 	ForceStop()
 	// Setter to set the http server config
-	SetMetricsConfig(enableMetrics, metricsAddress string)
+	SetMetricsConfig(metricsAddress string)
 }
 
 func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
@@ -57,14 +56,11 @@ type nonBlockingGRPCServer struct {
 	server        *grpc.Server
 	metricsServer *http.Server
 
-	// fields to set up metricsServer
-	enableMetrics  string
 	metricsAddress string
 }
 
 // SetMetricsConfig sets the enableMetrics and metricsAddress fields from environment variables
-func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsAddress string) {
-	s.enableMetrics = enableMetrics
+func (s *nonBlockingGRPCServer) SetMetricsConfig(metricsAddress string) {
 	s.metricsAddress = metricsAddress
 }
 
@@ -72,18 +68,13 @@ func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, c
 	s.wg.Add(1)
 	go s.serve(endpoint, ids, cs, ns)
 
-	// Parse the enableMetrics string into a boolean
-	enableMetrics, err := strconv.ParseBool(s.enableMetrics)
-	if err != nil {
-		klog.Errorf("Error parsing enableMetrics: %v", err)
-		return
+	port := ":" + s.metricsAddress
+
+	if port == ":" {
+		port = ":10252" // default
 	}
 
-	// Start metrics server if enableMetrics is true
-	if enableMetrics {
-		port := ":" + s.metricsAddress
-		go s.startMetricsServer(port)
-	}
+	go s.startMetricsServer(port)
 }
 
 func (s *nonBlockingGRPCServer) Wait() {

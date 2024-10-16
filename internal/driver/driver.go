@@ -52,7 +52,6 @@ type LinodeDriver struct {
 
 	readyMu        sync.Mutex // protects ready
 	ready          bool
-	enableMetrics  string
 	metricsAddress string
 }
 
@@ -84,7 +83,6 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	vendorVersion,
 	volumeLabelPrefix string,
 	encrypt Encryption,
-	enableMetrics string,
 	metricsAddress string,
 ) error {
 	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
@@ -130,7 +128,6 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.cs = cs
 
 	// Set metrics config
-	linodeDriver.enableMetrics = enableMetrics
 	linodeDriver.metricsAddress = metricsAddress
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
@@ -173,7 +170,7 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 
 	log.V(2).Info("Starting non-blocking GRPC server")
 	s := NewNonBlockingGRPCServer()
-	s.SetMetricsConfig(linodeDriver.enableMetrics, linodeDriver.metricsAddress)
+	s.SetMetricsConfig(linodeDriver.metricsAddress)
 	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
 	log.V(2).Info("GRPC server started successfully")
 	s.Wait()
