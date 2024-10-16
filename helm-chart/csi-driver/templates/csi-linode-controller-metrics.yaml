@@ -73,7 +73,7 @@ metadata:
     service: csi-node-server-metrics
   annotations:
     prometheus.io/scrape: 'true'
-    prometheus.io/port: {{ .Values.metricsPort }}
+    prometheus.io/port: {{ .Values.metricsPort | quote }}
     prometheus.io/path: '/metrics'
 spec:
   selector:

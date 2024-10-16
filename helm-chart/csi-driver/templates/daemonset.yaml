@@ -54,7 +54,7 @@ spec:
               key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
         - name: ENABLE_METRICS
           value: {{ .Values.enableMetrics | quote}}
-        - name: METRICS_ADDRESS
+        - name: METRICS_PORT
           value: {{ .Values.metricsPort | quote}}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
