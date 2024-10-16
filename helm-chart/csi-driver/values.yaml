@@ -9,7 +9,7 @@ region: ""
 enableMetrics: false
 
 # default metrics address port
-metricsAddress: 8081
+metricsPort: 10251
 
 # (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""

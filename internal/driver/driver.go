@@ -50,10 +50,10 @@ type LinodeDriver struct {
 	cscap []*csi.ControllerServiceCapability
 	nscap []*csi.NodeServiceCapability
 
-	readyMu        sync.Mutex // protects ready
-	ready          bool
-	enableMetrics  string
-	metricsAddress string
+	readyMu       sync.Mutex // protects ready
+	ready         bool
+	enableMetrics string
+	metricsPort   string
 }
 
 // MaxVolumeLabelPrefixLength is the maximum allowed length of a volume label
@@ -85,7 +85,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	volumeLabelPrefix string,
 	encrypt Encryption,
 	enableMetrics string,
-	metricsAddress string,
+	metricsPort string,
 ) error {
 	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
 	defer done()
@@ -131,7 +131,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 
 	// Set metrics config
 	linodeDriver.enableMetrics = enableMetrics
-	linodeDriver.metricsAddress = metricsAddress
+	linodeDriver.metricsPort = metricsPort
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
 	return nil
@@ -173,7 +173,7 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 
 	log.V(2).Info("Starting non-blocking GRPC server")
 	s := NewNonBlockingGRPCServer()
-	s.SetMetricsConfig(linodeDriver.enableMetrics, linodeDriver.metricsAddress)
+	s.SetMetricsConfig(linodeDriver.enableMetrics, linodeDriver.metricsPort)
 	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
 	log.V(2).Info("GRPC server started successfully")
 	s.Wait()

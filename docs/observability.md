@@ -28,7 +28,7 @@ helm template linode-csi-driver \
   --set apiToken="${LINODE_API_TOKEN}" \
   --set region="${REGION}" \
   --set enableMetrics="${ENABLE_METRICS}" \
-  --set metricsAddress="${METRICS_ADDRESS}" \
+  --set metricsPort="${METRICS_PORT}" \
   helm-chart/csi-driver --namespace kube-system > csi.yaml
 ```
 

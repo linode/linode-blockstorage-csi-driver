@@ -55,7 +55,7 @@ spec:
         - name: ENABLE_METRICS
           value: {{ .Values.enableMetrics | quote}}
         - name: METRICS_ADDRESS
-          value: {{ .Values.metricsAddress | quote}}
+          value: {{ .Values.metricsPort | quote}}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
         name: csi-linode-plugin

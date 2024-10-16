@@ -44,7 +44,7 @@ type NonBlockingGRPCServer interface {
 	// Stops the service forcefully
 	ForceStop()
 	// Setter to set the http server config
-	SetMetricsConfig(enableMetrics, metricsAddress string)
+	SetMetricsConfig(enableMetrics, metricsPort string)
 }
 
 func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
@@ -58,14 +58,14 @@ type nonBlockingGRPCServer struct {
 	metricsServer *http.Server
 
 	// fields to set up metricsServer
-	enableMetrics  string
-	metricsAddress string
+	enableMetrics string
+	metricsPort   string
 }
 
-// SetMetricsConfig sets the enableMetrics and metricsAddress fields from environment variables
-func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsAddress string) {
+// SetMetricsConfig sets the enableMetrics and metricsPort fields from environment variables
+func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort string) {
 	s.enableMetrics = enableMetrics
-	s.metricsAddress = metricsAddress
+	s.metricsPort = metricsPort
 }
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
@@ -81,7 +81,7 @@ func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, c
 
 	// Start metrics server if enableMetrics is true
 	if enableMetrics {
-		port := ":" + s.metricsAddress
+		port := ":" + s.metricsPort
 		go s.startMetricsServer(port)
 	}
 }
