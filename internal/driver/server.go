@@ -81,6 +81,7 @@ func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, c
 
 	// Start metrics server if enableMetrics is true
 	if enableMetrics {
+		klog.Info("Starting metrics server on :", s.metricsPort)
 		port := ":" + s.metricsPort
 		go s.startMetricsServer(port)
 	}
