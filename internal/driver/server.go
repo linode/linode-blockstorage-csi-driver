@@ -15,12 +15,18 @@ limitations under the License.
 package driver
 
 import (
+	"context"
+	"errors"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
@@ -37,6 +43,8 @@ type NonBlockingGRPCServer interface {
 	Stop()
 	// Stops the service forcefully
 	ForceStop()
+	// Setter to set the http server config
+	SetMetricsConfig(enableMetrics, metricsPort string)
 }
 
 func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
@@ -45,13 +53,38 @@ func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
 
 // NonBlocking server
 type nonBlockingGRPCServer struct {
-	wg     sync.WaitGroup
-	server *grpc.Server
+	wg            sync.WaitGroup
+	server        *grpc.Server
+	metricsServer *http.Server
+
+	// fields to set up metricsServer
+	enableMetrics string
+	metricsPort   string
+}
+
+// SetMetricsConfig sets the enableMetrics and metricsPort fields from environment variables
+func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort string) {
+	s.enableMetrics = enableMetrics
+	s.metricsPort = metricsPort
 }
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 	s.wg.Add(1)
 	go s.serve(endpoint, ids, cs, ns)
+
+	// Parse the enableMetrics string into a boolean
+	enableMetrics, err := strconv.ParseBool(s.enableMetrics)
+	if err != nil {
+		klog.Errorf("Error parsing enableMetrics: %v", err)
+		return
+	}
+	klog.Infof("Enable metrics: %v", enableMetrics)
+
+	// Start metrics server if enableMetrics is true
+	if enableMetrics {
+		port := ":" + s.metricsPort
+		go s.startMetricsServer(port)
+	}
 }
 
 func (s *nonBlockingGRPCServer) Wait() {
@@ -60,10 +93,17 @@ func (s *nonBlockingGRPCServer) Wait() {
 
 func (s *nonBlockingGRPCServer) Stop() {
 	s.server.GracefulStop()
+	err := s.metricsServer.Shutdown(context.Background())
+	if err != nil {
+		klog.Errorf("Failed to stop metrics server: %v", err)
+	}
 }
 
 func (s *nonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
+	if err := s.metricsServer.Close(); err != nil {
+		klog.Errorf("Failed to force stop metrics server: %v", err)
+	}
 }
 
 func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
@@ -113,5 +153,28 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 
 	if err := server.Serve(listener); err != nil {
 		klog.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+func (s *nonBlockingGRPCServer) startMetricsServer(addr string) {
+	defer s.wg.Done()
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	klog.Infof("Port %v", addr)
+
+	s.metricsServer = &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	klog.V(4).Infof("Starting metrics server at %s", addr)
+	if err := s.metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		klog.Fatalf("Failed to serve metrics: %v", err)
 	}
 }

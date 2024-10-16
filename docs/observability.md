@@ -21,13 +21,14 @@ To enable the metrics collection for the Linode CSI driver, follow the steps bel
 
 ### 1. Export the Helm Template for the CSI Driver with Metrics Enabled
 
-First, you need to generate a new Helm template for the Linode CSI driver with the `enable_metrics` flag set to `true`. This ensures that the CSI driver is configured to expose its metrics.
+First, you need to generate a new Helm template for the Linode CSI driver with the `enableMetrics` flag set to `true`. You will also have to specify an address that isn't in use for the metrics server to run on. This ensures that the CSI driver is configured to expose its metrics.
 
 ```bash
 helm template linode-csi-driver \
   --set apiToken="${LINODE_API_TOKEN}" \
   --set region="${REGION}" \
-  --set enable_metrics=true \
+  --set enableMetrics="${ENABLE_METRICS}" \
+  --set metricsPort="${METRICS_PORT}" \
   helm-chart/csi-driver --namespace kube-system > csi.yaml
 ```
 

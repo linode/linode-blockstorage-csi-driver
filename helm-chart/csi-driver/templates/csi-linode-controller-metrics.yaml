@@ -1,4 +1,4 @@
-{{- if .Values.enable_metrics }}
+{{- if .Values.enableMetrics}}
 ---
 apiVersion: v1
 kind: Service
@@ -16,7 +16,7 @@ spec:
   selector:
     app: csi-linode-controller
   ports:
-    - name: metrics-10248
+    - name: provisioner-metrics-port
       port: 10248
       targetPort: 10248
       protocol: TCP
@@ -37,7 +37,7 @@ spec:
   selector:
     app: csi-linode-controller
   ports:
-    - name: metrics-10249
+    - name: attacher-metrics-port
       port: 10249
       targetPort: 10249
       protocol: TCP
@@ -58,8 +58,29 @@ spec:
   selector:
     app: csi-linode-controller
   ports:
-    - name: metrics-10250
+    - name: resizer-metrics-port
       port: 10250
       targetPort: 10250
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: csi-node-server-metrics
+  namespace: kube-system
+  labels:
+    app: csi-linode-node
+    service: csi-node-server-metrics
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: {{ .Values.metricsPort | quote }}
+    prometheus.io/path: '/metrics'
+spec:
+  selector:
+    app: csi-linode-node
+  ports:
+    - name: node-server-metrics-port
+      port: {{ .Values.metricsPort }}
+      targetPort: {{ .Values.metricsPort }}
       protocol: TCP
 {{- end }}
