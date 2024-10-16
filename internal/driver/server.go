@@ -162,6 +162,8 @@ func (s *nonBlockingGRPCServer) startMetricsServer(addr string) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
+	klog.Infof("Port %v", addr)
+
 	s.metricsServer = &http.Server{
 		Addr:              addr,
 		Handler:           mux,
