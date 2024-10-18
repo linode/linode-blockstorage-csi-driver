@@ -112,6 +112,80 @@ var (
 	)
 )
 
+var (
+	// ControllerCreateVolumeTotal counts the total number of create volume calls.
+	ControllerCreateVolumeTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "csi_controller_create_volume_total",
+			Help: "Total number of Create Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerCreateVolumeDuration tracks the duration of create volume calls.
+	ControllerCreateVolumeDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "csi_controller_create_volume_duration_seconds",
+			Help: "Duration of Create Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerDeleteVolumeTotal counts the total number of delete volume calls.
+	ControllerDeleteVolumeTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "csi_controller_delete_volume_total",
+			Help: "Total number of Delete Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerDeleteVolumeDuration tracks the duration of delete volume calls.
+	ControllerDeleteVolumeDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "csi_controller_delete_volume_duration_seconds",
+			Help: "Duration of Delete Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerPublishVolumeTotal counts the total number of publish volume calls.
+	ControllerPublishVolumeTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "csi_controller_publish_volume_total",
+			Help: "Total number of Publish Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerPublishVolumeDuration tracks the duration of publish volume calls.
+	ControllerPublishVolumeDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "csi_controller_publish_volume_duration_seconds",
+			Help: "Duration of Publish Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerUnpublishVolumeTotal counts the total number of unpublish volume calls.
+	ControllerUnpublishVolumeTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "csi_controller_unpublish_volume_total",
+			Help: "Total number of Unpublish Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+
+	// ControllerUnpublishVolumeDuration tracks the duration of unpublish volume calls.
+	ControllerUnpublishVolumeDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "csi_controller_unpublish_volume_duration_seconds",
+			Help: "Duration of Unpublish Volume calls",
+		},
+		[]string{"functionStatus"},
+	)
+)
+
 // The init function registers all the defined Prometheus metrics.
 func init() {
 	prometheus.MustRegister(NodePublishTotal)
@@ -124,6 +198,14 @@ func init() {
 	prometheus.MustRegister(NodeUnstageVolumeDuration)
 	prometheus.MustRegister(NodeExpandTotal)
 	prometheus.MustRegister(NodeExpandDuration)
+	prometheus.MustRegister(ControllerCreateVolumeTotal)
+	prometheus.MustRegister(ControllerCreateVolumeDuration)
+	prometheus.MustRegister(ControllerDeleteVolumeTotal)
+	prometheus.MustRegister(ControllerDeleteVolumeDuration)
+	prometheus.MustRegister(ControllerPublishVolumeTotal)
+	prometheus.MustRegister(ControllerPublishVolumeDuration)
+	prometheus.MustRegister(ControllerUnpublishVolumeTotal)
+	prometheus.MustRegister(ControllerUnpublishVolumeDuration)
 }
 
 // RecordMetrics function is a helper to encapsulate metrics storage across function calls.
