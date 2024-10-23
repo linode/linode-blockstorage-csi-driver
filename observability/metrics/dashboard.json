@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 14905,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [
     {
       "asDropdown": false,
@@ -128,7 +128,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -158,14 +159,14 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(csi_controller_create_volume_duration_seconds_sum{functionStatus=\"true\"}[30m])",
+          "expr": "rate(csi_controller_create_volume_duration_seconds_count{functionStatus=\"true\"}[5m]) * 1000",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Create Volume Operation Total Time",
+      "title": "Time taken per create volume operation",
       "type": "timeseries"
     },
     {
@@ -225,7 +226,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -255,14 +257,14 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(csi_controller_delete_volume_duration_seconds_sum{functionStatus=\"true\"}[30m])",
+          "expr": "rate(csi_controller_delete_volume_duration_seconds_count{functionStatus=\"true\"}[5m]) * 1000",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Delete Volume Operation Total Time",
+      "title": "Time taken per delete volume operation",
       "type": "timeseries"
     },
     {
@@ -322,7 +324,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -352,14 +355,14 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(csi_controller_publish_volume_duration_seconds_sum{functionStatus=\"true\"}[30m])",
+          "expr": "rate(csi_controller_publish_volume_duration_seconds_count{functionStatus=\"true\"}[5m]) * 1000",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": " Publish Volume Operation Total Time",
+      "title": "Time taken per publish volume operation",
       "type": "timeseries"
     },
     {
@@ -419,7 +422,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -449,563 +453,14 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(csi_controller_unpublish_volume_duration_seconds_sum{functionStatus=\"true\"}[30m])",
+          "expr": "rate(csi_controller_unpublish_volume_duration_seconds_count{functionStatus=\"true\"}[5m]) * 1000",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Unpublish Volume Operation Total Time",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 17
-      },
-      "id": 53,
-      "panels": [],
-      "title": "Nodeserver Metrics",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "default": true,
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 18
-      },
-      "id": 49,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(csi_node_stage_volume_duration_seconds_count{functionStatus=\"true\"}[30m])",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NodeServer Stage Volume operation time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "default": true,
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 18
-      },
-      "id": 50,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(csi_node_unstage_volume_duration_seconds_count{functionStatus=\"true\"}[30m])",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NodeServer Unstage Volume operation time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "default": true,
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 26
-      },
-      "id": 48,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(csi_node_publish_duration_seconds_count{functionStatus=\"false\"}[30m])",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NodeServer Publish Volume operation time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "default": true,
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 26
-      },
-      "id": 47,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(csi_node_unpublish_duration_seconds_count{functionStatus=\"true\"}[30m])",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NodeServer Unpublish Volume operation time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "default": true,
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 6,
-        "y": 34
-      },
-      "id": 51,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(csi_node_expand_duration_seconds_count{functionStatus=\"true\"}[30m])",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NodeServer Expand Volume operation time",
+      "title": "Time taken per unpublish volume operation",
       "type": "timeseries"
     },
     {
@@ -1014,9 +469,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 17
       },
-      "id": 52,
+      "id": 53,
       "panels": [
         {
           "datasource": {
@@ -1075,17 +530,73 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.2:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-control-plane-5zgkr\", service=\"csi-node-server-metrics\"}"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 43
+            "y": 2
           },
-          "id": 46,
+          "id": 49,
           "options": {
             "legend": {
               "calcs": [],
@@ -1102,17 +613,17 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "fdysdomp8kh6oc"
+                "uid": "PBFA97CFB590B2093"
               },
               "editorMode": "code",
-              "expr": "rate(workqueue_adds_total{name=\"claims\"}[30m])",
+              "expr": "rate(csi_node_stage_volume_duration_seconds_count{functionStatus=\"true\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Volume Claims",
+          "title": "Time taken per stage volume operation",
           "type": "timeseries"
         },
         {
@@ -1172,17 +683,73 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.2:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-control-plane-5zgkr\", service=\"csi-node-server-metrics\"}"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 43
+            "y": 2
           },
-          "id": 45,
+          "id": 50,
           "options": {
             "legend": {
               "calcs": [],
@@ -1199,19 +766,408 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "fdysdomp8kh6oc"
+                "uid": "PBFA97CFB590B2093"
               },
               "editorMode": "code",
-              "expr": "rate(workqueue_adds_total{name=\"volumes\"}[30m])",
+              "expr": "rate(csi_node_unstage_volume_duration_seconds_count{functionStatus=\"true\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Persistent Volumes",
+          "title": "Time taken per unstage volume operation",
           "type": "timeseries"
         },
+        {
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "{app=\"csi-linode-node\", functionStatus=\"false\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 10
+          },
+          "id": 48,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+              },
+              "editorMode": "code",
+              "expr": "rate(csi_node_publish_duration_seconds_count{functionStatus=\"false\"}[10m]) * 1000",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Time taken per publish volume operation",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.2:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-control-plane-5zgkr\", service=\"csi-node-server-metrics\"}"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "{app=\"csi-linode-node\", functionStatus=\"true\", instance=\"10.0.0.3:8081\", job=\"kubernetes-service-endpoints\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-node-server-metrics\"}"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 10
+          },
+          "id": 47,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+              },
+              "editorMode": "code",
+              "expr": "rate(csi_node_unpublish_duration_seconds_count{functionStatus=\"true\"}[10m]) * 1000",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Time taken per unpublish volume operation",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 6,
+            "y": 18
+          },
+          "id": 51,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+              },
+              "editorMode": "code",
+              "expr": "rate(csi_node_expand_duration_seconds_count{functionStatus=\"true\"}[10m]) * 1000",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Time taken per expand volume operation",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Nodeserver Metrics",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 52,
+      "panels": [
         {
           "datasource": {
             "default": true,
@@ -1277,7 +1233,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 51
+            "y": 19
           },
           "id": 38,
           "options": {
@@ -1299,7 +1255,7 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(kubelet_runtime_operations_errors_total[30m])",
+              "expr": "rate(kubelet_runtime_operations_errors_total[10m])",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -1366,43 +1322,16 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
-            "overrides": [
-              {
-                "__systemRef": "hideSeriesFrom",
-                "matcher": {
-                  "id": "byNames",
-                  "options": {
-                    "mode": "exclude",
-                    "names": [
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.253:10248\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Identity/GetPluginCapabilities\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-provisioner-metrics\"}",
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.253:10248\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/ControllerGetCapabilities\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-provisioner-metrics\"}",
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.253:10249\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/ControllerGetCapabilities\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-attacher-metrics\"}",
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.253:10249\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Identity/GetPluginCapabilities\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-attacher-metrics\"}"
-                    ],
-                    "prefix": "All except:",
-                    "readOnly": true
-                  }
-                },
-                "properties": [
-                  {
-                    "id": "custom.hideFrom",
-                    "value": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": true
-                    }
-                  }
-                ]
-              }
-            ]
+            "overrides": []
           },
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 51
+            "y": 19
           },
           "id": 31,
           "options": {
@@ -1424,7 +1353,7 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_sum[30m])",
+              "expr": "rate(csi_sidecar_operations_seconds_sum[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -1435,7 +1364,206 @@
           "type": "timeseries"
         },
         {
-          "datasource": {},
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 27
+          },
+          "id": 59,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+              },
+              "editorMode": "code",
+              "expr": "round(rate(workqueue_adds_total{name=\"volumes\"}[10m]) * 1000)",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Persistent Volume Requests",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 27
+          },
+          "id": 60,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "PBFA97CFB590B2093"
+              },
+              "editorMode": "code",
+              "expr": "round(rate(workqueue_adds_total{name=\"claims\"}[10m]) * 1000)",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Persistent Volume Claims",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1525,7 +1653,7 @@
             "h": 8,
             "w": 12,
             "x": 6,
-            "y": 59
+            "y": 35
           },
           "id": 37,
           "options": {
@@ -1563,6 +1691,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "description": "Number of create volume requests made",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1616,38 +1745,13 @@
                 ]
               }
             },
-            "overrides": [
-              {
-                "__systemRef": "hideSeriesFrom",
-                "matcher": {
-                  "id": "byNames",
-                  "options": {
-                    "mode": "exclude",
-                    "names": [
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.58:10248\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/CreateVolume\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-provisioner-metrics\"}"
-                    ],
-                    "prefix": "All except:",
-                    "readOnly": true
-                  }
-                },
-                "properties": [
-                  {
-                    "id": "custom.hideFrom",
-                    "value": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": true
-                    }
-                  }
-                ]
-              }
-            ]
+            "overrides": []
           },
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 67
+            "y": 43
           },
           "id": 39,
           "options": {
@@ -1669,18 +1773,22 @@
                 "uid": "fdysdomp8kh6oc"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/CreateVolume\"}[30m])",
+              "expr": "round(rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/CreateVolume\"}[10m]) * 1000)",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Create Volume Requests",
+          "title": "Create Volume",
           "type": "timeseries"
         },
         {
-          "datasource": {},
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "description": "Time taken in seconds to create volume",
           "fieldConfig": {
             "defaults": {
@@ -1733,7 +1841,8 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
             "overrides": []
           },
@@ -1741,7 +1850,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 67
+            "y": 43
           },
           "id": 40,
           "options": {
@@ -1763,14 +1872,14 @@
                 "uid": "fdysdomp8kh6oc"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/CreateVolume\"}[30m])",
+              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/CreateVolume\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Total time taken to create volume",
+          "title": "Time taken per create volume request",
           "type": "timeseries"
         },
         {
@@ -1779,7 +1888,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "description": "Number requests to publish a volume",
+          "description": "Number of publish volume requests made",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1839,7 +1948,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 51
           },
           "id": 32,
           "options": {
@@ -1861,14 +1970,14 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerPublishVolume\"}[30m])",
+              "expr": "round (rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerPublishVolume\"}[10m]) * 1000)",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Controller Publish Volume",
+          "title": "Publish Volume",
           "type": "timeseries"
         },
         {
@@ -1929,7 +2038,8 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
             "overrides": []
           },
@@ -1937,7 +2047,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 51
           },
           "id": 35,
           "options": {
@@ -1959,14 +2069,14 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerPublishVolume\"}[30m])",
+              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerPublishVolume\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Total time taken to publish volume",
+          "title": "Time taken per publish volume request",
           "type": "timeseries"
         },
         {
@@ -1975,7 +2085,7 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "description": "Number of requests to delete a volume",
+          "description": "Number of delete volume requests made",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2035,7 +2145,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 83
+            "y": 59
           },
           "id": 36,
           "options": {
@@ -2057,14 +2167,14 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/DeleteVolume\"}[30m])",
+              "expr": "round (rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/DeleteVolume\"}[10m]) * 1000)",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Controller Delete Volume",
+          "title": "Delete Volume",
           "type": "timeseries"
         },
         {
@@ -2125,7 +2235,8 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
             "overrides": []
           },
@@ -2133,7 +2244,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 83
+            "y": 59
           },
           "id": 41,
           "options": {
@@ -2155,18 +2266,23 @@
                 "uid": "fdysdomp8kh6oc"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/DeleteVolume\"}[30m])",
+              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/DeleteVolume\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Time taken to delete a volume",
+          "title": "Time taken per delete volume request",
           "type": "timeseries"
         },
         {
-          "datasource": {},
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "description": "Number of unpublish volume requests made",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2228,7 +2344,7 @@
                   "options": {
                     "mode": "exclude",
                     "names": [
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.58:10249\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/ControllerUnpublishVolume\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-attacher-metrics\"}"
+                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.253:10249\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/ControllerUnpublishVolume\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-attacher-metrics\"}"
                     ],
                     "prefix": "All except:",
                     "readOnly": true
@@ -2251,7 +2367,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 91
+            "y": 67
           },
           "id": 33,
           "options": {
@@ -2273,7 +2389,7 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerUnpublishVolume\"}[$__rate_interval])",
+              "expr": "round (rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerUnpublishVolume\"}[10m]) * 1000)",
               "hide": false,
               "instant": false,
               "legendFormat": "__auto",
@@ -2281,11 +2397,15 @@
               "refId": "A"
             }
           ],
-          "title": "Controller Unpublish Volume",
+          "title": "Unpublish Volume",
           "type": "timeseries"
         },
         {
-          "datasource": {},
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "description": "Time taken in seconds to unpublish volume",
           "fieldConfig": {
             "defaults": {
@@ -2338,7 +2458,8 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
             "overrides": []
           },
@@ -2346,7 +2467,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 91
+            "y": 67
           },
           "id": 34,
           "options": {
@@ -2368,7 +2489,7 @@
                 "uid": "bdyek8jeyul1cf"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerUnpublishVolume\"}[$__rate_interval])",
+              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerUnpublishVolume\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -2379,8 +2500,12 @@
           "type": "timeseries"
         },
         {
-          "datasource": {},
-          "description": "Number of requests to expand a volume",
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "description": "Number of extend volume requests made",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2440,7 +2565,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 99
+            "y": 75
           },
           "id": 44,
           "options": {
@@ -2462,19 +2587,23 @@
                 "uid": "fdysdomp8kh6oc"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerExpandVolume\"}[$__rate_interval])",
+              "expr": "round (rate(csi_sidecar_operations_seconds_count{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerExpandVolume\"}[10m]) * 1000)",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Controller Expand Volume",
+          "title": "Expand Volume",
           "type": "timeseries"
         },
         {
-          "datasource": {},
-          "description": "Time taking in seconds to expand a volume",
+          "datasource": {
+            "default": true,
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "description": "Time taken in seconds to expand a volume",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2526,7 +2655,8 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
             "overrides": [
               {
@@ -2536,7 +2666,7 @@
                   "options": {
                     "mode": "exclude",
                     "names": [
-                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.58:10250\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/ControllerExpandVolume\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-resizer-metrics\"}"
+                      "{app=\"csi-linode-controller\", driver_name=\"linodebs.csi.linode.com\", grpc_status_code=\"OK\", instance=\"10.192.1.253:10250\", job=\"kubernetes-service-endpoints\", method_name=\"/csi.v1.Controller/ControllerExpandVolume\", namespace=\"kube-system\", node=\"csi-driver-cluster-85fa091-md-0-cwh9p-8pm79\", service=\"csi-resizer-metrics\"}"
                     ],
                     "prefix": "All except:",
                     "readOnly": true
@@ -2559,7 +2689,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 99
+            "y": 75
           },
           "id": 43,
           "options": {
@@ -2581,7 +2711,7 @@
                 "uid": "fdysdomp8kh6oc"
               },
               "editorMode": "code",
-              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerExpandVolume\"}[$__rate_interval])",
+              "expr": "rate(csi_sidecar_operations_seconds_sum{driver_name=\"linodebs.csi.linode.com\",grpc_status_code=\"OK\",method_name=\"/csi.v1.Controller/ControllerExpandVolume\"}[10m]) * 1000",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -2600,7 +2730,7 @@
             "h": 2,
             "w": 24,
             "x": 0,
-            "y": 107
+            "y": 83
           },
           "id": 28,
           "options": {
@@ -2630,16 +2760,15 @@
       "type": "row"
     }
   ],
-  "refresh": "5m",
+  "refresh": "",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "isNone": true,
           "selected": false,
-          "text": "None",
+          "text": "",
           "value": ""
         },
         "datasource": {
@@ -2665,9 +2794,8 @@
       },
       {
         "current": {
-          "isNone": true,
           "selected": false,
-          "text": "None",
+          "text": "",
           "value": ""
         },
         "datasource": {
@@ -2721,8 +2849,8 @@
     ]
   },
   "time": {
-    "from": "now-30m",
-    "to": "now"
+    "from": "2024-10-23T16:04:48.976Z",
+    "to": "2024-10-23T16:37:37.826Z"
   },
   "timepicker": {},
   "timezone": "",
