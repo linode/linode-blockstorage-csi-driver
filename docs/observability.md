@@ -184,5 +184,3 @@ kubectl logs <grafana-pod-name> -n monitoring
 This setup provides a quick and easy way to enable observability using Grafana dashboards, ensuring that you have visibility into your Kubernetes cluster and CSI driver operations.
 
 ---
-
-This updated documentation reflects the newly structured make targets for easier installation and management of Prometheus, Grafana, and the dashboard configuration. Let me know if you'd like further adjustments!
