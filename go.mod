@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
-	github.com/linode/go-metadata v0.2.0
+	github.com/linode/go-metadata v0.2.1
 	github.com/linode/linodego v1.42.0
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
 	github.com/prometheus/client_golang v1.20.5
@@ -27,7 +27,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/go-resty/resty/v2 v2.13.1 // indirect
+	github.com/go-resty/resty/v2 v2.15.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/moby/sys/mountinfo v0.7.1 // indirect
