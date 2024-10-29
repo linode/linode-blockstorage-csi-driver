@@ -19,9 +19,10 @@ import (
 )
 
 type ControllerServer struct {
-	driver   *LinodeDriver
-	client   linodeclient.LinodeClient
-	metadata Metadata
+	driver           *LinodeDriver
+	client           linodeclient.LinodeClient
+	metadata         Metadata
+	volumeEncryption string
 
 	csi.UnimplementedControllerServer
 }
@@ -32,7 +33,7 @@ type ControllerServer struct {
 // If driver or client are nil, NewControllerServer returns a non-nil error.
 //
 // [Controller Service RPC]: https://github.com/container-storage-interface/spec/blob/master/spec.md#controller-service-rpc
-func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linodeclient.LinodeClient, metadata Metadata) (*ControllerServer, error) {
+func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linodeclient.LinodeClient, metadata Metadata, volumeEncryption string) (*ControllerServer, error) {
 	log := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new ControllerServer")
@@ -47,9 +48,10 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 	}
 
 	cs := &ControllerServer{
-		driver:   driver,
-		client:   client,
-		metadata: metadata,
+		driver:           driver,
+		client:           client,
+		metadata:         metadata,
+		volumeEncryption: volumeEncryption,
 	}
 
 	log.V(4).Info("ControllerServer created successfully")
@@ -93,7 +95,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], sourceVolInfo, accessibilityRequirements)
+	vol, err := cs.createAndWaitForVolume(ctx, volName, sizeGB, req.GetParameters()[VolumeTags], cs.volumeEncryption, sourceVolInfo, accessibilityRequirements)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
