@@ -86,6 +86,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	encrypt Encryption,
 	enableMetrics string,
 	metricsPort string,
+	volumeEncryption string,
 ) error {
 	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
 	defer done()
@@ -123,7 +124,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 		return fmt.Errorf("new identity server: %w", err)
 	}
 
-	cs, err := NewControllerServer(ctx, linodeDriver, linodeClient, metadata)
+	cs, err := NewControllerServer(ctx, linodeDriver, linodeClient, metadata, volumeEncryption)
 	if err != nil {
 		return fmt.Errorf("new controller server: %w", err)
 	}
