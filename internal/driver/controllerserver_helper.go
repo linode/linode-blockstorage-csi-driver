@@ -186,7 +186,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 // attemptCreateLinodeVolume creates a Linode volume while ensuring idempotency.
 // It checks for existing volumes with the same label and either returns the existing
 // volume or creates a new one, optionally cloning from a source volume.
-func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, sourceVolume *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, volumeEncryption string, sourceVolume *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
@@ -216,7 +216,7 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 		return cs.cloneLinodeVolume(ctx, label, sourceVolume.VolumeID)
 	}
 
-	return cs.createLinodeVolume(ctx, label, sizeGB, tags, accessibilityRequirements)
+	return cs.createLinodeVolume(ctx, label, sizeGB, tags, volumeEncryption, accessibilityRequirements)
 }
 
 // Helper function to extract region from topology
@@ -237,7 +237,7 @@ func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
 
 // createLinodeVolume creates a new Linode volume with the specified label, size, and tags.
 // It returns the created volume or an error if the creation fails.
-func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, volumeEncryption string, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
@@ -250,11 +250,27 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 		}
 	}
 
+	// Check encryption status and if it's supported in the specified region.
+	var encryptionStatus string
+	if volumeEncryption == "true" {
+		supported, err := cs.isEncryptionSupported(ctx, region)
+		if err != nil {
+			return nil, err
+		}
+		if !supported {
+			return nil, errInternal("Volume encryption is not supported in the %s region", region)
+		}
+		encryptionStatus = "enabled"
+	} else {
+		encryptionStatus = "disabled"
+	}
+
 	// Prepare the volume creation request with region, label, and size.
 	volumeReq := linodego.VolumeCreateOptions{
-		Region: region,
-		Label:  label,
-		Size:   sizeGB,
+		Region:     region,
+		Label:      label,
+		Size:       sizeGB,
+		Encryption: encryptionStatus,
 	}
 
 	// If tags are provided, split them into a slice for the request.
@@ -270,6 +286,35 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 
 	log.V(4).Info("Linode volume created", "volume", result)
 	return result, nil
+}
+
+// isEncryptionSupported is a helper function that checks if the specified region supports volume encryption.
+// It returns true or false based on the support for encryption in that region.
+func (cs *ControllerServer) isEncryptionSupported(ctx context.Context, region string) (bool, error) {
+	log := logger.GetLogger(ctx)
+	log.V(4).Info("Checking if encryption is supported for region", "region", region)
+
+	// Fetch the list of regions from the Linode API
+	regions, err := cs.client.ListRegions(ctx, nil)
+	if err != nil {
+		return false, errInternal("failed to fetch regions: %v", err)
+	}
+
+	// Look for the specified region and check if encryption is supported.
+	for _, r := range regions {
+		if r.ID == region {
+			for _, capability := range r.Capabilities {
+				if capability == "Block Storage Encryption" { // https://techdocs.akamai.com/linode-api/reference/get-regions
+					return true, nil
+				}
+			}
+			break
+		}
+	}
+
+	// If the region was found but does not support encryption, return false
+	log.V(4).Info("Encryption not supported in the specified region", "region", region)
+	return false, nil
 }
 
 // cloneLinodeVolume clones a Linode volume using the specified source ID and label.
@@ -448,12 +493,12 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
-func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, volumeEncryption string, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", tags)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
-	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, sourceInfo, accessibilityRequirements)
+	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, volumeEncryption, sourceInfo, accessibilityRequirements)
 	if err != nil {
 		return nil, err
 	}
@@ -649,8 +694,30 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 	log.V(4).Info("Entering attachVolume()", "volume_id", volumeID, "node_id", linodeID)
 	defer log.V(4).Info("Exiting attachVolume()")
 
+	// Get the details of the volume to check for attachment possibilities
+	volume, err := cs.client.GetVolume(ctx, volumeID)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to retrieve volume details: %v", err)
+	}
+
+	// Check if the volume is encrypted
+	isEncrypted := volume.Encryption == "enabled"
+
+	// If the volume is encrypted, get the details of the Linode instance and check region compatibility
+	if isEncrypted {
+		linode, err := cs.client.GetInstance(ctx, linodeID)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to retrieve Linode instance details: %v", err)
+		}
+
+		// Ensure the encrypted volume and Linode are in the same region
+		if volume.Region != linode.Region {
+			return status.Errorf(codes.FailedPrecondition, "encrypted volume and Linode instance must be in the same region for attachment")
+		}
+	}
+
 	persist := false
-	_, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+	_, err = cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID:           linodeID,
 		PersistAcrossBoots: &persist,
 	})
