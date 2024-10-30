@@ -54,7 +54,8 @@ func TestDriverSuite(t *testing.T) {
 	linodeDriver := GetLinodeDriver(context.Background())
 	enableMetrics := "true"
 	metricsPort := "10251"
-	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort); err != nil {
+	volumeEncryption := "true"
+	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort, volumeEncryption); err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 

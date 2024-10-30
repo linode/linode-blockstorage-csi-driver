@@ -186,7 +186,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 // attemptCreateLinodeVolume creates a Linode volume while ensuring idempotency.
 // It checks for existing volumes with the same label and either returns the existing
 // volume or creates a new one, optionally cloning from a source volume.
-func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, volumeEncryption string, sourceVolume *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label, tags, volumeEncryption string, sizeGB int, sourceVolume *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
@@ -216,7 +216,7 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 		return cs.cloneLinodeVolume(ctx, label, sourceVolume.VolumeID)
 	}
 
-	return cs.createLinodeVolume(ctx, label, sizeGB, tags, volumeEncryption, accessibilityRequirements)
+	return cs.createLinodeVolume(ctx, label, tags, volumeEncryption, sizeGB, accessibilityRequirements)
 }
 
 // Helper function to extract region from topology
@@ -237,7 +237,7 @@ func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
 
 // createLinodeVolume creates a new Linode volume with the specified label, size, and tags.
 // It returns the created volume or an error if the creation fails.
-func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string, sizeGB int, tags string, volumeEncryption string, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags, volumeEncryption string, sizeGB int, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
@@ -252,7 +252,7 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label string
 
 	// Check encryption status and if it's supported in the specified region.
 	var encryptionStatus string
-	if volumeEncryption == "true" {
+	if volumeEncryption == True {
 		supported, err := cs.isEncryptionSupported(ctx, region)
 		if err != nil {
 			return nil, err
@@ -301,7 +301,8 @@ func (cs *ControllerServer) isEncryptionSupported(ctx context.Context, region st
 	}
 
 	// Look for the specified region and check if encryption is supported.
-	for _, r := range regions {
+	for i := range regions {
+		r := &regions[i]
 		if r.ID == region {
 			for _, capability := range r.Capabilities {
 				if capability == "Block Storage Encryption" { // https://techdocs.akamai.com/linode-api/reference/get-regions
@@ -493,12 +494,12 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
-func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, sizeGB int, tags string, volumeEncryption string, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name, tags, volumeEncryption string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", tags)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
-	vol, err := cs.attemptCreateLinodeVolume(ctx, name, sizeGB, tags, volumeEncryption, sourceInfo, accessibilityRequirements)
+	vol, err := cs.attemptCreateLinodeVolume(ctx, name, tags, volumeEncryption, sizeGB, sourceInfo, accessibilityRequirements)
 	if err != nil {
 		return nil, err
 	}
@@ -702,10 +703,11 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 
 	// Check if the volume is encrypted
 	isEncrypted := volume.Encryption == "enabled"
+	var linode *linodego.Instance
 
 	// If the volume is encrypted, get the details of the Linode instance and check region compatibility
 	if isEncrypted {
-		linode, err := cs.client.GetInstance(ctx, linodeID)
+		linode, err = cs.client.GetInstance(ctx, linodeID)
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to retrieve Linode instance details: %v", err)
 		}

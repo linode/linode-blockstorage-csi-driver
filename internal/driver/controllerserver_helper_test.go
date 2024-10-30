@@ -237,14 +237,15 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name           string
-		volumeName     string
-		sizeGB         int
-		tags           string
-		sourceInfo     *linodevolumes.LinodeVolumeKey
-		setupMocks     func()
-		expectedVolume *linodego.Volume
-		expectedError  error
+		name             string
+		volumeName       string
+		sizeGB           int
+		tags             string
+		volumeEncryption string
+		sourceInfo       *linodevolumes.LinodeVolumeKey
+		setupMocks       func()
+		expectedVolume   *linodego.Volume
+		expectedError    error
 	}{
 		{
 			name:       "Successful volume creation",
@@ -321,7 +322,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo, topology)
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.tags, tc.volumeEncryption, tc.sizeGB, tc.sourceInfo, topology)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
