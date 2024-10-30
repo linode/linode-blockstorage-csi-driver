@@ -21,6 +21,7 @@ import (
 type MockLinodeClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockLinodeClientMockRecorder
+	isgomock struct{}
 }
 
 // MockLinodeClientMockRecorder is the mock recorder for MockLinodeClient.
@@ -186,6 +187,21 @@ func (m *MockLinodeClient) ListInstances(arg0 context.Context, arg1 *linodego.Li
 func (mr *MockLinodeClientMockRecorder) ListInstances(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstances", reflect.TypeOf((*MockLinodeClient)(nil).ListInstances), arg0, arg1)
+}
+
+// ListRegions mocks base method.
+func (m *MockLinodeClient) ListRegions(arg0 context.Context, arg1 *linodego.ListOptions) ([]linodego.Region, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRegions", arg0, arg1)
+	ret0, _ := ret[0].([]linodego.Region)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRegions indicates an expected call of ListRegions.
+func (mr *MockLinodeClientMockRecorder) ListRegions(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegions", reflect.TypeOf((*MockLinodeClient)(nil).ListRegions), arg0, arg1)
 }
 
 // ListVolumes mocks base method.
