@@ -11,5 +11,9 @@ metadata:
 parameters:
   linodebs.csi.linode.com/volumeTags: {{ join "," .Values.volumeTags }}
 {{- end}}
+{{- if .Values.volumeEncryption }}
+parameters:
+  linodebs.csi.linode.com/encrypted: "true"
+{{- end}}
 allowVolumeExpansion: true
 provisioner: linodebs.csi.linode.com
