@@ -265,7 +265,7 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags,
 		}
 		encryptionStatus = "enabled"
 	} else {
-		log.V(4).Info(encryptionStatus)
+		log.V(4).Info("Encryption is disabled", "encryptionStatus: ", encryptionStatus)
 		encryptionStatus = "disabled"
 	}
 
