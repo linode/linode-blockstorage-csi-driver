@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
 	"strings"
 	"time"
 
@@ -256,7 +255,6 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags,
 
 	// Check encryption status and if it's supported in the specified region.
 	var encryptionStatus string
-	klog.Infof("Incoming volumeEncryption string is : %v", volumeEncryption)
 	if volumeEncryption == True {
 		supported, err := cs.isEncryptionSupported(ctx, region)
 		if err != nil {
@@ -267,7 +265,6 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags,
 		}
 		encryptionStatus = "enabled"
 	} else {
-		klog.Infof("Encryption is : %v ", encryptionStatus)
 		encryptionStatus = "disabled"
 	}
 
