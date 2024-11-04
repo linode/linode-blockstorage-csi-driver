@@ -82,7 +82,7 @@ const (
 	devicePathKey = "devicePath"
 
 	// volumeEncryption is the key used in the context map for encryption
-	VolumeEncryption = Name + "/encryption"
+	VolumeEncryption = Name + "/encrypted"
 )
 
 // canAttach indicates whether or not another volume can be attached to the
