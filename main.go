@@ -61,9 +61,6 @@ type configuration struct {
 	// Flag to enable metrics
 	enableMetrics string
 
-	// Flag to enable encryption
-	volumeEncryption string
-
 	// Flag to specify the port on which the http server will run
 	metricsPort string
 }
@@ -76,7 +73,6 @@ func loadConfig() configuration {
 	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
 	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
 	envflag.StringVar(&cfg.enableMetrics, "ENABLE_METRICS", "", "This flag conditionally runs the metrics servers")
-	envflag.StringVar(&cfg.volumeEncryption, "VOLUME_ENCRYPTION", "disabled", "This flag conditionally enables the encryption of volumes")
 	envflag.StringVar(&cfg.metricsPort, "METRICS_PORT", "8081", "This flag specifies the port on which the metrics https server will run")
 	envflag.Parse()
 	return cfg
@@ -159,7 +155,6 @@ func handle(ctx context.Context) error {
 		encrypt,
 		cfg.enableMetrics,
 		cfg.metricsPort,
-		cfg.volumeEncryption,
 	); err != nil {
 		return fmt.Errorf("setup driver: %w", err)
 	}

@@ -80,6 +80,9 @@ const (
 	// devicePathKey is the key used in the publish context map when a volume is
 	// published/attached to an instance.
 	devicePathKey = "devicePath"
+
+	// volumeEncryption is the key used in the context map for encryption
+	VolumeEncryption = Name + "/encryption"
 )
 
 // canAttach indicates whether or not another volume can be attached to the

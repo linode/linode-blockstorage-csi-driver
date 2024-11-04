@@ -108,8 +108,6 @@ spec:
               value: {{ .Values.enableMetrics | quote}}
             - name: METRICS_PORT
               value: {{ .Values.metricsPort | quote}}
-            - name: VOLUME_ENCRYPTION
-              value: {{ .Values.volumeEncryption | quote }}
           image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
           name: csi-linode-plugin
