@@ -297,22 +297,16 @@ func (cs *ControllerServer) isEncryptionSupported(ctx context.Context, region st
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Checking if encryption is supported for region", "region", region)
 
-	// Fetch the list of regions from the Linode API
-	regions, err := cs.client.ListRegions(ctx, nil)
+	// Get the specifications of specified region from Linode API
+	regionDetails, err := cs.client.GetRegion(ctx, region)
 	if err != nil {
-		return false, errInternal("failed to fetch regions: %v", err)
+		return false, errInternal("failed to fetch region %s: %v", region, err)
 	}
 
-	// Look for the specified region and check if encryption is supported.
-	for i := range regions {
-		r := &regions[i]
-		if r.ID == region {
-			for _, capability := range r.Capabilities {
-				if capability == "Block Storage Encryption" { // https://techdocs.akamai.com/linode-api/reference/get-regions
-					return true, nil
-				}
-			}
-			break
+	// Check if encryption is supported in the specified region
+	for _, capability := range regionDetails.Capabilities {
+		if capability == "Block Storage Encryption" {
+			return true, nil
 		}
 	}
 

@@ -623,8 +623,9 @@ func (c *fakeLinodeClient) ListInstanceDisks(_ context.Context, _ int, _ *linode
 	return c.disks, nil
 }
 
-func (flc *fakeLinodeClient) ListRegions(_ context.Context, _ *linodego.ListOptions) ([]linodego.Region, error) {
-	return []linodego.Region{}, nil
+//nolint:nilnil // TODO: re-work tests
+func (flc *fakeLinodeClient) GetRegion(context.Context, string) (*linodego.Region, error) {
+	return nil, nil
 }
 
 //nolint:nilnil // TODO: re-work tests

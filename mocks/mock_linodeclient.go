@@ -129,6 +129,21 @@ func (mr *MockLinodeClientMockRecorder) GetInstance(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstance", reflect.TypeOf((*MockLinodeClient)(nil).GetInstance), arg0, arg1)
 }
 
+// GetRegion mocks base method.
+func (m *MockLinodeClient) GetRegion(ctx context.Context, regionID string) (*linodego.Region, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegion", ctx, regionID)
+	ret0, _ := ret[0].(*linodego.Region)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegion indicates an expected call of GetRegion.
+func (mr *MockLinodeClientMockRecorder) GetRegion(ctx, regionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegion", reflect.TypeOf((*MockLinodeClient)(nil).GetRegion), ctx, regionID)
+}
+
 // GetVolume mocks base method.
 func (m *MockLinodeClient) GetVolume(arg0 context.Context, arg1 int) (*linodego.Volume, error) {
 	m.ctrl.T.Helper()
@@ -187,21 +202,6 @@ func (m *MockLinodeClient) ListInstances(arg0 context.Context, arg1 *linodego.Li
 func (mr *MockLinodeClientMockRecorder) ListInstances(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListInstances", reflect.TypeOf((*MockLinodeClient)(nil).ListInstances), arg0, arg1)
-}
-
-// ListRegions mocks base method.
-func (m *MockLinodeClient) ListRegions(arg0 context.Context, arg1 *linodego.ListOptions) ([]linodego.Region, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRegions", arg0, arg1)
-	ret0, _ := ret[0].([]linodego.Region)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListRegions indicates an expected call of ListRegions.
-func (mr *MockLinodeClientMockRecorder) ListRegions(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegions", reflect.TypeOf((*MockLinodeClient)(nil).ListRegions), arg0, arg1)
 }
 
 // ListVolumes mocks base method.

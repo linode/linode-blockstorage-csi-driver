@@ -243,8 +243,8 @@ func TestCreateLinodeVolumeWithEncryptionSupport(t *testing.T) {
 			setupMocks: func() {
 				// Set cs.metadata.Region based on the test case's region field
 				cs.metadata.Region = "us-lax"
-				mockClient.EXPECT().ListRegions(gomock.Any(), gomock.Any()).Return([]linodego.Region{
-					{ID: "us-lax", Capabilities: []string{"Block Storage Encryption"}},
+				mockClient.EXPECT().GetRegion(gomock.Any(), cs.metadata.Region).Return(&linodego.Region{
+					ID: "us-lax", Capabilities: []string{"Block Storage Encryption"},
 				}, nil)
 				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 10, Encryption: "enabled"}, nil)
 			},
@@ -258,8 +258,8 @@ func TestCreateLinodeVolumeWithEncryptionSupport(t *testing.T) {
 			setupMocks: func() {
 				// Set cs.metadata.Region based on the test case's region field
 				cs.metadata.Region = "us-ord"
-				mockClient.EXPECT().ListRegions(gomock.Any(), gomock.Any()).Return([]linodego.Region{
-					{ID: "us-ord", Capabilities: []string{"Other Capability"}},
+				mockClient.EXPECT().GetRegion(gomock.Any(), cs.metadata.Region).Return(&linodego.Region{
+					ID: "us-ord", Capabilities: []string{"Other Capabilities"},
 				}, nil)
 			},
 			expectedError: errInternal("Volume encryption is not supported in the us-ord region"),
@@ -271,11 +271,12 @@ func TestCreateLinodeVolumeWithEncryptionSupport(t *testing.T) {
 			tc.setupMocks()
 			_, err := cs.createLinodeVolume(context.Background(), tc.volumeName, "", tc.volumeEncryption, 10, nil)
 
-			if err != nil && tc.expectedError == nil {
+			switch {
+			case err != nil && tc.expectedError == nil:
 				t.Errorf("Expected no error but got %v", err)
-			} else if err == nil && tc.expectedError != nil {
+			case err == nil && tc.expectedError != nil:
 				t.Errorf("Expected error %v but got none", tc.expectedError)
-			} else if err != nil && err.Error() != tc.expectedError.Error() {
+			case err != nil && err.Error() != tc.expectedError.Error():
 				t.Errorf("Expected error %v, got %v", tc.expectedError, err)
 			}
 		})
@@ -433,8 +434,8 @@ func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
 				},
 			},
 			setupMocks: func() {
-				mockClient.EXPECT().ListRegions(gomock.Any(), gomock.Any()).Return([]linodego.Region{
-					{ID: "us-lax", Capabilities: []string{"Block Storage Encryption"}},
+				mockClient.EXPECT().GetRegion(gomock.Any(), "us-lax").Return(&linodego.Region{
+					ID: "us-lax", Capabilities: []string{"Block Storage Encryption"},
 				}, nil)
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 10, Encryption: "enabled"}, nil)
@@ -456,8 +457,8 @@ func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
 				},
 			},
 			setupMocks: func() {
-				mockClient.EXPECT().ListRegions(gomock.Any(), gomock.Any()).Return([]linodego.Region{
-					{ID: "us-ord", Capabilities: []string{"Other Capability"}},
+				mockClient.EXPECT().GetRegion(gomock.Any(), "us-ord").Return(&linodego.Region{
+					ID: "us-ord", Capabilities: []string{"Other Capabilities"},
 				}, nil)
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 			},
@@ -470,11 +471,12 @@ func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
 			tc.setupMocks()
 			_, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, "", tc.volumeEncryption, 10, nil, tc.topology)
 
-			if err != nil && tc.expectedError == nil {
+			switch {
+			case err != nil && tc.expectedError == nil:
 				t.Errorf("Expected no error but got %v", err)
-			} else if err == nil && tc.expectedError != nil {
+			case err == nil && tc.expectedError != nil:
 				t.Errorf("Expected error %v but got none", tc.expectedError)
-			} else if err != nil && err.Error() != tc.expectedError.Error() {
+			case err != nil && tc.expectedError != nil && err.Error() != tc.expectedError.Error():
 				t.Errorf("Expected error %v, got %v", tc.expectedError, err)
 			}
 		})
