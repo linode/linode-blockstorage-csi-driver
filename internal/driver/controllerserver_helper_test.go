@@ -676,10 +676,6 @@ func TestGetAndValidateVolume(t *testing.T) {
 		client: mockClient,
 	}
 
-	volContext := map[string]string{
-		VolumeTopologyRegion: "us-east",
-	}
-
 	testCases := []struct {
 		name           string
 		volumeID       int
@@ -768,7 +764,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linode, volContext)
+			result, err := cs.getAndValidateVolume(context.Background(), tc.volumeID, tc.linode)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
