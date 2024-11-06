@@ -711,6 +711,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{
 					ID:       123,
 					LinodeID: nil,
+					Region:   "us-east",
 				}, nil)
 			},
 			expectedResult: "",
