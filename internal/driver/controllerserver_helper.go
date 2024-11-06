@@ -483,6 +483,10 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 		volumeContext[LuksKeySizeAttribute] = req.GetParameters()[LuksKeySizeAttribute]
 	}
 
+	if req.GetParameters()[VolumeEncryption] == True {
+		volumeContext[VolumeEncryption] = True
+	}
+
 	volumeContext[VolumeTopologyRegion] = vol.Region
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
@@ -491,12 +495,12 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
-func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name, tags, volumeEncryption string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", tags)
+	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags])
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
-	vol, err := cs.attemptCreateLinodeVolume(ctx, name, tags, volumeEncryption, sizeGB, sourceInfo, accessibilityRequirements)
+	vol, err := cs.attemptCreateLinodeVolume(ctx, name, parameters[VolumeTags], parameters[VolumeEncryption], sizeGB, sourceInfo, accessibilityRequirements)
 	if err != nil {
 		return nil, err
 	}

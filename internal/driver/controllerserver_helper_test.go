@@ -303,21 +303,22 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name             string
-		volumeName       string
-		sizeGB           int
-		tags             string
-		volumeEncryption string
-		sourceInfo       *linodevolumes.LinodeVolumeKey
-		setupMocks       func()
-		expectedVolume   *linodego.Volume
-		expectedError    error
+		name           string
+		volumeName     string
+		sizeGB         int
+		parameters     map[string]string
+		sourceInfo     *linodevolumes.LinodeVolumeKey
+		setupMocks     func()
+		expectedVolume *linodego.Volume
+		expectedError  error
 	}{
 		{
 			name:       "Successful volume creation",
 			volumeName: "test-volume",
 			sizeGB:     20,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -331,7 +332,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume creation fails",
 			volumeName: "test-volume",
 			sizeGB:     20,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -344,7 +347,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume exists with different size",
 			volumeName: "existing-volume",
 			sizeGB:     30,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return([]linodego.Volume{
@@ -358,7 +363,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume creation from source",
 			volumeName: "cloned-volume",
 			sizeGB:     40,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: &linodevolumes.LinodeVolumeKey{VolumeID: 789},
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -372,7 +379,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume creation timeout",
 			volumeName: "timeout-volume",
 			sizeGB:     50,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -388,7 +397,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.tags, tc.volumeEncryption, tc.sizeGB, tc.sourceInfo, topology)
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, tc.sizeGB, tc.sourceInfo, topology)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
@@ -413,17 +422,19 @@ func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
 	cs := &ControllerServer{client: mockClient}
 
 	testCases := []struct {
-		name             string
-		volumeName       string
-		volumeEncryption string
-		topology         *csi.TopologyRequirement
-		setupMocks       func()
-		expectedError    error
+		name          string
+		volumeName    string
+		parameters    map[string]string
+		topology      *csi.TopologyRequirement
+		setupMocks    func()
+		expectedError error
 	}{
 		{
-			name:             "Encryption enabled and supported",
-			volumeName:       "encrypted-volume",
-			volumeEncryption: "true",
+			name:       "Encryption enabled and supported",
+			volumeName: "encrypted-volume",
+			parameters: map[string]string{
+				VolumeEncryption: "true",
+			},
 			topology: &csi.TopologyRequirement{
 				Preferred: []*csi.Topology{
 					{
@@ -444,9 +455,11 @@ func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:             "Encryption enabled but unsupported region",
-			volumeName:       "unsupported-encryption-volume",
-			volumeEncryption: "true",
+			name:       "Encryption enabled but unsupported region",
+			volumeName: "unsupported-encryption-volume",
+			parameters: map[string]string{
+				VolumeEncryption: "true",
+			},
 			topology: &csi.TopologyRequirement{
 				Preferred: []*csi.Topology{
 					{
@@ -469,7 +482,7 @@ func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
-			_, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, "", tc.volumeEncryption, 10, nil, tc.topology)
+			_, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, 10, nil, tc.topology)
 
 			switch {
 			case err != nil && tc.expectedError == nil:
