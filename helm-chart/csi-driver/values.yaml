@@ -12,7 +12,7 @@ enableMetrics: false
 metricsPort: 8081
 
 # enable encryption for volumes by default
-volumeEncryption: false
+#volumeEncryption: false
 
 # (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""
