@@ -187,7 +187,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	// Check if the volume exists and is valid.
 	// If the volume is already attached to the specified instance, it returns its device path.
-	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance, req.GetVolumeContext())
+	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
 		return resp, err
