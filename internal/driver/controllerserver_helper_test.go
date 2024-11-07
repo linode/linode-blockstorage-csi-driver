@@ -217,6 +217,54 @@ func TestCreateVolumeContext(t *testing.T) {
 	}
 }
 
+func TestCreateVolumeContext_Encryption(t *testing.T) {
+	vol := &linodego.Volume{
+		Region: "us-east",
+	}
+	tests := []struct {
+		name           string
+		req            *csi.CreateVolumeRequest
+		expectedResult map[string]string
+	}{
+		{
+			name: "Encrypted volume with encryption enabled",
+			req: &csi.CreateVolumeRequest{
+				Name: "encrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: True,
+				},
+			},
+			expectedResult: map[string]string{
+				VolumeEncryption:     True,
+				VolumeTopologyRegion: "us-east",
+			},
+		},
+		{
+			name: "Unencrypted volume",
+			req: &csi.CreateVolumeRequest{
+				Name:       "unencrypted-volume",
+				Parameters: map[string]string{},
+			},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := &ControllerServer{}
+			ctx := context.Background()
+			result := cs.createVolumeContext(ctx, tt.req, vol)
+
+			// Use reflect.DeepEqual to compare maps; log specific missing keys if the test fails
+			if !reflect.DeepEqual(result, tt.expectedResult) {
+				t.Errorf("createVolumeContext() = %v, want %v", result, tt.expectedResult)
+			}
+		})
+	}
+}
+
 func TestCreateAndWaitForVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -450,6 +498,99 @@ func TestPrepareVolumeParams(t *testing.T) {
 
 			if !reflect.DeepEqual(size, tt.expectedSize) {
 				t.Errorf("Expected size in bytes: %d, but got: %d", tt.expectedSize, size)
+			}
+		})
+	}
+}
+
+func TestPrepareVolumeParams_Encryption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mocks.NewMockLinodeClient(ctrl)
+	cs := &ControllerServer{
+		client: mockClient,
+		driver: &LinodeDriver{
+			volumeLabelPrefix: "csi-linode-pv-",
+		},
+		metadata: Metadata{Region: "us-east"},
+	}
+	ctx := context.Background()
+
+	tests := []struct {
+		name            string
+		req             *csi.CreateVolumeRequest
+		setupMocks      func()
+		expectedEncrypt string
+		expectedError   error
+	}{
+		{
+			name: "Encryption supported and enabled",
+			req: &csi.CreateVolumeRequest{
+				Name: "encrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: True,
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 << 30, // 10 GiB
+				},
+			},
+			setupMocks: func() {
+				mockClient.EXPECT().GetRegion(gomock.Any(), "us-east").Return(&linodego.Region{
+					Capabilities: []string{"Block Storage Encryption"},
+				}, nil)
+			},
+			expectedEncrypt: "enabled",
+			expectedError:   nil,
+		},
+		{
+			name: "Encryption not supported in region",
+			req: &csi.CreateVolumeRequest{
+				Name: "unencrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: True,
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 << 30, // 10 GiB
+				},
+			},
+			setupMocks: func() {
+				mockClient.EXPECT().GetRegion(gomock.Any(), "us-east").Return(&linodego.Region{
+					Capabilities: []string{},
+				}, nil)
+			},
+			expectedEncrypt: "disabled",
+			expectedError:   errInternal("Volume encryption is not supported in the us-east region"),
+		},
+		{
+			name: "Encryption disabled in parameters",
+			req: &csi.CreateVolumeRequest{
+				Name: "unencrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: "false",
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 << 30, // 10 GiB
+				},
+			},
+			setupMocks:      func() {},
+			expectedEncrypt: "disabled",
+			expectedError:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+
+			_, _, _, encryptionStatus, err := cs.prepareVolumeParams(ctx, tt.req)
+
+			if err != nil && !reflect.DeepEqual(err, tt.expectedError) {
+				t.Errorf("Expected error %v, got %v", tt.expectedError, err)
+			}
+
+			if encryptionStatus != tt.expectedEncrypt {
+				t.Errorf("Expected encryption status %v, got %v", tt.expectedEncrypt, encryptionStatus)
 			}
 		})
 	}
