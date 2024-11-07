@@ -217,72 +217,6 @@ func TestCreateVolumeContext(t *testing.T) {
 	}
 }
 
-func TestCreateLinodeVolumeWithEncryptionSupport(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-	cs := &ControllerServer{
-		client:   mockClient,
-		metadata: Metadata{}, // Leave Region unset initially
-	}
-
-	testCases := []struct {
-		name             string
-		volumeName       string
-		volumeEncryption string
-		region           string
-		setupMocks       func()
-		expectedError    error
-	}{
-		{
-			name:             "Encryption enabled and region supports encryption",
-			volumeName:       "encrypted-volume",
-			volumeEncryption: "true",
-			region:           "us-lax",
-			setupMocks: func() {
-				// Set cs.metadata.Region based on the test case's region field
-				cs.metadata.Region = "us-lax"
-				mockClient.EXPECT().GetRegion(gomock.Any(), cs.metadata.Region).Return(&linodego.Region{
-					ID: "us-lax", Capabilities: []string{"Block Storage Encryption"},
-				}, nil)
-				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 10, Encryption: "enabled"}, nil)
-			},
-			expectedError: nil,
-		},
-		{
-			name:             "Encryption enabled but region does not support encryption",
-			volumeName:       "unencrypted-volume",
-			volumeEncryption: "true",
-			region:           "us-ord",
-			setupMocks: func() {
-				// Set cs.metadata.Region based on the test case's region field
-				cs.metadata.Region = "us-ord"
-				mockClient.EXPECT().GetRegion(gomock.Any(), cs.metadata.Region).Return(&linodego.Region{
-					ID: "us-ord", Capabilities: []string{"Other Capabilities"},
-				}, nil)
-			},
-			expectedError: errInternal("Volume encryption is not supported in the us-ord region"),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupMocks()
-			_, err := cs.createLinodeVolume(context.Background(), tc.volumeName, "", tc.volumeEncryption, 10, nil)
-
-			switch {
-			case err != nil && tc.expectedError == nil:
-				t.Errorf("Expected no error but got %v", err)
-			case err == nil && tc.expectedError != nil:
-				t.Errorf("Expected error %v but got none", tc.expectedError)
-			case err != nil && err.Error() != tc.expectedError.Error():
-				t.Errorf("Expected error %v, got %v", tc.expectedError, err)
-			}
-		})
-	}
-}
-
 func TestCreateAndWaitForVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -396,8 +330,8 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
-
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, tc.sizeGB, tc.sourceInfo, topology)
+			encryptionStatus := "disabled"
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, encryptionStatus, tc.sizeGB, tc.sourceInfo, topology)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
@@ -409,88 +343,6 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 
 			if !reflect.DeepEqual(tc.expectedVolume, volume) {
 				t.Errorf("expected volume %v, got %v", tc.expectedVolume, volume)
-			}
-		})
-	}
-}
-
-func TestCreateAndWaitForVolumeWithEncryption(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-	cs := &ControllerServer{client: mockClient}
-
-	testCases := []struct {
-		name          string
-		volumeName    string
-		parameters    map[string]string
-		topology      *csi.TopologyRequirement
-		setupMocks    func()
-		expectedError error
-	}{
-		{
-			name:       "Encryption enabled and supported",
-			volumeName: "encrypted-volume",
-			parameters: map[string]string{
-				VolumeEncryption: "true",
-			},
-			topology: &csi.TopologyRequirement{
-				Preferred: []*csi.Topology{
-					{
-						Segments: map[string]string{
-							VolumeTopologyRegion: "us-lax",
-						},
-					},
-				},
-			},
-			setupMocks: func() {
-				mockClient.EXPECT().GetRegion(gomock.Any(), "us-lax").Return(&linodego.Region{
-					ID: "us-lax", Capabilities: []string{"Block Storage Encryption"},
-				}, nil)
-				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
-				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 10, Encryption: "enabled"}, nil)
-				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 10, Status: linodego.VolumeActive, Encryption: "enabled"}, nil)
-			},
-			expectedError: nil,
-		},
-		{
-			name:       "Encryption enabled but unsupported region",
-			volumeName: "unsupported-encryption-volume",
-			parameters: map[string]string{
-				VolumeEncryption: "true",
-			},
-			topology: &csi.TopologyRequirement{
-				Preferred: []*csi.Topology{
-					{
-						Segments: map[string]string{
-							VolumeTopologyRegion: "us-ord",
-						},
-					},
-				},
-			},
-			setupMocks: func() {
-				mockClient.EXPECT().GetRegion(gomock.Any(), "us-ord").Return(&linodego.Region{
-					ID: "us-ord", Capabilities: []string{"Other Capabilities"},
-				}, nil)
-				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
-			},
-			expectedError: errInternal("Volume encryption is not supported in the us-ord region"),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupMocks()
-			_, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, 10, nil, tc.topology)
-
-			switch {
-			case err != nil && tc.expectedError == nil:
-				t.Errorf("Expected no error but got %v", err)
-			case err == nil && tc.expectedError != nil:
-				t.Errorf("Expected error %v but got none", tc.expectedError)
-			case err != nil && tc.expectedError != nil && err.Error() != tc.expectedError.Error():
-				t.Errorf("Expected error %v, got %v", tc.expectedError, err)
 			}
 		})
 	}
@@ -578,7 +430,7 @@ func TestPrepareVolumeParams(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			volumeName, sizeGB, size, err := cs.prepareVolumeParams(ctx, tt.req)
+			volumeName, sizeGB, size, _, err := cs.prepareVolumeParams(ctx, tt.req)
 
 			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
 				if tt.expectedError != nil {
@@ -1164,7 +1016,6 @@ func TestAttachVolume(t *testing.T) {
 			volumeID: 123,
 			linodeID: 456,
 			setupMocks: func() {
-				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(&linodego.Volume{}, nil)
 				mockClient.EXPECT().AttachVolume(gomock.Any(), 123, gomock.Any()).Return(&linodego.Volume{}, nil)
 			},
 			expectedError: nil,
@@ -1174,7 +1025,6 @@ func TestAttachVolume(t *testing.T) {
 			volumeID: 789,
 			linodeID: 101,
 			setupMocks: func() {
-				mockClient.EXPECT().GetVolume(gomock.Any(), 789).Return(&linodego.Volume{}, nil)
 				mockClient.EXPECT().AttachVolume(gomock.Any(), 789, gomock.Any()).Return(nil, &linodego.Error{Message: "Volume 789 is already attached"})
 			},
 			expectedError: status.Error(codes.Unavailable, "attach volume: [000] Volume 789 is already attached"),
@@ -1184,7 +1034,6 @@ func TestAttachVolume(t *testing.T) {
 			volumeID: 202,
 			linodeID: 303,
 			setupMocks: func() {
-				mockClient.EXPECT().GetVolume(gomock.Any(), 202).Return(&linodego.Volume{}, nil)
 				mockClient.EXPECT().AttachVolume(gomock.Any(), 202, gomock.Any()).Return(nil, errors.New("API error"))
 			},
 			expectedError: status.Error(codes.Internal, "attach volume: API error"),
@@ -1206,72 +1055,6 @@ func TestAttachVolume(t *testing.T) {
 				if tc.expectedError.Error() != err.Error() {
 					t.Errorf("expected error %v, got %v", tc.expectedError, err)
 				}
-			}
-		})
-	}
-}
-
-func TestAttachVolumeWithEncryptionRegionMismatch(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-	cs := &ControllerServer{client: mockClient}
-
-	tests := []struct {
-		name           string
-		volumeID       int
-		linodeID       int
-		volume         *linodego.Volume
-		linodeInstance *linodego.Instance
-		expectedError  error
-	}{
-		{
-			name:     "Encryption enabled with region mismatch",
-			volumeID: 123,
-			linodeID: 456,
-			volume: &linodego.Volume{
-				ID:         123,
-				Encryption: "enabled",
-				Region:     "us-lax",
-			},
-			linodeInstance: &linodego.Instance{
-				ID:     456,
-				Region: "us-ord",
-			},
-			expectedError: status.Error(codes.FailedPrecondition, "encrypted volume and Linode instance must be in the same region for attachment"),
-		},
-		{
-			name:     "Encryption enabled with matching regions",
-			volumeID: 789,
-			linodeID: 101,
-			volume: &linodego.Volume{
-				ID:         789,
-				Encryption: "enabled",
-				Region:     "us-lax",
-			},
-			linodeInstance: &linodego.Instance{
-				ID:     101,
-				Region: "us-lax",
-			},
-			expectedError: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockClient.EXPECT().GetVolume(gomock.Any(), tt.volumeID).Return(tt.volume, nil)
-
-			mockClient.EXPECT().GetInstance(gomock.Any(), tt.linodeID).Return(tt.linodeInstance, nil)
-
-			if tt.expectedError == nil {
-				mockClient.EXPECT().AttachVolume(gomock.Any(), tt.volumeID, gomock.Any()).Return(&linodego.Volume{}, nil)
-			}
-
-			err := cs.attachVolume(context.Background(), tt.volumeID, tt.linodeID)
-
-			if err != nil && err.Error() != tt.expectedError.Error() {
-				t.Errorf("attachVolume() error = %v, expected %v", err, tt.expectedError)
 			}
 		})
 	}

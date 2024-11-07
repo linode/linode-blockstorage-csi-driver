@@ -240,7 +240,7 @@ func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
 
 // createLinodeVolume creates a new Linode volume with the specified label, size, and tags.
 // It returns the created volume or an error if the creation fails.
-func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags, volumeEncryption string, sizeGB int, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags, encryptionStatus string, sizeGB int, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
 
@@ -251,21 +251,6 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags,
 			log.V(4).Info("Using region from topology", "region", topologyRegion)
 			region = topologyRegion
 		}
-	}
-
-	// Check encryption status and if it's supported in the specified region.
-	var encryptionStatus string
-	if volumeEncryption == True {
-		supported, err := cs.isEncryptionSupported(ctx, region)
-		if err != nil {
-			return nil, err
-		}
-		if !supported {
-			return nil, errInternal("Volume encryption is not supported in the %s region", region)
-		}
-		encryptionStatus = "enabled"
-	} else {
-		encryptionStatus = "disabled"
 	}
 
 	// Prepare the volume creation request with region, label, and size.
@@ -446,25 +431,38 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // prepareVolumeParams prepares the volume parameters for creation.
 // It extracts the capacity range from the request, calculates the size,
 // and generates a normalized volume name. Returns the volume name and size in GB.
-func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (volumeName string, targetSizeGB int, size int64, err error) {
+func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (volumeName string, targetSizeGB int, size int64, encryptionStatus string, err error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
 
+	// Check encryption status and if it's supported in the specified region.
+	encryptionStatus = "disabled"
 	// Retrieve the capacity range from the request to determine the size limits for the volume.
 	capRange := req.GetCapacityRange()
 	// Get the requested size in bytes, handling any potential errors.
 	size, err = getRequestCapacitySize(capRange)
 	if err != nil {
-		return "", 0, 0, err
+		return "", 0, 0, encryptionStatus, err
 	}
 
 	preKey := linodevolumes.CreateLinodeVolumeKey(0, req.GetName())
 	volumeName = preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
 	targetSizeGB = bytesToGB(size)
+	// Check if encryption should be enabled
+	if req.GetParameters()[VolumeEncryption] == True {
+		supported, err := cs.isEncryptionSupported(ctx, cs.metadata.Region)
+		if err != nil {
+			return "", targetSizeGB, size, encryptionStatus, nil
+		}
+		if !supported {
+			return "", targetSizeGB, 0, encryptionStatus, errInternal("Volume encryption is not supported in the %s region", cs.metadata.Region)
+		}
+		encryptionStatus = "enabled"
+	}
 
 	log.V(4).Info("Volume parameters prepared", "volumeName", volumeName, "targetSizeGB", targetSizeGB)
-	return volumeName, targetSizeGB, size, nil
+	return volumeName, targetSizeGB, size, encryptionStatus, nil
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
@@ -495,12 +493,12 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
-func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
+func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, encryptionStatus string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags])
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
-	vol, err := cs.attemptCreateLinodeVolume(ctx, name, parameters[VolumeTags], parameters[VolumeEncryption], sizeGB, sourceInfo, accessibilityRequirements)
+	vol, err := cs.attemptCreateLinodeVolume(ctx, name, parameters[VolumeTags], encryptionStatus, sizeGB, sourceInfo, accessibilityRequirements)
 	if err != nil {
 		return nil, err
 	}
@@ -696,31 +694,8 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 	log.V(4).Info("Entering attachVolume()", "volume_id", volumeID, "node_id", linodeID)
 	defer log.V(4).Info("Exiting attachVolume()")
 
-	// Get the details of the volume to check for attachment possibilities
-	volume, err := cs.client.GetVolume(ctx, volumeID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to retrieve volume details: %v", err)
-	}
-
-	// Check if the volume is encrypted
-	isEncrypted := volume.Encryption == "enabled"
-	var linode *linodego.Instance
-
-	// If the volume is encrypted, get the details of the Linode instance and check region compatibility
-	if isEncrypted {
-		linode, err = cs.client.GetInstance(ctx, linodeID)
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed to retrieve Linode instance details: %v", err)
-		}
-
-		// Ensure the encrypted volume and Linode are in the same region
-		if volume.Region != linode.Region {
-			return status.Errorf(codes.FailedPrecondition, "encrypted volume and Linode instance must be in the same region for attachment")
-		}
-	}
-
 	persist := false
-	_, err = cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+	_, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID:           linodeID,
 		PersistAcrossBoots: &persist,
 	})
