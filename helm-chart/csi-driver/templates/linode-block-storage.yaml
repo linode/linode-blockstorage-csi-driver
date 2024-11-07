@@ -7,14 +7,9 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
 {{- end }}
-{{- if or .Values.volumeTags .Values.volumeEncryption }}
-parameters:
 {{- if .Values.volumeTags }}
+parameters:
   linodebs.csi.linode.com/volumeTags: {{ join "," .Values.volumeTags }}
-{{- end}}
-{{- if .Values.volumeEncryption }}
-  linodebs.csi.linode.com/encrypted: "true"
-{{- end}}
 {{- end}}
 allowVolumeExpansion: true
 provisioner: linodebs.csi.linode.com
