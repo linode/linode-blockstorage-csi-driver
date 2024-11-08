@@ -436,14 +436,14 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
 
-	// Check encryption status and if it's supported in the specified region.
+	// by default encryption is disabled
 	encryptionStatus = "disabled"
 	// Retrieve the capacity range from the request to determine the size limits for the volume.
 	capRange := req.GetCapacityRange()
 	// Get the requested size in bytes, handling any potential errors.
 	size, err = getRequestCapacitySize(capRange)
 	if err != nil {
-		return "", 0, 0, encryptionStatus, err
+		return "", 0, 0, "", err
 	}
 
 	preKey := linodevolumes.CreateLinodeVolumeKey(0, req.GetName())
@@ -453,10 +453,10 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	if req.GetParameters()[VolumeEncryption] == True {
 		supported, err := cs.isEncryptionSupported(ctx, cs.metadata.Region)
 		if err != nil {
-			return "", targetSizeGB, size, encryptionStatus, nil
+			return volumeName, targetSizeGB, size, encryptionStatus, err
 		}
 		if !supported {
-			return "", targetSizeGB, 0, encryptionStatus, errInternal("Volume encryption is not supported in the %s region", cs.metadata.Region)
+			return volumeName, targetSizeGB, size, encryptionStatus, errInternal("Volume encryption is not supported in the %s region", cs.metadata.Region)
 		}
 		encryptionStatus = "enabled"
 	}
@@ -495,7 +495,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 // It logs the process and handles any errors that occur during creation or waiting.
 func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, encryptionStatus string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, accessibilityRequirements *csi.TopologyRequirement) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags])
+	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags], "encryptionStatus", encryptionStatus)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
 	vol, err := cs.attemptCreateLinodeVolume(ctx, name, parameters[VolumeTags], encryptionStatus, sizeGB, sourceInfo, accessibilityRequirements)
