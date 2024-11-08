@@ -481,10 +481,6 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 		volumeContext[LuksKeySizeAttribute] = req.GetParameters()[LuksKeySizeAttribute]
 	}
 
-	if req.GetParameters()[VolumeEncryption] == True {
-		volumeContext[VolumeEncryption] = True
-	}
-
 	volumeContext[VolumeTopologyRegion] = vol.Region
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
