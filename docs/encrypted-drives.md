@@ -1,4 +1,15 @@
-## 🔒 Encrypted Block Storage
+## 📜 Table of Contents
+
+1. [🔒 Encrypted Block Storage](#encrypted-block-storage)
+    - [Example StorageClass](#example-storageclass-with-blockstorage)
+    - [Example PVC](#example-pvc-for-blockstorage)
+2. [🔒 Encrypted Drives using LUKS](#encrypted-drives-using-luks)
+    - [Example StorageClass with LUKS](#example-storageclass-with-luks)
+    - [Example PVC with LUKS](#example-pvc-with-luks)
+
+**NOTE**: LUKS encryption allows users to bring their own keys and manage them, while BlockStorage encryption is managed by Linode and it's automatically handled on the backend.
+
+### Encrypted Block Storage
 
 **Notes**:
 
@@ -14,7 +25,7 @@
    - For your specific region, check the `capabilities` and see if `Block Storage Encryption` is listed in it.
 5. **Usage in PersistentVolumeClaims (PVCs)**: Use the `storageClassName` field in a PVC to reference the desired StorageClass (`linode-block-storage-encrypted` or `linode-block-storage-retain-encrypted`). Each PVC will inherit the encryption settings defined in the referenced StorageClass.
 
-#### 🔑 Example StorageClass
+#### Example StorageClass with BlockStorage
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -39,7 +50,7 @@ provisioner: linodebs.csi.linode.com
 reclaimPolicy: Retain
 ```
 
-#### 📝 Example PVC
+#### Example PVC for BlockStorage
 
 ```yaml
 apiVersion: v1
@@ -67,10 +78,9 @@ spec:
   storageClassName: linode-block-storage-retain-encrypted
 ```
 
-
 ---
 
-## 🔒 Encrypted Drives using LUKS
+### Encrypted Drives using LUKS
 
 **Notes:**
 
@@ -84,7 +94,7 @@ spec:
     The CSI driver is careful to otherwise keep the secret on an ephemeral tmpfs
     mount and otherwise refuses to continue.
 
-#### 🔑 Example StorageClass
+#### Example StorageClass with LUKS
 
 > [!TIP]
 > To use an encryption key per PVC you can make a new StorageClass/Secret
@@ -117,7 +127,7 @@ stringData:
   luksKey: "SECRETGOESHERE"  
 ```
 
-#### 📝 Example PVC
+#### Example PVC with LUKS
 
 ```yaml
 apiVersion: v1
@@ -144,3 +154,4 @@ spec:
       storage: 10Gi
   storageClassName: linode-block-storage-retain-luks
 ```
+---
