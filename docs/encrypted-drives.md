@@ -1,4 +1,4 @@
-## 🔒 Encrypted Drives
+## 🔒 Encrypted Block Storage
 
 **Notes**:
 
@@ -10,6 +10,8 @@
 
 3. **Default StorageClass Annotation**: By marking both StorageClasses with `storageclass.kubernetes.io/is-default-class: "true"`, they’re eligible to act as default classes. However, Kubernetes will only treat one StorageClass as the actual default. Consider applying this annotation only to the preferred default StorageClass.
 4. **Region Compatibility**: Ensure that encryption is supported in the Linode region where the volumes will be created. If encryption is not available in a specific region, the CSI driver will return an error.
+   - To check if the region has encryption capability visit https://techdocs.akamai.com/linode-api/reference/get-regions
+   - For your specific region, check the `capabilities` and see if `Block Storage Encryption` is listed in it.
 5. **Usage in PersistentVolumeClaims (PVCs)**: Use the `storageClassName` field in a PVC to reference the desired StorageClass (`linode-block-storage-encrypted` or `linode-block-storage-retain-encrypted`). Each PVC will inherit the encryption settings defined in the referenced StorageClass.
 
 #### 🔑 Example StorageClass
@@ -20,8 +22,6 @@ kind: StorageClass
 metadata:
   name: linode-block-storage-encrypted
   namespace: kube-system
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
 parameters:
   linodebs.csi.linode.com/encrypted: "true"
 allowVolumeExpansion: true
@@ -32,8 +32,6 @@ kind: StorageClass
 metadata:
   name: linode-block-storage-retain-encrypted
   namespace: kube-system
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
 parameters:
   linodebs.csi.linode.com/encrypted: "true"
 allowVolumeExpansion: true
