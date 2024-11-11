@@ -235,7 +235,6 @@ func TestCreateVolumeContext_Encryption(t *testing.T) {
 				},
 			},
 			expectedResult: map[string]string{
-				VolumeEncryption:     True,
 				VolumeTopologyRegion: "us-east",
 			},
 		},
