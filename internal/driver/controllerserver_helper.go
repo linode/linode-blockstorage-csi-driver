@@ -563,7 +563,7 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 //
 // Additionally, it checks if the volume and instance are in the same region based on
 // the provided volume context. If they are not in the same region, it returns an internal error.
-func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance, volContext map[string]string) (string, error) {
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (string, error) {
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
@@ -584,8 +584,8 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 	}
 
 	// check if the volume and instance are in the same region
-	if instance.Region != volContext[VolumeTopologyRegion] {
-		return "", errRegionMismatch(volContext[VolumeTopologyRegion], instance.Region)
+	if instance.Region != volume.Region {
+		return "", errRegionMismatch(volume.Region, instance.Region)
 	}
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
