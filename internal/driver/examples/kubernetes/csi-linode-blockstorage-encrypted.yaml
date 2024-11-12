@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pvc-pod
+  name: csi-example-encryption-pod
 spec:
   containers:
-    - name: pvc-pod
+    - name: csi-example-encryption-pod
       image: ubuntu
       command:
         - sleep
