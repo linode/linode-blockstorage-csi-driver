@@ -553,6 +553,7 @@ func TestListVolumes(t *testing.T) {
 				}
 				if linodeVolume == nil {
 					t.Fatalf("no matching linode volume for %#v", volume)
+					return
 				}
 
 				if want, got := int64(linodeVolume.Size<<30), volume.GetCapacityBytes(); want != got {
