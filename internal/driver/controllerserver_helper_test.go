@@ -273,16 +273,6 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		client: mockClient,
 	}
 
-	topology := &csi.TopologyRequirement{
-		Preferred: []*csi.Topology{
-			{
-				Segments: map[string]string{
-					VolumeTopologyRegion: "us-east",
-				},
-			},
-		},
-	}
-
 	testCases := []struct {
 		name           string
 		volumeName     string
@@ -378,7 +368,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 			encryptionStatus := "disabled"
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, encryptionStatus, tc.sizeGB, tc.sourceInfo, topology)
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, encryptionStatus, tc.sizeGB, tc.sourceInfo, "us-east")
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
@@ -477,26 +467,31 @@ func TestPrepareVolumeParams(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			volumeName, sizeGB, size, _, err := cs.prepareVolumeParams(ctx, tt.req)
+			params, err := cs.prepareVolumeParams(ctx, tt.req)
 
-			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
-				if tt.expectedError != nil {
-					t.Errorf("expected error %v, got %v", tt.expectedError, err)
-				} else {
-					t.Errorf("expected no error but got %v", err)
+			// First, verify that the error matches the expectation
+			if (err != nil && tt.expectedError == nil) || (err == nil && tt.expectedError != nil) {
+				t.Errorf("expected error %v, got %v", tt.expectedError, err)
+			} else if err != nil && tt.expectedError != nil && err.Error() != tt.expectedError.Error() {
+				t.Errorf("expected error message %v, got %v", tt.expectedError.Error(), err.Error())
+			}
+
+			// Only check params fields if params is not nil
+			if params != nil {
+				if params.VolumeName != tt.expectedName {
+					t.Errorf("Expected volume name: %s, but got: %s", tt.expectedName, params.VolumeName)
 				}
-			}
 
-			if !reflect.DeepEqual(volumeName, tt.expectedName) {
-				t.Errorf("Expected volume name: %s, but got: %s", tt.expectedName, volumeName)
-			}
+				if params.TargetSizeGB != tt.expectedSizeGB {
+					t.Errorf("Expected size in GB: %d, but got: %d", tt.expectedSizeGB, params.TargetSizeGB)
+				}
 
-			if !reflect.DeepEqual(sizeGB, tt.expectedSizeGB) {
-				t.Errorf("Expected size in GB: %d, but got: %d", tt.expectedSizeGB, sizeGB)
-			}
-
-			if !reflect.DeepEqual(size, tt.expectedSize) {
-				t.Errorf("Expected size in bytes: %d, but got: %d", tt.expectedSize, size)
+				if params.Size != tt.expectedSize {
+					t.Errorf("Expected size in bytes: %d, but got: %d", tt.expectedSize, params.Size)
+				}
+			} else if err == nil {
+				// If params is nil and no error was expected, the test should fail
+				t.Errorf("expected non-nil params, got nil")
 			}
 		})
 	}
@@ -582,14 +577,24 @@ func TestPrepareVolumeParams_Encryption(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMocks()
 
-			_, _, _, encryptionStatus, err := cs.prepareVolumeParams(ctx, tt.req)
+			// Call prepareVolumeParams and capture the result and error
+			params, err := cs.prepareVolumeParams(ctx, tt.req)
 
-			if err != nil && !reflect.DeepEqual(err, tt.expectedError) {
-				t.Errorf("Expected error %v, got %v", tt.expectedError, err)
+			// Verify that the error matches the expected error
+			if (err != nil && tt.expectedError == nil) || (err == nil && tt.expectedError != nil) {
+				t.Errorf("expected error %v, got %v", tt.expectedError, err)
+			} else if err != nil && tt.expectedError != nil && err.Error() != tt.expectedError.Error() {
+				t.Errorf("expected error message %v, got %v", tt.expectedError.Error(), err.Error())
 			}
 
-			if encryptionStatus != tt.expectedEncrypt {
-				t.Errorf("Expected encryption status %v, got %v", tt.expectedEncrypt, encryptionStatus)
+			// Only proceed to check params fields if params is non-nil and no error was expected
+			if params != nil && err == nil {
+				if params.EncryptionStatus != tt.expectedEncrypt {
+					t.Errorf("Expected encryption status %v, got %v", tt.expectedEncrypt, params.EncryptionStatus)
+				}
+			} else if params == nil && err == nil {
+				// Fail the test if params is nil but no error was expected
+				t.Errorf("expected non-nil params, got nil")
 			}
 		})
 	}

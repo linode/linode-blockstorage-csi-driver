@@ -75,7 +75,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Prepare the volume parameters such as name and SizeGB from the request.
 	// This step may involve calculations or adjustments based on the request's content.
-	volName, sizeGB, size, encryptionStatus, err := cs.prepareVolumeParams(ctx, req)
+	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
@@ -93,7 +93,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create the volume
-	vol, err := cs.createAndWaitForVolume(ctx, volName, req.GetParameters(), encryptionStatus, sizeGB, sourceVolInfo, accessibilityRequirements)
+	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
@@ -103,7 +103,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volContext := cs.createVolumeContext(ctx, req, vol)
 
 	// Prepare and return response
-	resp := cs.prepareCreateVolumeResponse(ctx, vol, size, volContext, sourceVolInfo, contentSource)
+	resp := cs.prepareCreateVolumeResponse(ctx, vol, params.Size, volContext, sourceVolInfo, contentSource)
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
