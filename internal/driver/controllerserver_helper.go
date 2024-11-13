@@ -201,7 +201,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 // volume or creates a new one, optionally cloning from a source volume.
 func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label, tags, volumeEncryption string, sizeGB int, sourceVolume *linodevolumes.LinodeVolumeKey, region string) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
+	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags, "encryptionStatus", volumeEncryption, "region", region)
 
 	// List existing volumes with the specified label
 	jsonFilter, err := json.Marshal(map[string]string{"label": label})
@@ -252,7 +252,7 @@ func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
 // It returns the created volume or an error if the creation fails.
 func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags, encryptionStatus string, sizeGB int, region string) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags)
+	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags, "encryptionStatus", encryptionStatus, "region", region)
 
 	// Prepare the volume creation request with region, label, and size.
 	volumeReq := linodego.VolumeCreateOptions{
@@ -462,17 +462,23 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 
 	// Check if encryption should be enabled
 	if req.GetParameters()[VolumeEncryption] == True {
-		supported, err := cs.isEncryptionSupported(ctx, cs.metadata.Region)
+		supported, err := cs.isEncryptionSupported(ctx, region)
 		if err != nil {
 			return nil, err
 		}
 		if !supported {
-			return nil, errInternal("Volume encryption is not supported in the %s region", cs.metadata.Region)
+			return nil, errInternal("Volume encryption is not supported in the %s region", region)
 		}
 		encryptionStatus = "enabled"
 	}
 
-	log.V(4).Info("Volume parameters prepared", "volumeName", volumeName, "targetSizeGB", targetSizeGB)
+	log.V(4).Info("Volume parameters prepared", "parameters", &VolumeParams{
+		VolumeName:       volumeName,
+		TargetSizeGB:     targetSizeGB,
+		Size:             size,
+		EncryptionStatus: encryptionStatus,
+		Region:           region,
+	})
 	return &VolumeParams{
 		VolumeName:       volumeName,
 		TargetSizeGB:     targetSizeGB,
@@ -508,7 +514,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 // It logs the process and handles any errors that occur during creation or waiting.
 func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, encryptionStatus string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, region string) (*linodego.Volume, error) {
 	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags], "encryptionStatus", encryptionStatus)
+	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags], "encryptionStatus", encryptionStatus, "region", region)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 
 	vol, err := cs.attemptCreateLinodeVolume(ctx, name, parameters[VolumeTags], encryptionStatus, sizeGB, sourceInfo, region)
