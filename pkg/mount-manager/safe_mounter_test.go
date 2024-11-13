@@ -22,14 +22,15 @@ func TestNewSafeMounter(t *testing.T) {
 	safeMounter := NewSafeMounter()
 
 	if safeMounter == nil {
-		t.Fatalf("Expected non-nil SafeFormatAndMount, got nil")
+		t.Fatal("Expected non-nil SafeFormatAndMount, got nil")
+		return
 	}
 
 	if safeMounter.Interface == nil {
-		t.Error("Expected non-nil Interface, got nil")
+		t.Fatal("Expected non-nil Interface, got nil")
 	}
 
 	if safeMounter.Exec == nil {
-		t.Error("Expected non-nil Exec, got nil")
+		t.Fatal("Expected non-nil Exec, got nil")
 	}
 }

@@ -52,6 +52,7 @@ func TestDriverSuite(t *testing.T) {
 		Memory: 4 << 30, // 4GiB
 	}
 	linodeDriver := GetLinodeDriver(context.Background())
+	// variables that are picked up from the environment
 	enableMetrics := "true"
 	metricsPort := "10251"
 	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort); err != nil {

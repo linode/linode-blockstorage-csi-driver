@@ -217,6 +217,53 @@ func TestCreateVolumeContext(t *testing.T) {
 	}
 }
 
+func TestCreateVolumeContext_Encryption(t *testing.T) {
+	vol := &linodego.Volume{
+		Region: "us-east",
+	}
+	tests := []struct {
+		name           string
+		req            *csi.CreateVolumeRequest
+		expectedResult map[string]string
+	}{
+		{
+			name: "Encrypted volume with encryption enabled",
+			req: &csi.CreateVolumeRequest{
+				Name: "encrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: True,
+				},
+			},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
+		},
+		{
+			name: "Unencrypted volume",
+			req: &csi.CreateVolumeRequest{
+				Name:       "unencrypted-volume",
+				Parameters: map[string]string{},
+			},
+			expectedResult: map[string]string{
+				VolumeTopologyRegion: "us-east",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := &ControllerServer{}
+			ctx := context.Background()
+			result := cs.createVolumeContext(ctx, tt.req, vol)
+
+			// Use reflect.DeepEqual to compare maps; log specific missing keys if the test fails
+			if !reflect.DeepEqual(result, tt.expectedResult) {
+				t.Errorf("createVolumeContext() = %v, want %v", result, tt.expectedResult)
+			}
+		})
+	}
+}
+
 func TestCreateAndWaitForVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -226,21 +273,11 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 		client: mockClient,
 	}
 
-	topology := &csi.TopologyRequirement{
-		Preferred: []*csi.Topology{
-			{
-				Segments: map[string]string{
-					VolumeTopologyRegion: "us-east",
-				},
-			},
-		},
-	}
-
 	testCases := []struct {
 		name           string
 		volumeName     string
 		sizeGB         int
-		tags           string
+		parameters     map[string]string
 		sourceInfo     *linodevolumes.LinodeVolumeKey
 		setupMocks     func()
 		expectedVolume *linodego.Volume
@@ -250,7 +287,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Successful volume creation",
 			volumeName: "test-volume",
 			sizeGB:     20,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -264,7 +303,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume creation fails",
 			volumeName: "test-volume",
 			sizeGB:     20,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -277,7 +318,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume exists with different size",
 			volumeName: "existing-volume",
 			sizeGB:     30,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return([]linodego.Volume{
@@ -291,7 +334,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume creation from source",
 			volumeName: "cloned-volume",
 			sizeGB:     40,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: &linodevolumes.LinodeVolumeKey{VolumeID: 789},
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -305,7 +350,9 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			name:       "Volume creation timeout",
 			volumeName: "timeout-volume",
 			sizeGB:     50,
-			tags:       "tag1,tag2",
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
 			sourceInfo: nil,
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -320,8 +367,8 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
-
-			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.sizeGB, tc.tags, tc.sourceInfo, topology)
+			encryptionStatus := "disabled"
+			volume, err := cs.createAndWaitForVolume(context.Background(), tc.volumeName, tc.parameters, encryptionStatus, tc.sizeGB, tc.sourceInfo, "us-east")
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				if tc.expectedError != nil {
@@ -420,26 +467,134 @@ func TestPrepareVolumeParams(t *testing.T) {
 			}
 			ctx := context.Background()
 
-			volumeName, sizeGB, size, err := cs.prepareVolumeParams(ctx, tt.req)
+			params, err := cs.prepareVolumeParams(ctx, tt.req)
 
-			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
-				if tt.expectedError != nil {
-					t.Errorf("expected error %v, got %v", tt.expectedError, err)
-				} else {
-					t.Errorf("expected no error but got %v", err)
+			// First, verify that the error matches the expectation
+			if (err != nil && tt.expectedError == nil) || (err == nil && tt.expectedError != nil) {
+				t.Errorf("expected error %v, got %v", tt.expectedError, err)
+			} else if err != nil && tt.expectedError != nil && err.Error() != tt.expectedError.Error() {
+				t.Errorf("expected error message %v, got %v", tt.expectedError.Error(), err.Error())
+			}
+
+			// Only check params fields if params is not nil
+			if params != nil {
+				if params.VolumeName != tt.expectedName {
+					t.Errorf("Expected volume name: %s, but got: %s", tt.expectedName, params.VolumeName)
 				}
+
+				if params.TargetSizeGB != tt.expectedSizeGB {
+					t.Errorf("Expected size in GB: %d, but got: %d", tt.expectedSizeGB, params.TargetSizeGB)
+				}
+
+				if params.Size != tt.expectedSize {
+					t.Errorf("Expected size in bytes: %d, but got: %d", tt.expectedSize, params.Size)
+				}
+			} else if err == nil {
+				// If params is nil and no error was expected, the test should fail
+				t.Errorf("expected non-nil params, got nil")
+			}
+		})
+	}
+}
+
+func TestPrepareVolumeParams_Encryption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mocks.NewMockLinodeClient(ctrl)
+	cs := &ControllerServer{
+		client: mockClient,
+		driver: &LinodeDriver{
+			volumeLabelPrefix: "csi-linode-pv-",
+		},
+		metadata: Metadata{Region: "us-east"},
+	}
+	ctx := context.Background()
+
+	tests := []struct {
+		name            string
+		req             *csi.CreateVolumeRequest
+		setupMocks      func()
+		expectedEncrypt string
+		expectedError   error
+	}{
+		{
+			name: "Encryption supported and enabled",
+			req: &csi.CreateVolumeRequest{
+				Name: "encrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: True,
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 << 30, // 10 GiB
+				},
+			},
+			setupMocks: func() {
+				mockClient.EXPECT().GetRegion(gomock.Any(), "us-east").Return(&linodego.Region{
+					Capabilities: []string{"Block Storage Encryption"},
+				}, nil)
+			},
+			expectedEncrypt: "enabled",
+			expectedError:   nil,
+		},
+		{
+			name: "Encryption not supported in region",
+			req: &csi.CreateVolumeRequest{
+				Name: "unencrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: True,
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 << 30, // 10 GiB
+				},
+			},
+			setupMocks: func() {
+				mockClient.EXPECT().GetRegion(gomock.Any(), "us-east").Return(&linodego.Region{
+					Capabilities: []string{},
+				}, nil)
+			},
+			expectedEncrypt: "disabled",
+			expectedError:   errInternal("Volume encryption is not supported in the us-east region"),
+		},
+		{
+			name: "Encryption disabled in parameters",
+			req: &csi.CreateVolumeRequest{
+				Name: "unencrypted-volume",
+				Parameters: map[string]string{
+					VolumeEncryption: "false",
+				},
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10 << 30, // 10 GiB
+				},
+			},
+			setupMocks:      func() {},
+			expectedEncrypt: "disabled",
+			expectedError:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+
+			// Call prepareVolumeParams and capture the result and error
+			params, err := cs.prepareVolumeParams(ctx, tt.req)
+
+			// Verify that the error matches the expected error
+			if (err != nil && tt.expectedError == nil) || (err == nil && tt.expectedError != nil) {
+				t.Errorf("expected error %v, got %v", tt.expectedError, err)
+			} else if err != nil && tt.expectedError != nil && err.Error() != tt.expectedError.Error() {
+				t.Errorf("expected error message %v, got %v", tt.expectedError.Error(), err.Error())
 			}
 
-			if !reflect.DeepEqual(volumeName, tt.expectedName) {
-				t.Errorf("Expected volume name: %s, but got: %s", tt.expectedName, volumeName)
-			}
-
-			if !reflect.DeepEqual(sizeGB, tt.expectedSizeGB) {
-				t.Errorf("Expected size in GB: %d, but got: %d", tt.expectedSizeGB, sizeGB)
-			}
-
-			if !reflect.DeepEqual(size, tt.expectedSize) {
-				t.Errorf("Expected size in bytes: %d, but got: %d", tt.expectedSize, size)
+			// Only proceed to check params fields if params is non-nil and no error was expected
+			if params != nil && err == nil {
+				if params.EncryptionStatus != tt.expectedEncrypt {
+					t.Errorf("Expected encryption status %v, got %v", tt.expectedEncrypt, params.EncryptionStatus)
+				}
+			} else if params == nil && err == nil {
+				// Fail the test if params is nil but no error was expected
+				t.Errorf("expected non-nil params, got nil")
 			}
 		})
 	}

@@ -15,6 +15,7 @@ type LinodeClient interface {
 	ListInstanceVolumes(ctx context.Context, instanceID int, options *linodego.ListOptions) ([]linodego.Volume, error)
 	ListInstanceDisks(ctx context.Context, instanceID int, options *linodego.ListOptions) ([]linodego.InstanceDisk, error)
 
+	GetRegion(ctx context.Context, regionID string) (*linodego.Region, error)
 	GetInstance(context.Context, int) (*linodego.Instance, error)
 	GetVolume(context.Context, int) (*linodego.Volume, error)
 

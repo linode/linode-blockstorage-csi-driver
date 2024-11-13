@@ -21,6 +21,7 @@ import (
 type MockMetadataClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockMetadataClientMockRecorder
+	isgomock struct{}
 }
 
 // MockMetadataClientMockRecorder is the mock recorder for MockMetadataClient.

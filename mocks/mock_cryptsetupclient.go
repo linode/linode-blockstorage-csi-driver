@@ -21,6 +21,7 @@ import (
 type MockDevice struct {
 	ctrl     *gomock.Controller
 	recorder *MockDeviceMockRecorder
+	isgomock struct{}
 }
 
 // MockDeviceMockRecorder is the mock recorder for MockDevice.
@@ -186,6 +187,7 @@ func (mr *MockDeviceMockRecorder) VolumeKeyGet(keyslot, passphrase any) *gomock.
 type MockCryptSetupClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockCryptSetupClientMockRecorder
+	isgomock struct{}
 }
 
 // MockCryptSetupClientMockRecorder is the mock recorder for MockCryptSetupClient.

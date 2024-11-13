@@ -212,11 +212,11 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1003, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil).AnyTimes()
 				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1003, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
 				m.EXPECT().ListInstanceDisks(gomock.Any(), 1003, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
-				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 			},
 			expectedError: nil,
 		},
@@ -553,6 +553,7 @@ func TestListVolumes(t *testing.T) {
 				}
 				if linodeVolume == nil {
 					t.Fatalf("no matching linode volume for %#v", volume)
+					return
 				}
 
 				if want, got := int64(linodeVolume.Size<<30), volume.GetCapacityBytes(); want != got {
@@ -621,6 +622,11 @@ func (c *fakeLinodeClient) ListInstanceVolumes(_ context.Context, _ int, _ *lino
 
 func (c *fakeLinodeClient) ListInstanceDisks(_ context.Context, _ int, _ *linodego.ListOptions) ([]linodego.InstanceDisk, error) {
 	return c.disks, nil
+}
+
+//nolint:nilnil // TODO: re-work tests
+func (flc *fakeLinodeClient) GetRegion(context.Context, string) (*linodego.Region, error) {
+	return nil, nil
 }
 
 //nolint:nilnil // TODO: re-work tests

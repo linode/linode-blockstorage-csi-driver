@@ -21,6 +21,7 @@ import (
 type MockLinodeClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockLinodeClientMockRecorder
+	isgomock struct{}
 }
 
 // MockLinodeClientMockRecorder is the mock recorder for MockLinodeClient.
@@ -126,6 +127,21 @@ func (m *MockLinodeClient) GetInstance(arg0 context.Context, arg1 int) (*linodeg
 func (mr *MockLinodeClientMockRecorder) GetInstance(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstance", reflect.TypeOf((*MockLinodeClient)(nil).GetInstance), arg0, arg1)
+}
+
+// GetRegion mocks base method.
+func (m *MockLinodeClient) GetRegion(ctx context.Context, regionID string) (*linodego.Region, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegion", ctx, regionID)
+	ret0, _ := ret[0].(*linodego.Region)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegion indicates an expected call of GetRegion.
+func (mr *MockLinodeClientMockRecorder) GetRegion(ctx, regionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegion", reflect.TypeOf((*MockLinodeClient)(nil).GetRegion), ctx, regionID)
 }
 
 // GetVolume mocks base method.
