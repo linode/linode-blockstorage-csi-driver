@@ -23,6 +23,7 @@ func TestNewSafeMounter(t *testing.T) {
 
 	if safeMounter == nil {
 		t.Fatal("Expected non-nil SafeFormatAndMount, got nil")
+		return
 	}
 
 	if safeMounter.Interface == nil {
