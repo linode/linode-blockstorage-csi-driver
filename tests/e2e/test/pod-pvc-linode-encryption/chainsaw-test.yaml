@@ -39,7 +39,7 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
-    - name: Check if volume is created
+    - name: Check if encrypted volume is created and encrypted
       try:
         - script:
             env:
@@ -53,38 +53,29 @@ spec:
                 value: (to_string({"tags":($namespace)}))
             content: |
               set -e
-              curl -s \
+              RESPONSE=$(curl -s \
                 -H "Authorization: Bearer $LINODE_TOKEN" \
                 -H "X-Filter: $FILTER" \
                 -H "Content-Type: application/json" \
-                "https://api.linode.com/v4beta/volumes"
+                "https://api.linode.com/v4beta/volumes")
+              
+              # Check if the results field is 1
+              RESULTS_COUNT=$(echo "$RESPONSE" | jq -r '.results')
+              if [ "$RESULTS_COUNT" -ne 1 ]; then
+              echo "Error: Expected results to be 1, but got $RESULTS_COUNT"
+              exit 1
+              fi
+
+              # Check the encryption field
+              ENCRYPTION_STATUS=$(echo "$RESPONSE" | jq -r '.data[0].encryption')
+              if [ "$ENCRYPTION_STATUS" != "enabled" ]; then
+                echo "Error: Encryption is not enabled (found: $ENCRYPTION_STATUS)"
+                exit 1
+              fi
+
+              echo "Encryption is enabled."
             check:
               ($error): ~
-              (json_parse($stdout)):
-                results: 1
-    - name: Check if volume is encrypted
-      try:
-        - script:
-            env:
-              - name: TARGET_API
-                value: api.linode.com
-              - name: TARGET_API_VERSION
-                value: v4beta
-              - name: URI
-                value: volumes
-              - name: FILTER
-                value: (to_string({"tags":($namespace)}))
-            content: |
-              set -e
-              curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
-                -H "X-Filter: $FILTER" \
-                -H "Content-Type: application/json" \
-                "https://api.linode.com/v4beta/volumes"
-            check:
-              ($error): ~
-              (json_parse($stdout)):
-                data[*].encryption: "enabled"
     - name: Create a file inside the pod and check it was created
       try:
         - script:

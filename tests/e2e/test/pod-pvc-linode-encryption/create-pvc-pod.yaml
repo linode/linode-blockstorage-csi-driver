@@ -10,6 +10,7 @@ provisioner: linodebs.csi.linode.com
 reclaimPolicy: Delete
 parameters:
   linodebs.csi.linode.com/encrypted: "true"
+  linodebs.csi.linode.com/volumeTags: (to_string($namespace))
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
