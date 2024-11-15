@@ -4,7 +4,7 @@ kind: StorageClass
 metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
-  name: (join('-', ['linode-block-storage-encrypted', $namespace]))
+  name: (join('-', ['linode-blockstorage-encrypted', $namespace]))
   namespace: kube-system
 provisioner: linodebs.csi.linode.com
 reclaimPolicy: Delete
@@ -21,7 +21,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: (join('-', ['linode-block-storage-encrypted', $namespace]))
+  storageClassName: (join('-', ['linode-blockstorage-encrypted', $namespace]))
 ---
 apiVersion: v1
 kind: Pod
@@ -37,11 +37,6 @@ spec:
     volumeMounts:
     - mountPath: /data
       name: csi-volume
-    securityContext:
-      privileged: true
-      capabilities:
-        add: ["SYS_ADMIN"]
-      allowPrivilegeEscalation: true
   tolerations:
   - key: "node-role.kubernetes.io/control-plane"
     operator: "Exists"
