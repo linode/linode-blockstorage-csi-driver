@@ -63,6 +63,7 @@ spec:
               RESULTS_COUNT=$(echo "$RESPONSE" | jq -r '.results')
               if [ "$RESULTS_COUNT" -ne 1 ]; then
               echo "Error: Expected results to be 1, but got $RESULTS_COUNT"
+              echo "$RESPONSE"
               exit 1
               fi
 
@@ -70,6 +71,7 @@ spec:
               ENCRYPTION_STATUS=$(echo "$RESPONSE" | jq -r '.data[0].encryption')
               if [ "$ENCRYPTION_STATUS" != "enabled" ]; then
                 echo "Error: Encryption is not enabled (found: $ENCRYPTION_STATUS)"
+                echo "$RESPONSE"
                 exit 1
               fi
 
