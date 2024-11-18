@@ -62,9 +62,9 @@ spec:
               # Check if the results field is 1
               RESULTS_COUNT=$(echo "$RESPONSE" | jq -r '.results')
               if [ "$RESULTS_COUNT" -ne 1 ]; then
-              echo "Error: Expected results to be 1, but got $RESULTS_COUNT"
-              echo "$RESPONSE"
-              exit 1
+                echo "Error: Expected results to be 1, but got $RESULTS_COUNT"
+                echo "$RESPONSE"
+                exit 1
               fi
 
               # Check the encryption field
