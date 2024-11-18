@@ -65,7 +65,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.github_token }}
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
       IMAGE_VERSION: ${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
-      LINODE_REGION: us-sea
+      LINODE_REGION: us-lax
       LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
       LINODE_MACHINE_TYPE: g6-standard-2
       WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '1' }}
