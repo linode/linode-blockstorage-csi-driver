@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel"
 	"math"
 	"strconv"
 	"time"
@@ -25,6 +26,8 @@ type ControllerServer struct {
 
 	csi.UnimplementedControllerServer
 }
+
+var tracer = otel.Tracer("controller")
 
 // NewControllerServer instantiates a new RPC service that implements the
 // CSI [Controller Service RPC] endpoints.
@@ -70,6 +73,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// This includes checking for required fields and valid volume capabilities.
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+
+		// Record OpenTelemetry trace for failure
+		metrics.RecordError(ctx, tracer, "CreateVolume", err, map[string]string{
+			"volume_name": req.GetName(),
+		})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -78,6 +86,10 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+
+		metrics.RecordError(ctx, tracer, "CreateVolume", err, map[string]string{
+			"volume_name": req.GetName(),
+		})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -96,6 +108,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+
+		metrics.RecordError(ctx, tracer, "CreateVolume", err, map[string]string{
+			"volume_name": params.VolumeName,
+			"region":      params.Region,
+		})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -107,6 +124,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
+
+	metrics.RecordSuccess(ctx, tracer, "CreateVolume", map[string]string{
+		"volume_name": vol.Label,
+		"region":      params.Region,
+	})
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
