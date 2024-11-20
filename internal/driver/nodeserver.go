@@ -17,7 +17,9 @@ limitations under the License.
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -380,16 +382,30 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// from the limit of block devices that can be attached to the instance,
 	// which will effectively give us the number of block storage volumes
 	// that can be attached to this node/instance.
-	//
-	// This is what the spec wants us to report: the actual number of volumes
-	// that can be attached, and not the theoretical maximum number of
-	// devices that can be attached.
 	log.V(4).Info("Listing instance disks", "nodeID", ns.metadata.ID)
 	disks, err := ns.client.ListInstanceDisks(ctx, ns.metadata.ID, nil)
 	if err != nil {
 		return &csi.NodeGetInfoResponse{}, errInternal("list instance disks: %v", err)
 	}
-	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(disks)
+
+	log.V(4).Info("Filtering disks", "disks", disks)
+
+	// Filter out disks that are created by the driver
+	// to avoid counting them towards the max volume attachments
+	// that can be attached to the instance.
+	filterdDisks := slices.DeleteFunc(disks, func(disk linodego.InstanceDisk) bool {
+		// Check if the disk label starts with the volume label prefix
+		if disk.Label != "" && ns.driver.volumeLabelPrefix != "" {
+			return strings.HasPrefix(disk.Label, ns.driver.volumeLabelPrefix)
+		}
+		return false
+	})
+
+	log.V(4).Info("Filtered disks", "disks", filterdDisks)
+
+	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(filterdDisks)
+
+	log.V(2).Info("Max volumes", "maxVolumes", maxVolumes)
 
 	log.V(2).Info("functionStatusfully completed")
 	return &csi.NodeGetInfoResponse{

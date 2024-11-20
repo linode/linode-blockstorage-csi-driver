@@ -412,7 +412,60 @@ func TestNodeGetInfo(t *testing.T) {
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().ListInstanceDisks(gomock.Any(), gomock.Any(), gomock.Any()).Return([]linodego.InstanceDisk{
 					{
-						ID: 1,
+						ID:    1,
+						Label: "main",
+					},
+				}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "with swap disk",
+			req:  &csi.NodeGetInfoRequest{},
+			resp: &csi.NodeGetInfoResponse{
+				NodeId:            "10",
+				MaxVolumesPerNode: 6,
+				AccessibleTopology: &csi.Topology{
+					Segments: map[string]string{
+						"topology.linode.com/region": "testregion",
+					},
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), gomock.Any(), gomock.Any()).Return([]linodego.InstanceDisk{
+					{
+						ID:    1,
+						Label: "main",
+					},
+					{
+						ID:    2,
+						Label: "swap",
+					},
+				}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "with a pv already attached",
+			req:  &csi.NodeGetInfoRequest{},
+			resp: &csi.NodeGetInfoResponse{
+				NodeId:            "10",
+				MaxVolumesPerNode: 7,
+				AccessibleTopology: &csi.Topology{
+					Segments: map[string]string{
+						"topology.linode.com/region": "testregion",
+					},
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), gomock.Any(), gomock.Any()).Return([]linodego.InstanceDisk{
+					{
+						ID:    1,
+						Label: "main",
+					},
+					{
+						ID:    2,
+						Label: "pvc123",
 					},
 				}, nil)
 			},
@@ -429,7 +482,9 @@ func TestNodeGetInfo(t *testing.T) {
 				tt.expectLinodeClientCalls(mockClient)
 			}
 			ns := &NodeServer{
-				driver: &LinodeDriver{},
+				driver: &LinodeDriver{
+					volumeLabelPrefix: "pvc",
+				},
 				client: mockClient,
 				metadata: Metadata{
 					ID:     10,
