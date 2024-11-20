@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -11,7 +12,7 @@ import (
 // RecordError starts a new span for error tracking, logs the error, and records attributes.
 func RecordError(ctx context.Context, tracer trace.Tracer, operationName string, err error, params map[string]string) {
 	// Starting a span for the operation
-	ctx, span := tracer.Start(ctx, operationName)
+	_, span := tracer.Start(ctx, operationName)
 	defer span.End()
 
 	// Add error information to span
@@ -30,7 +31,7 @@ func RecordError(ctx context.Context, tracer trace.Tracer, operationName string,
 // RecordSuccess starts a span for successful operations and records custom attributes.
 func RecordSuccess(ctx context.Context, tracer trace.Tracer, operationName string, params map[string]string) {
 	// Starting a span for the operation
-	ctx, span := tracer.Start(ctx, operationName)
+	_, span := tracer.Start(ctx, operationName)
 	defer span.End()
 
 	// Set custom attributes

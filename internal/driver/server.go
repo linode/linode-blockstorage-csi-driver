@@ -18,14 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/exporters/prometheus"
-	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/semconv/v1.17.0"
 	"net"
 	"net/http"
 	"net/url"
@@ -33,6 +25,15 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -90,6 +91,12 @@ func initOpenTelemetry(serviceName string) error {
 		return fmt.Errorf("failed to create Prometheus exporter: %w", err)
 	}
 
+	if prometheusExporter == nil {
+		klog.Warning("Prometheus exporter is nil, tracing is disabled")
+	} else {
+		klog.Infof("Prometheus exporter is ready")
+	}
+
 	// Create OTLP trace exporter
 	traceExporter, err := otlptrace.New(
 		context.Background(),
@@ -118,7 +125,6 @@ func initOpenTelemetry(serviceName string) error {
 }
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
-
 	// Initialize OpenTelemetry
 	if err := initOpenTelemetry("Linode-CSI-Driver"); err != nil {
 		klog.Fatalf("Failed to initialize OpenTelemetry: %v", err)
@@ -169,13 +175,13 @@ func (s *nonBlockingGRPCServer) ForceStop() {
 }
 
 func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
+	// Create otel gRPC ServerHandler
+	serverHandler := otelgrpc.NewServerHandler()
+
 	opts := []grpc.ServerOption{
+		grpc.StatsHandler(serverHandler), // Stats handler for otel
 		grpc.ChainUnaryInterceptor(
-			logger.LogGRPC,
-			otelgrpc.UnaryServerInterceptor(), // OpenTelemetry tracing interceptor
-		),
-		grpc.ChainStreamInterceptor(
-			otelgrpc.StreamServerInterceptor(), // OpenTelemetry tracing interceptor
+			logger.LogGRPC, // Existing logging interceptor
 		),
 	}
 
