@@ -3,14 +3,22 @@ package metrics
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 )
 
+var tracer trace.Tracer
+
+// InitTracer initializes the global tracer.
+func InitTracer(serviceName string) {
+	tracer = otel.Tracer(serviceName)
+}
+
 // RecordError starts a new span for error tracking, logs the error, and records attributes.
-func RecordError(ctx context.Context, tracer trace.Tracer, operationName string, err error, params map[string]string) {
+func RecordError(ctx context.Context, operationName string, err error, params map[string]string) {
 	// Starting a span for the operation
 	_, span := tracer.Start(ctx, operationName)
 	defer span.End()
@@ -29,7 +37,7 @@ func RecordError(ctx context.Context, tracer trace.Tracer, operationName string,
 }
 
 // RecordSuccess starts a span for successful operations and records custom attributes.
-func RecordSuccess(ctx context.Context, tracer trace.Tracer, operationName string, params map[string]string) {
+func RecordSuccess(ctx context.Context, operationName string, params map[string]string) {
 	// Starting a span for the operation
 	_, span := tracer.Start(ctx, operationName)
 	defer span.End()
