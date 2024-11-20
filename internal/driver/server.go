@@ -30,7 +30,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
 )
 
 // Defines Non blocking GRPC server interfaces
@@ -59,7 +59,6 @@ type NonBlockingGRPCServer interface {
 
 // Variables for open telemetry setup
 var tracerProvider *trace.TracerProvider
-var prometheusExporter *prometheus.Exporter
 
 func NewNonBlockingGRPCServer() NonBlockingGRPCServer {
 	return &nonBlockingGRPCServer{}
@@ -83,24 +82,13 @@ func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort stri
 }
 
 func initOpenTelemetry(serviceName string) error {
-	var err error
-
-	// Create Prometheus exporter for metrics
-	prometheusExporter, err = prometheus.New()
-	if err != nil {
-		return fmt.Errorf("failed to create Prometheus exporter: %w", err)
-	}
-
-	if prometheusExporter == nil {
-		klog.Warning("Prometheus exporter is nil, tracing is disabled")
-	} else {
-		klog.Infof("Prometheus exporter is ready")
-	}
-
-	// Create OTLP trace exporter
+	// Configure the OTLP trace exporter for the OpenTelemetry Collector
 	traceExporter, err := otlptrace.New(
 		context.Background(),
-		otlptracehttp.NewClient(),
+		otlptracehttp.NewClient(
+			otlptracehttp.WithEndpoint("otel-collector:4318"), // Replace with your backend endpoint
+			otlptracehttp.WithInsecure(),
+		),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create OTLP trace exporter: %w", err)
@@ -120,6 +108,9 @@ func initOpenTelemetry(serviceName string) error {
 
 	// Set the global TracerProvider
 	otel.SetTracerProvider(tracerProvider)
+
+	// Initialize the metrics package tracer
+	metrics.InitTracer(serviceName)
 
 	return nil
 }

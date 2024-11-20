@@ -9,7 +9,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
-	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -26,8 +25,6 @@ type ControllerServer struct {
 
 	csi.UnimplementedControllerServer
 }
-
-var tracer = otel.Tracer("controller")
 
 // NewControllerServer instantiates a new RPC service that implements the
 // CSI [Controller Service RPC] endpoints.
@@ -70,24 +67,23 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	log.V(2).Info("Processing request", "req", req)
 
 	// Validate the incoming request to ensure it meets the necessary criteria.
-	// This includes checking for required fields and valid volume capabilities.
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
 
-		// Record OpenTelemetry trace for failure
-		metrics.RecordError(ctx, tracer, "CreateVolume", err, map[string]string{
+		// Updated RecordError call
+		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{
 			"volume_name": req.GetName(),
 		})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
-	// Prepare the volume parameters such as name and SizeGB from the request.
-	// This step may involve calculations or adjustments based on the request's content.
+	// Prepare the volume parameters
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
 
-		metrics.RecordError(ctx, tracer, "CreateVolume", err, map[string]string{
+		// Updated RecordError call
+		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{
 			"volume_name": req.GetName(),
 		})
 		return &csi.CreateVolumeResponse{}, err
@@ -96,8 +92,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	contentSource := req.GetVolumeContentSource()
 	accessibilityRequirements := req.GetAccessibilityRequirements()
 
-	// Attempt to retrieve information about a source volume if the request includes a content source.
-	// This is important for scenarios where the volume is being cloned from an existing one.
+	// Attempt to retrieve information about a source volume
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
@@ -109,7 +104,8 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
 
-		metrics.RecordError(ctx, tracer, "CreateVolume", err, map[string]string{
+		// Updated RecordError call
+		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{
 			"volume_name": params.VolumeName,
 			"region":      params.Region,
 		})
@@ -125,7 +121,8 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
 
-	metrics.RecordSuccess(ctx, tracer, "CreateVolume", map[string]string{
+	// Updated RecordSuccess call
+	metrics.RecordSuccess(ctx, "CreateVolume", map[string]string{
 		"volume_name": vol.Label,
 		"region":      params.Region,
 	})
