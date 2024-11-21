@@ -667,11 +667,17 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		PersistAcrossBoots: &persist,
 	})
 	if err != nil {
+		// https://github.com/container-storage-interface/spec/blob/master/spec.md#controllerpublishvolume-errors
 		code := codes.Internal // Default error code is Internal.
 		// Check if the error indicates that the volume is already attached.
 		var apiErr *linodego.Error
-		if errors.As(err, &apiErr) && strings.Contains(apiErr.Message, "is already attached") {
-			code = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
+		if errors.As(err, &apiErr) {
+			switch {
+			case strings.Contains(apiErr.Message, "is already attached"):
+				code = codes.FailedPrecondition // Allow a retry if the volume is already attached: race condition can occur here
+			case strings.Contains(apiErr.Message, "Maximum number of block storage volumes are attached to this Linode"):
+				code = codes.ResourceExhausted
+			}
 		}
 		return status.Errorf(code, "attach volume: %v", err)
 	}
