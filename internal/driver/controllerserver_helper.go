@@ -95,31 +95,6 @@ type VolumeParams struct {
 	Region           string
 }
 
-// canAttach indicates whether or not another volume can be attached to the
-// Linode with the given ID.
-//
-// Whether or not another volume can be attached is based on how many instance
-// disks and block storage volumes are currently attached to the instance.
-func (cs *ControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
-	log := logger.GetLogger(ctx)
-	log.V(4).Info("Checking if volume can be attached", "instance_id", instance.ID)
-
-	// Get the maximum number of volume attachments allowed for the instance
-	limit, err := cs.maxAllowedVolumeAttachments(ctx, instance)
-	if err != nil {
-		return false, err
-	}
-
-	// List the volumes currently attached to the instance
-	volumes, err := cs.client.ListInstanceVolumes(ctx, instance.ID, nil)
-	if err != nil {
-		return false, errInternal("list instance volumes: %v", err)
-	}
-
-	// Return true if the number of attached volumes is less than the limit
-	return len(volumes) < limit, nil
-}
-
 // maxAllowedVolumeAttachments calculates the maximum number of volumes that can be attached to a Linode instance,
 // taking into account the instance's memory and currently attached disks.
 func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
@@ -675,33 +650,6 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 
 	log.V(4).Info("Instance retrieved", "instance", instance)
 	return instance, nil
-}
-
-// checkAttachmentCapacity checks if the specified instance can accommodate
-// additional volume attachments. It retrieves the maximum number of allowed
-// attachments and compares it with the currently attached volumes. If the
-// limit is exceeded, it returns an error indicating the maximum volume
-// attachments allowed.
-func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instance *linodego.Instance) error {
-	log := logger.GetLogger(ctx)
-	log.V(4).Info("Entering checkAttachmentCapacity()", "linodeID", instance.ID)
-	defer log.V(4).Info("Exiting checkAttachmentCapacity()")
-
-	canAttach, err := cs.canAttach(ctx, instance)
-	if err != nil {
-		return err
-	}
-	if !canAttach {
-		// If the instance cannot accommodate more attachments, retrieve the maximum allowed attachments.
-		limit, err := cs.maxAllowedVolumeAttachments(ctx, instance)
-		if errors.Is(err, errNilInstance) {
-			return errInternal("cannot calculate max volume attachments for a nil instance")
-		} else if err != nil {
-			return errMaxAttachments // Return an error indicating the maximum attachments limit has been reached.
-		}
-		return errMaxVolumeAttachments(limit) // Return an error indicating the maximum volume attachments allowed.
-	}
-	return nil // Return nil if the instance can accommodate more attachments.
 }
 
 // attachVolume attaches the specified volume to the given Linode instance.

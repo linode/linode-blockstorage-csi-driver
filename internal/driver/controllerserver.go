@@ -202,12 +202,6 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		}, nil
 	}
 
-	// Check if the instance can accommodate the volume attachment
-	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
-		return resp, capErr
-	}
-
 	// Attach the volume to the specified instance
 	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
