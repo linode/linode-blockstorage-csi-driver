@@ -1111,7 +1111,7 @@ func TestAttachVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().AttachVolume(gomock.Any(), 789, gomock.Any()).Return(nil, &linodego.Error{Message: "Volume 789 is already attached"})
 			},
-			expectedError: status.Error(codes.Unavailable, "attach volume: [000] Volume 789 is already attached"),
+			expectedError: errAlreadyAttached,
 		},
 		{
 			name:     "API error",
@@ -1120,7 +1120,7 @@ func TestAttachVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().AttachVolume(gomock.Any(), 202, gomock.Any()).Return(nil, errors.New("API error"))
 			},
-			expectedError: status.Error(codes.Internal, "attach volume: API error"),
+			expectedError: errInternal("attach volume: API error"),
 		},
 	}
 

@@ -34,6 +34,10 @@ var (
 	// attachments allowed for the instance, call errMaxVolumeAttachments.
 	errMaxAttachments = status.Error(codes.ResourceExhausted, "max number of volumes already attached to instance")
 
+	// errAlreadyAttached is used to indicate that a volume is already attached
+	// to a Linode instance.
+	errAlreadyAttached = status.Error(codes.FailedPrecondition, "volume is already attached")
+
 	// errResizeDown indicates a request would result in a volume being resized
 	// to be smaller than it currently is.
 	//
@@ -59,10 +63,6 @@ var (
 // should be in wantRegion.
 func errRegionMismatch(gotRegion, wantRegion string) error {
 	return status.Errorf(codes.InvalidArgument, "source volume is in region %q, needs to be in region %q", gotRegion, wantRegion)
-}
-
-func errMaxVolumeAttachments(numAttachments int) error {
-	return status.Errorf(codes.ResourceExhausted, "max number of volumes (%d) already attached to instance", numAttachments)
 }
 
 func errInstanceNotFound(linodeID int) error {

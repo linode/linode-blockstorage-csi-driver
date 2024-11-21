@@ -10,8 +10,6 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -667,13 +665,17 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		PersistAcrossBoots: &persist,
 	})
 	if err != nil {
-		code := codes.Internal // Default error code is Internal.
-		// Check if the error indicates that the volume is already attached.
+		// https://github.com/container-storage-interface/spec/blob/master/spec.md#controllerpublishvolume-errors
 		var apiErr *linodego.Error
-		if errors.As(err, &apiErr) && strings.Contains(apiErr.Message, "is already attached") {
-			code = codes.Unavailable // Allow a retry if the volume is already attached: race condition can occur here
+		if errors.As(err, &apiErr) {
+			switch {
+			case strings.Contains(apiErr.Message, "is already attached"):
+				return errAlreadyAttached
+			case strings.Contains(apiErr.Message, "Maximum number of block storage volumes are attached to this Linode"):
+				return errMaxAttachments
+			}
 		}
-		return status.Errorf(code, "attach volume: %v", err)
+		return errInternal("attach volume: %v", err)
 	}
 	return nil // Return nil if the volume is successfully attached.
 }
