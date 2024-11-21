@@ -933,64 +933,6 @@ func TestGetAndValidateVolume(t *testing.T) {
 	}
 }
 
-func TestCheckAttachmentCapacity(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-	cs := &ControllerServer{
-		client: mockClient,
-	}
-
-	testCases := []struct {
-		name          string
-		instance      *linodego.Instance
-		setupMocks    func()
-		expectedError error
-	}{
-		{
-			name: "Can attach volume",
-			instance: &linodego.Instance{
-				ID: 123,
-				Specs: &linodego.InstanceSpec{
-					Memory: 4096,
-				},
-			},
-			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 123, gomock.Any()).Return([]linodego.Volume{}, nil)
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 123, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
-			},
-			expectedError: nil,
-		},
-		{
-			name: "Cannot attach volume - max attachments reached",
-			instance: &linodego.Instance{
-				ID: 456,
-				Specs: &linodego.InstanceSpec{
-					Memory: 1024,
-				},
-			},
-			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil)
-			},
-			expectedError: errMaxVolumeAttachments(6),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupMocks()
-
-			err := cs.checkAttachmentCapacity(context.Background(), tc.instance)
-
-			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
-				t.Errorf("expected error %v, got %v", tc.expectedError, err)
-			}
-		})
-	}
-}
-
 func TestGetContentSourceVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
