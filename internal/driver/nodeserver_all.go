@@ -22,20 +22,30 @@ func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest)
 		return nil, status.Error(codes.InvalidArgument, "volume ID or path empty")
 	}
 
+	var volumeCondition *csi.VolumeCondition
+
 	var statfs unix.Statfs_t
 	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
 	err := unix.Statfs(req.GetVolumePath(), &statfs)
-	if err != nil && !errors.Is(err, unix.EIO) {
-		if errors.Is(err, unix.ENOENT) {
-			return nil, status.Errorf(codes.NotFound, "volume path not found: %v", err.Error())
+	switch {
+	case errors.Is(err, unix.EIO):
+		// EIO is returned when the filesystem is not mounted.
+		volumeCondition = &csi.VolumeCondition{
+			Abnormal: true,
+			Message:  fmt.Sprintf("failed to get stats: %v", err.Error()),
 		}
+	case errors.Is(err, unix.ENOENT):
+		// ENOENT is returned when the volume path does not exist.
+		return nil, status.Errorf(codes.NotFound, "volume path not found: %v", err.Error())
+	case err != nil:
+		// Any other error is considered an internal error.
 		return nil, status.Errorf(codes.Internal, "failed to get stats: %v", err.Error())
-	}
-
-	// If we got a filesystem error that suggests things are not well with this volume
-	var abnormal bool
-	if errors.Is(err, unix.EIO) {
-		abnormal = true
+	default:
+		// If no error occurred, the volume is considered healthy.
+		volumeCondition = &csi.VolumeCondition{
+			Abnormal: false,
+			Message:  "healthy",
+		}
 	}
 
 	response := &csi.NodeGetVolumeStatsResponse{
@@ -53,10 +63,7 @@ func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest)
 				Unit:      csi.VolumeUsage_INODES,
 			},
 		},
-		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: abnormal,
-			Message:  fmt.Sprintf("failed to call statfs on volume, got err: %s", err),
-		},
+		VolumeCondition: volumeCondition,
 	}
 
 	log.V(2).Info("Successfully retrieved volume stats", "volumeID", req.GetVolumeId(), "volumePath", req.GetVolumePath(), "response", response)
