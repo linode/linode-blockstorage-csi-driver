@@ -377,37 +377,12 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
 	for volNum := range volumes {
-		key := linodevolumes.CreateLinodeVolumeKey(volumes[volNum].ID, volumes[volNum].Label)
-
-		// If the volume is attached to a Linode instance, add it to the
-		// list. Note that in the Linode API, volumes can only be
-		// attached to a single Linode at a time. We are storing it in
-		// a []string here, since that is what the response struct
-		// returns. We do not need to pre-allocate the slice with
-		// make(), since the CSI specification says this response field
-		// is optional, and thus it should tolerate a nil slice.
-		var publishedNodeIDs []string
-		if volumes[volNum].LinodeID != nil {
-			publishedNodeIDs = append(publishedNodeIDs, strconv.Itoa(*volumes[volNum].LinodeID))
-		}
-
+		csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(&volumes[volNum])
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
-			Volume: &csi.Volume{
-				VolumeId:      key.GetVolumeKey(),
-				CapacityBytes: gbToBytes(volumes[volNum].Size),
-				AccessibleTopology: []*csi.Topology{
-					{
-						Segments: map[string]string{
-							VolumeTopologyRegion: volumes[volNum].Region,
-						},
-					},
-				},
-			},
+			Volume: csiVol,
 			Status: &csi.ListVolumesResponse_VolumeStatus{
-				PublishedNodeIds: publishedNodeIDs,
-				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: false,
-				},
+				PublishedNodeIds: publishedNodeIds,
+				VolumeCondition:  volumeCondition,
 			},
 		})
 	}
@@ -492,4 +467,82 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		NodeExpansionRequired: false,
 	}
 	return resp, nil
+}
+
+// ControllerGetVolume returns information about the specified volume.
+// It checks if the volume exists and returns its ID, size, and status.
+// For more details, refer to the CSI Driver Spec documentation.
+func (cs *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerGetVolume")
+	defer done()
+
+	log.V(2).Info("Processing request", "req", req)
+
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerGetVolume", req)
+	if statusErr != nil {
+		return &csi.ControllerGetVolumeResponse{}, statusErr
+	}
+
+	// Get the volume
+	log.V(4).Info("Checking if volume exists", "volume_id", volumeID)
+	vol, err := cs.client.GetVolume(ctx, volumeID)
+	if linodego.IsNotFound(err) {
+		return &csi.ControllerGetVolumeResponse{}, errVolumeNotFound(volumeID)
+	} else if err != nil {
+		return &csi.ControllerGetVolumeResponse{}, errInternal("get volume: %v", err)
+	}
+
+	csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(vol)
+	resp := &csi.ControllerGetVolumeResponse{
+		Volume: csiVol,
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: publishedNodeIds,
+			VolumeCondition:  volumeCondition,
+		},
+	}
+
+	log.V(2).Info("Volume retrieved successfully", "volume_id", volumeID, "response", resp)
+	return resp, nil
+}
+
+func getVolumeResponse(volume *linodego.Volume) (csiVolume *csi.Volume, publishedNodeIds []string, volumeCondition *csi.VolumeCondition) {
+	key := linodevolumes.CreateLinodeVolumeKey(volume.ID, volume.Label)
+
+	// If the volume is attached to a Linode instance, add it to the
+	// list. Note that in the Linode API, volumes can only be
+	// attached to a single Linode at a time. We are storing it in
+	// a []string here, since that is what the response struct
+	// returns. We do not need to pre-allocate the slice with
+	// make(), since the CSI specification says this response field
+	// is optional, and thus it should tolerate a nil slice.
+	var publishedNodeIDs []string
+	if volume.LinodeID != nil {
+		publishedNodeIDs = append(publishedNodeIDs, strconv.Itoa(*volume.LinodeID))
+	}
+
+	csiVolume = &csi.Volume{
+		VolumeId:      key.GetVolumeKey(),
+		CapacityBytes: gbToBytes(volume.Size),
+		AccessibleTopology: []*csi.Topology{
+			{
+				Segments: map[string]string{
+					VolumeTopologyRegion: volume.Region,
+				},
+			},
+		},
+	}
+
+	publishedNodeIds = publishedNodeIDs
+
+	abnormal := false
+	if volume.Status != linodego.VolumeActive {
+		abnormal = true
+	}
+
+	volumeCondition = &csi.VolumeCondition{
+		Abnormal: abnormal,
+		Message:  string(volume.Status),
+	}
+
+	return
 }
