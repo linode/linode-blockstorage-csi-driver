@@ -85,6 +85,9 @@ func InitOtelTracing() (*otlptrace.Exporter, error) {
 		otlptracegrpc.WithEndpoint(endpoint),
 		otlptracegrpc.WithInsecure(), // Use WithInsecure() if the endpoint does not use TLS
 	)
+	if err != nil {
+		klog.ErrorS(err, "Failed to create the exported resource")
+	}
 
 	// Resource will autopopulate spans with common attributes
 	res, err := resource.New(ctx,
