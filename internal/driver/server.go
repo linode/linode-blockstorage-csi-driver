@@ -80,7 +80,7 @@ func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort stri
 func InitOtelTracing() (*otlptrace.Exporter, error) {
 	// Setup OTLP exporter
 	ctx := context.Background()
-	oltpEndpoint := "http://localhost:4318"
+	oltpEndpoint := "localhost:4318"
 	exporter, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpoint(oltpEndpoint),
 		otlptracehttp.WithInsecure(), // Use WithInsecure() if the endpoint does not use TLS
