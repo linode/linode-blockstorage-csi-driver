@@ -10,18 +10,22 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var tracer trace.Tracer
+var Tracer trace.Tracer
 
 // InitTracer initializes the global tracer.
 func InitTracer(serviceName string) {
-	tracer = otel.Tracer(serviceName)
+	Tracer = otel.Tracer(serviceName)
 }
 
-// RecordError starts a new span for error tracking, logs the error, and records attributes.
+// RecordError logs the error and records attributes in the existing span.
 func RecordError(ctx context.Context, operationName string, err error, params map[string]string) {
-	// Starting a span for the operation
-	_, span := tracer.Start(ctx, operationName)
-	defer span.End()
+	// Retrieve the current span from the context
+	span := trace.SpanFromContext(ctx)
+	if !span.SpanContext().IsValid() {
+		// If no valid span exists, start a new one
+		_, span = Tracer.Start(ctx, operationName)
+		defer span.End()
+	}
 
 	// Add error information to span
 	span.SetStatus(codes.Error, err.Error())
@@ -36,11 +40,15 @@ func RecordError(ctx context.Context, operationName string, err error, params ma
 	klog.Errorf("Error in operation %s: %v. Params: %v", operationName, err, params)
 }
 
-// RecordSuccess starts a span for successful operations and records custom attributes.
+// RecordSuccess records custom attributes in the existing span.
 func RecordSuccess(ctx context.Context, operationName string, params map[string]string) {
-	// Starting a span for the operation
-	_, span := tracer.Start(ctx, operationName)
-	defer span.End()
+	// Retrieve the current span from the context
+	span := trace.SpanFromContext(ctx)
+	if !span.SpanContext().IsValid() {
+		// If no valid span exists, start a new one
+		_, span = Tracer.Start(ctx, operationName)
+		defer span.End()
+	}
 
 	// Set custom attributes
 	for key, value := range params {
@@ -50,6 +58,6 @@ func RecordSuccess(ctx context.Context, operationName string, params map[string]
 	// Mark the span as successful
 	span.SetStatus(codes.Ok, "operation successful")
 
-	// Log success for debugging purpose
+	// Log success for debugging purposes
 	klog.Infof("Operation %s succeeded. Params: %v", operationName, params)
 }
