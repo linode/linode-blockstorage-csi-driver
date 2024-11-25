@@ -17,7 +17,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -81,10 +80,11 @@ func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort stri
 func InitOtelTracing() (*otlptrace.Exporter, error) {
 	// Setup OTLP exporter
 	ctx := context.Background()
-	exporter, err := otlptracegrpc.New(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create the OTLP exporter: %w", err)
-	}
+	endpoint := "http://localhost:4317"
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(), // Use WithInsecure() if the endpoint does not use TLS
+	)
 
 	// Resource will autopopulate spans with common attributes
 	res, err := resource.New(ctx,
