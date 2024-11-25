@@ -30,7 +30,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc"
@@ -80,10 +80,10 @@ func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort stri
 func InitOtelTracing() (*otlptrace.Exporter, error) {
 	// Setup OTLP exporter
 	ctx := context.Background()
-	endpoint := "http://localhost:4317"
-	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(endpoint),
-		otlptracegrpc.WithInsecure(), // Use WithInsecure() if the endpoint does not use TLS
+	oltpEndpoint := "http://localhost:4318"
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint(oltpEndpoint),
+		otlptracehttp.WithInsecure(), // Use WithInsecure() if the endpoint does not use TLS
 	)
 	if err != nil {
 		klog.ErrorS(err, "Failed to create the exported resource")
