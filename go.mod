@@ -17,9 +17,9 @@ require (
 	golang.org/x/sys v0.27.0
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.2
-	k8s.io/apimachinery v0.31.2
+	k8s.io/apimachinery v0.31.3
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/mount-utils v0.31.2
+	k8s.io/mount-utils v0.31.3
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
 
