@@ -60,6 +60,10 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 // This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	// Start a new span for the CreateVolume operation
+	ctx, span := metrics.Tracer.Start(ctx, "CreateVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
 	defer done()
 
@@ -69,11 +73,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Validate the incoming request to ensure it meets the necessary criteria.
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
-
-		// Updated RecordError call
-		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{
-			"volume_name": req.GetName(),
-		})
+		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{"volume_name": req.GetName()})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -81,11 +81,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
-
-		// Updated RecordError call
-		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{
-			"volume_name": req.GetName(),
-		})
+		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{"volume_name": req.GetName()})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -103,12 +99,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
-
-		// Updated RecordError call
-		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{
-			"volume_name": params.VolumeName,
-			"region":      params.Region,
-		})
+		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{"volume_name": params.VolumeName, "region": params.Region})
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -120,12 +111,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
-
-	// Updated RecordSuccess call
-	metrics.RecordSuccess(ctx, "CreateVolume", map[string]string{
-		"volume_name": vol.Label,
-		"region":      params.Region,
-	})
+	metrics.RecordSuccess(ctx, "CreateVolume", map[string]string{"volume_name": vol.Label, "region": params.Region})
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
