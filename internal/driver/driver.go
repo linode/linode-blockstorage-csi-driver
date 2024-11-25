@@ -30,6 +30,7 @@ import (
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
 )
 
 // Name is the name of the driver provided by this package.
@@ -132,6 +133,9 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	// Set metrics config
 	linodeDriver.enableMetrics = enableMetrics
 	linodeDriver.metricsPort = metricsPort
+
+	// Init tracer for now, later make it conditional
+	metrics.InitTracer("linode-csi-driver")
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
 	return nil
