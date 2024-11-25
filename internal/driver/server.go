@@ -26,21 +26,18 @@ import (
 	"sync"
 	"time"
 
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
 )
 
 // Defines Non blocking GRPC server interfaces
@@ -81,46 +78,37 @@ func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort stri
 	s.metricsPort = metricsPort
 }
 
-func initOpenTelemetry(serviceName string) error {
-	// Configure the OTLP trace exporter for the OpenTelemetry Collector
-	traceExporter, err := otlptrace.New(
-		context.Background(),
-		otlptracehttp.NewClient(
-			otlptracehttp.WithEndpoint("otel-collector:4318"), // Replace with your backend endpoint
-			otlptracehttp.WithInsecure(),
-		),
-	)
+func InitOtelTracing() (*otlptrace.Exporter, error) {
+	// Setup OTLP exporter
+	ctx := context.Background()
+	exporter, err := otlptracegrpc.New(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create OTLP trace exporter: %w", err)
+		return nil, fmt.Errorf("failed to create the OTLP exporter: %w", err)
 	}
 
-	// Create BatchSpanProcessor and attach the trace exporter
-	batchSpanProcessor := trace.NewBatchSpanProcessor(traceExporter)
-
-	// Create TracerProvider
-	tracerProvider = trace.NewTracerProvider(
-		trace.WithSpanProcessor(batchSpanProcessor),
-		trace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(serviceName),
-		)),
+	// Resource will autopopulate spans with common attributes
+	res, err := resource.New(ctx,
+		resource.WithFromEnv(), // pull attributes from OTEL_RESOURCE_ATTRIBUTES and OTEL_SERVICE_NAME environment variables
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithHost(),
 	)
+	if err != nil {
+		klog.ErrorS(err, "Failed to create the OTLP resource, spans will lack some metadata")
+	}
 
-	// Set the global TracerProvider
-	otel.SetTracerProvider(tracerProvider)
+	// Create a trace provider with the exporter.
+	// Use propagator and sampler defined in environment variables.
+	traceProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), trace.WithResource(res))
 
-	// Initialize the metrics package tracer
-	metrics.InitTracer(serviceName)
+	// Register the trace provider as global.
+	otel.SetTracerProvider(traceProvider)
 
-	return nil
+	return exporter, nil
 }
 
 func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
-	// Initialize OpenTelemetry
-	if err := initOpenTelemetry("Linode-CSI-Driver"); err != nil {
-		klog.Fatalf("Failed to initialize OpenTelemetry: %v", err)
-	}
-
 	s.wg.Add(1)
 	go s.serve(endpoint, ids, cs, ns)
 
@@ -175,6 +163,18 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 			logger.LogGRPC, // Existing logging interceptor
 		),
 	}
+
+	exporter, err := InitOtelTracing()
+	if err != nil {
+		klog.Fatalf("Failed to initialize otel tracing: %v", err)
+	}
+	// Exporter will flush traces on shutdown
+	defer func() {
+		if err = exporter.Shutdown(context.Background()); err != nil {
+			klog.Errorf("Could not shutdown otel exporter: %v", err)
+		}
+	}()
+	opts = append(opts, grpc.StatsHandler(otelgrpc.NewServerHandler()))
 
 	urlObj, err := url.Parse(endpoint)
 	if err != nil {
