@@ -19,15 +19,11 @@ func InitTracer(serviceName string) {
 	Tracer = otel.Tracer(serviceName)
 }
 
-// RecordError logs the error and records failed attributes in the existing span.
+// RecordError creates a child span, records the error, and logs it.
 func RecordError(ctx context.Context, operationName string, err error, params map[string]string) {
-	// Retrieve the current span from the context
-	span := trace.SpanFromContext(ctx)
-	if !span.SpanContext().IsValid() {
-		// If no valid span exists, start a new one
-		_, span = Tracer.Start(ctx, operationName)
-		defer span.End()
-	}
+	// Create a child span for the operation
+	_, span := Tracer.Start(ctx, operationName)
+	defer span.End()
 
 	// Add error information to span
 	span.SetStatus(codes.Error, err.Error())
@@ -42,15 +38,11 @@ func RecordError(ctx context.Context, operationName string, err error, params ma
 	klog.Errorf("Error in operation %s: %v. Params: %v", operationName, err, params)
 }
 
-// RecordSuccess records successful attributes in the existing span.
+// RecordSuccess creates a child span, records success, and logs it.
 func RecordSuccess(ctx context.Context, operationName string, params map[string]string) {
-	// Retrieve the current span from the context
-	span := trace.SpanFromContext(ctx)
-	if !span.SpanContext().IsValid() {
-		// If no valid span exists, start a new one
-		_, span = Tracer.Start(ctx, operationName)
-		defer span.End()
-	}
+	// Create a child span for the operation
+	_, span := Tracer.Start(ctx, operationName)
+	defer span.End()
 
 	// Set custom attributes
 	for key, value := range params {
@@ -64,15 +56,11 @@ func RecordSuccess(ctx context.Context, operationName string, params map[string]
 	klog.Infof("Operation %s succeeded. Params: %v", operationName, params)
 }
 
-// RecordSubFunctionCall records custom attributes in the existing span.
+// RecordSubFunctionCall creates a child span for a subfunction call.
 func RecordSubFunctionCall(ctx context.Context, operationName string, params map[string]string) {
-	// Retrieve the current span from the context
-	span := trace.SpanFromContext(ctx)
-	if !span.SpanContext().IsValid() {
-		// If no valid span exists, start a new one
-		_, span = Tracer.Start(ctx, operationName)
-		defer span.End()
-	}
+	// Create a child span for the operation
+	_, span := Tracer.Start(ctx, operationName)
+	defer span.End()
 
 	// Set custom attributes
 	for key, value := range params {
