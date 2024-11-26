@@ -61,7 +61,7 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	// Start a new span for the CreateVolume operation
-	ctx, span := metrics.Tracer.Start(ctx, "CreateVolume")
+	_, span := metrics.Tracer.Start(ctx, "CreateVolume")
 	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
@@ -73,16 +73,28 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Validate the incoming request to ensure it meets the necessary criteria.
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
-		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{"volume_name": req.GetName()})
+		metrics.RecordError(ctx, "ValidateCreateVolumeRequest", err, map[string]string{
+			"volume_name": req.GetName(),
+			"requestBody": metrics.SerializeRequest(req)})
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		metrics.RecordSubFunctionCall(ctx, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": metrics.SerializeRequest(req)})
 	}
 
 	// Prepare the volume parameters
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
-		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{"volume_name": req.GetName()})
+		metrics.RecordError(ctx, "PrepareVolumeParams", err, map[string]string{
+			"volume_name":      req.GetName(),
+			"requestBody":      metrics.SerializeRequest(req),
+			"volumeParameters": metrics.SerializeRequest(params)})
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		metrics.RecordSubFunctionCall(ctx, "PrepareVolumeParams", map[string]string{
+			"volume_name":      req.GetName(),
+			"requestBody":      metrics.SerializeRequest(req),
+			"volumeParameters": metrics.SerializeRequest(params)})
 	}
 
 	contentSource := req.GetVolumeContentSource()
@@ -92,15 +104,24 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.RecordError(ctx, "GetContentSourceVolume", err, map[string]string{
+			"volume_name": req.GetName(),
+			"requestBody": metrics.SerializeRequest(req)})
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		metrics.RecordSubFunctionCall(ctx, "GetContentSourceVolume", map[string]string{
+			"volume_name": req.GetName(),
+			"requestBody": metrics.SerializeRequest(req)})
 	}
 
 	// Create the volume
 	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
-		metrics.RecordError(ctx, "CreateVolume", err, map[string]string{"volume_name": params.VolumeName, "region": params.Region})
+		metrics.RecordError(ctx, "CreateAndWaitForVolume", err, map[string]string{"volumeParameters": metrics.SerializeRequest(params)})
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		metrics.RecordSubFunctionCall(ctx, "CreateAndWaitForVolume", map[string]string{"volumeParameters": metrics.SerializeRequest(params)})
 	}
 
 	// Create volume context
@@ -111,7 +132,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
-	metrics.RecordSuccess(ctx, "CreateVolume", map[string]string{"volume_name": vol.Label, "region": params.Region})
+	metrics.RecordSuccess(ctx, "CreateVolume", map[string]string{"volume_name": vol.Label, "volumeParameters": metrics.SerializeRequest(params)})
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
