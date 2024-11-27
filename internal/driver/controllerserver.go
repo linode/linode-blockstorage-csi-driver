@@ -155,7 +155,7 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if linodego.IsNotFound(err) {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "volumeExistCheck", map[string]string{
-			"volumeID":    strconv.Itoa(vol.ID),
+			"volumeID":    strconv.Itoa(volID),
 			"requestBody": metrics.SerializeRequest(req),
 		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, nil
@@ -176,7 +176,7 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "Delete Volume", map[string]string{
-			"volumeID":    strconv.Itoa(vol.ID),
+			"volumeID":    strconv.Itoa(volID),
 			"requestBody": metrics.SerializeRequest(req),
 		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
