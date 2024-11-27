@@ -61,7 +61,7 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	// Start a new span for the CreateVolume operation
-	_, span := metrics.Tracer.Start(ctx, "Starting CreateVolume")
+	_, span := metrics.Tracer.Start(ctx, "CreateVolume")
 	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
@@ -119,7 +119,6 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
-	metrics.TraceFunctionData(ctx, "Finishing CreateVolume", map[string]string{"volume_name": vol.Label, "volumeParameters": metrics.SerializeRequest(params)}, metrics.TracingSuccess, nil)
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
@@ -131,11 +130,12 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 // function will return a success response without any error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
-	defer done()
 	// Start a new span for the DeleteVolume operation
 	_, span := metrics.Tracer.Start(ctx, "Starting DeleteVolume")
 	defer span.End()
+
+	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
+	defer done()
 
 	functionStartTime := time.Now()
 	volID, statusErr := linodevolumes.VolumeIdAsInt("DeleteVolume", req)
@@ -186,11 +186,6 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Completed, functionStartTime)
-	metrics.TraceFunctionData(ctx, "Finishing Delete Volume", map[string]string{
-		"volumeName": vol.Label,
-		"volumeId":   strconv.Itoa(vol.ID),
-		"linodeID":   strconv.Itoa(*vol.LinodeID),
-	}, metrics.TracingSuccess, nil)
 	log.V(2).Info("Volume deleted successfully", "volume_id", volID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
