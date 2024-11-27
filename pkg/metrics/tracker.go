@@ -8,7 +8,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	tracer "go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2"
 )
 
@@ -19,11 +22,53 @@ const (
 	TracingSubfunction = "subfunction"
 )
 
-var Tracer trace.Tracer
+// Global tracing variables
+var (
+	Tracer         tracer.Tracer
+	TracerProvider *trace.TracerProvider
+)
+
+// InitOtelTracing initializes the OpenTelemetry tracing and returns an exporter.
+func InitOtelTracing(ctx context.Context, serviceName, serviceVersion, tracingPort string) {
+	oltpEndpoint := fmt.Sprintf("otel-collector:%s", tracingPort)
+
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint(oltpEndpoint),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		klog.Errorf("Failed to create OTLP HTTP exporter: %v", err)
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithAttributes(
+			attribute.String("service.name", serviceName),
+			attribute.String("service.version", serviceVersion),
+		),
+	)
+	if err != nil {
+		klog.Errorf("Failed to create resource: %v", err)
+	}
+
+	TracerProvider = trace.NewTracerProvider(
+		trace.WithBatcher(exporter),
+		trace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(TracerProvider)
+
+	klog.Infof("OpenTelemetry tracing initialized for service: %s, version: %s, port: %s", serviceName, serviceVersion, tracingPort)
+}
 
 // InitTracer initializes the global tracer.
-func InitTracer(serviceName string) {
+func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort string) {
+	// Initialize the OTLP exporter and TracerProvider
+	InitOtelTracing(ctx, serviceName, serviceVersion, tracingPort)
+
+	// Set the global tracer
 	Tracer = otel.Tracer(serviceName)
+	klog.Infof("Tracing initialized successfully for service: %s, version: %s, port: %s", serviceName, serviceVersion, tracingPort)
 }
 
 // TraceFunctionData handles tracing for success, error, or subfunction calls.
@@ -32,7 +77,7 @@ func TraceFunctionData(ctx context.Context, operationName string, params map[str
 	_, span := Tracer.Start(ctx, operationName)
 	defer span.End()
 
-	// Set attributes
+	// Add attributes to the span
 	for key, value := range params {
 		span.SetAttributes(attribute.String(key, value))
 	}
@@ -52,7 +97,7 @@ func TraceFunctionData(ctx context.Context, operationName string, params map[str
 		span.SetStatus(codes.Ok, "Sub-function call successful")
 		klog.Infof("Sub-function call in operation %s succeeded. Params: %v", operationName, params)
 	default:
-		klog.Warningf("Unknown status type: %s. Operation: %s", status, operationName)
+		klog.Warningf("Unknown status: %s for operation %s", status, operationName)
 	}
 }
 

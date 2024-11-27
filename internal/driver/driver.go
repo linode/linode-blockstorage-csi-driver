@@ -143,7 +143,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.tracingPort = tracingPort
 
 	if linodeDriver.enableTracing == True {
-		metrics.InitTracer("linode-csi-driver")
+		metrics.InitTracer(ctx, "linode-csi-driver", linodeDriver.vendorVersion, linodeDriver.tracingPort)
 	}
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
@@ -187,7 +187,6 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 	log.V(2).Info("Starting non-blocking GRPC server")
 	s := NewNonBlockingGRPCServer()
 	s.SetMetricsConfig(linodeDriver.enableMetrics, linodeDriver.metricsPort)
-	s.SetTracingConfig(linodeDriver.enableTracing, linodeDriver.tracingPort)
 	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
 	log.V(2).Info("GRPC server started successfully")
 	s.Wait()
