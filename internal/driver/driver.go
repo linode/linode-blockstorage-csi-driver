@@ -55,6 +55,8 @@ type LinodeDriver struct {
 	ready         bool
 	enableMetrics string
 	metricsPort   string
+	enableTracing string
+	tracingPort   string
 }
 
 // MaxVolumeLabelPrefixLength is the maximum allowed length of a volume label
@@ -87,6 +89,8 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	encrypt Encryption,
 	enableMetrics string,
 	metricsPort string,
+	enableTracing string,
+	tracingPort string,
 ) error {
 	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
 	defer done()
@@ -134,8 +138,13 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.enableMetrics = enableMetrics
 	linodeDriver.metricsPort = metricsPort
 
-	// Init tracer for now, later make it conditional
-	metrics.InitTracer("linode-csi-driver")
+	// Set tracing config
+	linodeDriver.enableTracing = enableTracing
+	linodeDriver.tracingPort = tracingPort
+
+	if linodeDriver.enableTracing == True {
+		metrics.InitTracer("linode-csi-driver")
+	}
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
 	return nil
@@ -178,6 +187,7 @@ func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
 	log.V(2).Info("Starting non-blocking GRPC server")
 	s := NewNonBlockingGRPCServer()
 	s.SetMetricsConfig(linodeDriver.enableMetrics, linodeDriver.metricsPort)
+	s.SetTracingConfig(linodeDriver.enableTracing, linodeDriver.tracingPort)
 	s.Start(endpoint, linodeDriver.ids, linodeDriver.cs, linodeDriver.ns)
 	log.V(2).Info("GRPC server started successfully")
 	s.Wait()

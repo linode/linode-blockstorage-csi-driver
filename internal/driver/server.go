@@ -51,6 +51,7 @@ type NonBlockingGRPCServer interface {
 	ForceStop()
 	// Setter to set the http server config
 	SetMetricsConfig(enableMetrics, metricsPort string)
+	SetTracingConfig(enableTracing string, tracingPort string)
 }
 
 // Variables for open telemetry setup
@@ -69,12 +70,22 @@ type nonBlockingGRPCServer struct {
 	// fields to set up metricsServer
 	enableMetrics string
 	metricsPort   string
+
+	// fields to set up tracingServer
+	enableTracing string
+	tracingPort   string
 }
 
 // SetMetricsConfig sets the enableMetrics and metricsPort fields from environment variables
 func (s *nonBlockingGRPCServer) SetMetricsConfig(enableMetrics, metricsPort string) {
 	s.enableMetrics = enableMetrics
 	s.metricsPort = metricsPort
+}
+
+// SetTracingConfig sets the enableTracing and tracingPort fields from environment variables
+func (s *nonBlockingGRPCServer) SetTracingConfig(enableTracing, tracingPort string) {
+	s.enableTracing = enableTracing
+	s.tracingPort = tracingPort
 }
 
 func InitOtelTracing() (*otlptrace.Exporter, error) {
@@ -167,17 +178,24 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 		),
 	}
 
-	exporter, err := InitOtelTracing()
+	enableTracing, err := strconv.ParseBool(s.enableTracing)
 	if err != nil {
-		klog.Fatalf("Failed to initialize otel tracing: %v", err)
+		klog.Errorf("Error parsing enableTracing: %v", err)
 	}
-	// Exporter will flush traces on shutdown
-	defer func() {
-		if err = exporter.Shutdown(context.Background()); err != nil {
-			klog.Errorf("Could not shutdown otel exporter: %v", err)
+	if enableTracing {
+		exporter, exporterError := InitOtelTracing()
+		if exporterError != nil {
+			klog.Fatalf("Failed to initialize otel tracing: %v", err)
 		}
-	}()
-	opts = append(opts, grpc.StatsHandler(otelgrpc.NewServerHandler()))
+
+		// Exporter will flush traces on shutdown
+		defer func() {
+			if exporterError = exporter.Shutdown(context.Background()); exporterError != nil {
+				klog.Errorf("Could not shutdown otel exporter: %v", exporterError)
+			}
+		}()
+		opts = append(opts, grpc.StatsHandler(otelgrpc.NewServerHandler()))
+	}
 
 	urlObj, err := url.Parse(endpoint)
 	if err != nil {
