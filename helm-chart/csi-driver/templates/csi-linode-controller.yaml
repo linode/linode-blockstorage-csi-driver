@@ -108,6 +108,10 @@ spec:
               value: {{ .Values.enableMetrics | quote}}
             - name: METRICS_PORT
               value: {{ .Values.metricsPort | quote}}
+            - name: OTEL_TRACING
+              value: {{.Values.enableTracing | quote}}
+            - name: OTEL_TRACING_PORT
+              value: {{.Values.tracingPort | quote}}
           image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
           name: csi-linode-plugin
