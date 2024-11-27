@@ -46,6 +46,10 @@ func InitOtelTracing(ctx context.Context, serviceName, serviceVersion, tracingPo
 			attribute.String("service.name", serviceName),
 			attribute.String("service.version", serviceVersion),
 		),
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithHost(),
 	)
 	if err != nil {
 		klog.Errorf("Failed to create resource: %v", err)
