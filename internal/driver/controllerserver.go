@@ -142,7 +142,6 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if statusErr != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "getVolumeID", map[string]string{
-			"volumeID":    strconv.Itoa(volID),
 			"requestBody": metrics.SerializeRequest(req),
 		}, metrics.TracingError, statusErr)
 		return &csi.DeleteVolumeResponse{}, statusErr
@@ -156,14 +155,13 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if linodego.IsNotFound(err) {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "volumeExistCheck", map[string]string{
-			"volumeLabel": vol.Label,
+			"volumeID":    strconv.Itoa(vol.ID),
 			"requestBody": metrics.SerializeRequest(req),
 		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, nil
 	} else if err != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "volumeExistCheck", map[string]string{
-			"volumeLabel": vol.Label,
 			"requestBody": metrics.SerializeRequest(req),
 		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, errInternal("get volume %d: %v", volID, err)
@@ -178,7 +176,7 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "Delete Volume", map[string]string{
-			"volumeLabel": vol.Label,
+			"volumeID":    strconv.Itoa(vol.ID),
 			"requestBody": metrics.SerializeRequest(req),
 		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
