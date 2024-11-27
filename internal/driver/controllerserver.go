@@ -133,11 +133,18 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
 	defer done()
+	// Start a new span for the DeleteVolume operation
+	_, span := metrics.Tracer.Start(ctx, "Starting DeleteVolume")
+	defer span.End()
 
 	functionStartTime := time.Now()
 	volID, statusErr := linodevolumes.VolumeIdAsInt("DeleteVolume", req)
 	if statusErr != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "getVolumeID", map[string]string{
+			"volumeID":    strconv.Itoa(volID),
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, statusErr)
 		return &csi.DeleteVolumeResponse{}, statusErr
 	}
 
@@ -148,9 +155,17 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	vol, err := cs.client.GetVolume(ctx, volID)
 	if linodego.IsNotFound(err) {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "volumeExistCheck", map[string]string{
+			"volumeLabel": vol.Label,
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, nil
 	} else if err != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "volumeExistCheck", map[string]string{
+			"volumeLabel": vol.Label,
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, errInternal("get volume %d: %v", volID, err)
 	}
 	if vol.LinodeID != nil {
@@ -162,12 +177,20 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	log.V(4).Info("Deleting volume", "volume_id", volID)
 	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "Delete Volume", map[string]string{
+			"volumeLabel": vol.Label,
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
 	}
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Completed, functionStartTime)
-
+	metrics.TraceFunctionData(ctx, "Finishing Delete Volume", map[string]string{
+		"volumeName": vol.Label,
+		"volumeId":   strconv.Itoa(vol.ID),
+		"linodeID":   strconv.Itoa(*vol.LinodeID),
+	}, metrics.TracingSuccess, nil)
 	log.V(2).Info("Volume deleted successfully", "volume_id", volID)
 	return &csi.DeleteVolumeResponse{}, nil
 }
