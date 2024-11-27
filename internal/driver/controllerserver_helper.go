@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -425,6 +427,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 		return errInvalidVolumeCapability(volCaps)
 	}
 
+	metrics.TraceFunctionData(ctx, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": metrics.SerializeRequest(req)}, metrics.TracingSubfunction, nil)
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
 }
@@ -479,13 +482,21 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
 	})
-	return &VolumeParams{
+
+	params := &VolumeParams{
 		VolumeName:       volumeName,
 		TargetSizeGB:     targetSizeGB,
 		Size:             size,
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
-	}, nil
+	}
+
+	metrics.TraceFunctionData(ctx, "PrepareVolumeParams", map[string]string{
+		"volume_name":      req.GetName(),
+		"requestBody":      metrics.SerializeRequest(req),
+		"volumeParameters": metrics.SerializeRequest(params)}, metrics.TracingSubfunction, nil)
+
+	return params, nil
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
@@ -540,6 +551,9 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}
 
+	metrics.TraceFunctionData(ctx, "CreateAndWaitForVolume",
+		map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
+		metrics.TracingSubfunction, nil)
 	log.V(4).Info("Volume is active", "volumeID", vol.ID)
 	return vol, nil
 }
