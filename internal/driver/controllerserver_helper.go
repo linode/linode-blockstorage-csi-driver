@@ -554,6 +554,7 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 	metrics.TraceFunctionData(ctx, "CreateAndWaitForVolume",
 		map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
 		metrics.TracingSubfunction, nil)
+
 	log.V(4).Info("Volume is active", "volumeID", vol.ID)
 	return vol, nil
 }
@@ -666,6 +667,10 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 		return "", errRegionMismatch(volume.Region, instance.Region)
 	}
 
+	metrics.TraceFunctionData(ctx, "GetAndValidateVolume", map[string]string{
+		"volumeSpecs": metrics.SerializeRequest(volume),
+	}, metrics.TracingSubfunction, nil)
+
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
 }
@@ -686,6 +691,10 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 		// If any other error occurs, return an internal error.
 		return nil, errInternal("get linode instance %d: %v", linodeID, err)
 	}
+
+	metrics.TraceFunctionData(ctx, "GetInstance", map[string]string{
+		"instanceSpecs": metrics.SerializeRequest(instance),
+	}, metrics.TracingSubfunction, nil)
 
 	log.V(4).Info("Instance retrieved", "instance", instance)
 	return instance, nil
@@ -715,6 +724,11 @@ func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instanc
 		}
 		return errMaxVolumeAttachments(limit) // Return an error indicating the maximum volume attachments allowed.
 	}
+
+	metrics.TraceFunctionData(ctx, "CheckAttachmentCapacity", map[string]string{
+		"instanceSpecs": metrics.SerializeRequest(instance),
+	}, metrics.TracingSubfunction, nil)
+
 	return nil // Return nil if the instance can accommodate more attachments.
 }
 
@@ -741,5 +755,11 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		}
 		return status.Errorf(code, "attach volume: %v", err)
 	}
+
+	metrics.TraceFunctionData(ctx, "AttachVolume", map[string]string{
+		"volumeID": strconv.Itoa(volumeID),
+		"linodeID": strconv.Itoa(linodeID),
+	}, metrics.TracingError, nil)
+
 	return nil // Return nil if the volume is successfully attached.
 }

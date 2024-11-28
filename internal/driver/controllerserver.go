@@ -131,7 +131,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	// Start a new span for the DeleteVolume operation
-	_, span := metrics.Tracer.Start(ctx, "Starting DeleteVolume")
+	_, span := metrics.Tracer.Start(ctx, "DeleteVolume")
 	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
@@ -194,6 +194,10 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // the device path if successful.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (resp *csi.ControllerPublishVolumeResponse, err error) {
+	// Start a new span for the ControllerPublishVolume operation
+	_, span := metrics.Tracer.Start(ctx, "ControllerPublishVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerPublishVolume")
 	defer done()
 
@@ -204,6 +208,9 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateControllerPublishVolumeRequest", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return resp, err
 	}
 
@@ -211,6 +218,9 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	instance, err := cs.getInstance(ctx, linodeID)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "GetInstance", map[string]string{
+			"linodeID": strconv.Itoa(linodeID),
+		}, metrics.TracingError, err)
 		return resp, err
 	}
 
@@ -219,11 +229,20 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance)
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "GetAndValidateVolume", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"linodeID": strconv.Itoa(linodeID),
+		}, metrics.TracingError, err)
 		return resp, err
 	}
 	// If devicePath is not empty, the volume is already attached
 	if devicePath != "" {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "VolumeAlreadyAttached", map[string]string{
+			"volumeID":   strconv.Itoa(volumeID),
+			"devicePath": devicePath,
+			"linodeID":   strconv.Itoa(linodeID),
+		}, metrics.TracingError, nil)
 		return &csi.ControllerPublishVolumeResponse{
 			PublishContext: map[string]string{
 				devicePathKey: devicePath,
@@ -234,12 +253,19 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Check if the instance can accommodate the volume attachment
 	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "CheckAttachmentCapacity", map[string]string{
+			"linodeID": strconv.Itoa(linodeID),
+		}, metrics.TracingError, capErr)
 		return resp, capErr
 	}
 
 	// Attach the volume to the specified instance
 	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "AttachVolume", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"linodeID": strconv.Itoa(linodeID),
+		}, metrics.TracingError, attachErr)
 		return resp, attachErr
 	}
 
@@ -248,6 +274,10 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
 		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "WaitForVolumeLinodeID", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"linodeID": strconv.Itoa(linodeID),
+		}, metrics.TracingError, err)
 		return resp, err
 	}
 
@@ -273,6 +303,10 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 // return a successful response without error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	// Start a new span for the ControllerUnpublishVolume operation
+	_, span := metrics.Tracer.Start(ctx, "ControllerUnpublishVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerUnpublishVolume")
 	defer done()
 
@@ -282,12 +316,18 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "GetVolumeID", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, statusErr)
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
 	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "GetNodeID", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, statusErr)
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
@@ -295,14 +335,25 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "VolumeNotFound", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+		}, metrics.TracingError, nil)
 		log.V(4).Info("Volume not found, skipping", "volume_id", volumeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "GetVolume", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+		}, metrics.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
+
 	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "VolumeAttachedToDifferentNode", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"nodeID":   strconv.Itoa(*volume.LinodeID),
+		}, metrics.TracingError, nil)
 		log.V(4).Info("Volume attached to different instance, skipping", "volume_id", volumeID, "attached_node_id", *volume.LinodeID, "requested_node_id", linodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
@@ -324,6 +375,10 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Completed, functionStartTime)
+	metrics.TraceFunctionData(ctx, "Finishing ControllerUnpublishVolume", map[string]string{
+		"volumeID": strconv.Itoa(volumeID),
+		"nodeID":   strconv.Itoa(linodeID),
+	}, metrics.TracingSuccess, nil)
 
 	log.V(2).Info("Volume detached successfully", "volume_id", volumeID)
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
