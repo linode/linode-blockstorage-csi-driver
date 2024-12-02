@@ -160,6 +160,10 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	if vol.LinodeID != nil {
 		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "volumeExistCheck", map[string]string{
+			"requestBody":   metrics.SerializeRequest(req),
+			"volumeDetails": metrics.SerializeRequest(vol),
+		}, metrics.TracingError, errVolumeInUse)
 		return &csi.DeleteVolumeResponse{}, errVolumeInUse
 	}
 
@@ -321,7 +325,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
 		metrics.TraceFunctionData(ctx, "VolumeNotFound", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
-		}, metrics.TracingError, nil)
+		}, metrics.TracingError, err)
 		log.V(4).Info("Volume not found, skipping", "volume_id", volumeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
@@ -337,7 +341,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		metrics.TraceFunctionData(ctx, "VolumeAttachedToDifferentNode", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 			"nodeID":   strconv.Itoa(*volume.LinodeID),
-		}, metrics.TracingError, nil)
+		}, metrics.TracingError, errVolumeInUse)
 		log.V(4).Info("Volume attached to different instance, skipping", "volume_id", volumeID, "attached_node_id", *volume.LinodeID, "requested_node_id", linodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
@@ -345,15 +349,27 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	log.V(4).Info("Executing detach volume", "volume_id", volumeID, "node_id", linodeID)
 	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ErrorInDetachVolume", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"nodeID":   strconv.Itoa(*volume.LinodeID),
+		}, metrics.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ErrorInDetachVolume", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"nodeID":   strconv.Itoa(*volume.LinodeID),
+		}, metrics.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
 	}
 
 	log.V(4).Info("Waiting for volume to detach", "volume_id", volumeID, "node_id", linodeID)
 	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
 		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "VolumeAttachedToDifferentNode", map[string]string{
+			"volumeID": strconv.Itoa(volumeID),
+			"nodeID":   strconv.Itoa(*volume.LinodeID),
+		}, metrics.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
 	}
 
