@@ -60,9 +60,6 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 // This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	// Start a new span for the CreateVolume operation
-	_, span := metrics.Tracer.Start(ctx, "CreateVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
 	defer done()
