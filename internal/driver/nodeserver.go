@@ -85,9 +85,6 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	// Start a new span for the NodePublishVolume operation
-	_, span := metrics.Tracer.Start(ctx, "NodePublishVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
@@ -174,9 +171,6 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	// Start a new span for the NodeUnpublishVolume operation
-	_, span := metrics.Tracer.Start(ctx, "NodeUnpublishVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
@@ -218,9 +212,6 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	// Start a new span for the NodeStageVolume operation
-	_, span := metrics.Tracer.Start(ctx, "NodeStageVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
 	defer done()
@@ -329,9 +320,6 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	// Start a new span for the NodeUnstageVolume operation
-	_, span := metrics.Tracer.Start(ctx, "NodeUnstageVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
 	defer done()
@@ -383,9 +371,6 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	// Start a new span for the NodeExpandVolume operation
-	_, span := metrics.Tracer.Start(ctx, "NodeExpandVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
 	defer done()

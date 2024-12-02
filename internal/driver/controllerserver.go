@@ -127,9 +127,6 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 // function will return a success response without any error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	// Start a new span for the DeleteVolume operation
-	_, span := metrics.Tracer.Start(ctx, "DeleteVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
 	defer done()
@@ -191,9 +188,6 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // the device path if successful.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (resp *csi.ControllerPublishVolumeResponse, err error) {
-	// Start a new span for the ControllerPublishVolume operation
-	_, span := metrics.Tracer.Start(ctx, "ControllerPublishVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerPublishVolume")
 	defer done()
@@ -300,9 +294,6 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 // return a successful response without error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	// Start a new span for the ControllerUnpublishVolume operation
-	_, span := metrics.Tracer.Start(ctx, "ControllerUnpublishVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerUnpublishVolume")
 	defer done()
@@ -526,9 +517,6 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 // it returns the new capacity and indicates that no node expansion is required.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (resp *csi.ControllerExpandVolumeResponse, err error) {
-	// Start a new span for the ControllerPublishVolume operation
-	_, span := metrics.Tracer.Start(ctx, "ControllerExpandVolume")
-	defer span.End()
 
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
