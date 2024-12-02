@@ -85,7 +85,6 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
 
@@ -171,7 +170,6 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
 
@@ -212,7 +210,6 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
 	defer done()
 
@@ -320,7 +317,6 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
 	defer done()
 
@@ -371,7 +367,6 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
 	defer done()
 
