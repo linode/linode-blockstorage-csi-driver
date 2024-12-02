@@ -85,6 +85,10 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	// Start a new span for the NodePublishVolume operation
+	_, span := metrics.Tracer.Start(ctx, "NodePublishVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
 	defer done()
 
@@ -99,6 +103,9 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodePublishVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.NodePublishTotal, metrics.NodePublishDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateNodePublishVolumeRequest", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -116,6 +123,9 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		response, err := ns.nodePublishVolumeBlock(ctx, req, options, fs)
 		if err != nil {
 			metrics.RecordMetrics(metrics.NodePublishTotal, metrics.NodePublishDuration, metrics.Failed, functionStartTime)
+			metrics.TraceFunctionData(ctx, "NodePublishVolumeBlock", map[string]string{
+				"requestBody": metrics.SerializeRequest(req),
+			}, metrics.TracingError, err)
 		}
 		metrics.RecordMetrics(metrics.NodePublishTotal, metrics.NodePublishDuration, metrics.Completed, functionStartTime)
 		return response, err
@@ -128,11 +138,17 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	notMnt, err := ns.ensureMountPoint(ctx, targetPath, fs)
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodePublishTotal, metrics.NodePublishDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "EnsuringMountPath", map[string]string{
+			"targetPath": targetPath,
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 	if !notMnt {
 		log.V(4).Info("Target path is already a mount point", "volumeID", volumeID, "targetPath", targetPath)
 		metrics.RecordMetrics(metrics.NodePublishTotal, metrics.NodePublishDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "EnsuringMountPath", map[string]string{
+			"targetPath": targetPath,
+		}, metrics.TracingError, err)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
@@ -144,6 +160,9 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodePublishTotal, metrics.NodePublishDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "EnsuringMountPath", map[string]string{
+			"targetPath": targetPath,
+		}, metrics.TracingError, err)
 		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
 
@@ -155,6 +174,10 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	// Start a new span for the NodeUnpublishVolume operation
+	_, span := metrics.Tracer.Start(ctx, "NodeUnpublishVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
 	defer done()
 
@@ -171,6 +194,9 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	if err := validateNodeUnpublishVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.NodeUnpublishTotal, metrics.NodeUnpublishDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateNodeUnpublishVolumeRequest", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -178,6 +204,9 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	log.V(4).Info("Unmounting and deleting target path", "volumeID", volumeID, "targetPath", targetPath)
 	if err := mount.CleanupMountPoint(targetPath, ns.mounter.Interface, true /* bind mount */); err != nil {
 		metrics.RecordMetrics(metrics.NodeUnpublishTotal, metrics.NodeUnpublishDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "CleanupMountPoint", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", targetPath, err)
 	}
 
@@ -189,6 +218,10 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	// Start a new span for the NodeStageVolume operation
+	_, span := metrics.Tracer.Start(ctx, "NodeStageVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
 	defer done()
 
@@ -203,6 +236,9 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeStageVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateNodeStageVolumeRequest", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -210,6 +246,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ParseLinodeVolumeKey", map[string]string{
+			"volumeID":    volumeID,
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -224,6 +264,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateDevicePath", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+			"devicePath":  devicePath,
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -232,6 +276,9 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), filesystem.NewFileSystem())
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateMountPoint", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -244,6 +291,9 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 		*/
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "MountPathInuse", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		log.V(4).Info("Staging target path is already a mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
@@ -252,6 +302,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// Do nothing else with the mount point for stage
 	if blk := req.GetVolumeCapability().GetBlock(); blk != nil {
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateVolumeCapability", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+			"block":       metrics.SerializeRequest(blk),
+		}, metrics.TracingError, err)
 		log.V(4).Info("Volume is a block volume", "volumeID", volumeID)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
@@ -261,6 +315,9 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", req.GetStagingTargetPath())
 	if err := ns.mountVolume(ctx, devicePath, req); err != nil {
 		metrics.RecordMetrics(metrics.NodeStageVolumeTotal, metrics.NodeStageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "MountVolume", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -272,6 +329,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	// Start a new span for the NodeUnstageVolume operation
+	_, span := metrics.Tracer.Start(ctx, "NodeUnstageVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
 	defer done()
 
@@ -288,6 +349,9 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	err := validateNodeUnstageVolumeRequest(ctx, req)
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodeUnstageVolumeTotal, metrics.NodeUnstageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateRequest", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -295,6 +359,9 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	err = mount.CleanupMountPoint(stagingTargetPath, ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
 		metrics.RecordMetrics(metrics.NodeUnstageVolumeTotal, metrics.NodeUnstageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateUnmountPath", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, errInternal("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err)
 	}
 
@@ -302,6 +369,9 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	if err := ns.closeLuksMountSource(ctx, volumeID); err != nil {
 		metrics.RecordMetrics(metrics.NodeUnstageVolumeTotal, metrics.NodeUnstageVolumeDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "CloseLUKSservice", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, fmt.Errorf("closing luks to unstage volume %s: %w", volumeID, err)
 	}
 
@@ -313,6 +383,10 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	// Start a new span for the NodeExpandVolume operation
+	_, span := metrics.Tracer.Start(ctx, "NodeExpandVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
 	defer done()
 
@@ -324,6 +398,9 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
 		metrics.RecordMetrics(metrics.NodeExpandTotal, metrics.NodeExpandDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ValidateVolumeRequest", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, err
 	}
 
@@ -334,12 +411,19 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	if err != nil {
 		// Node volume expansion is not supported yet. To meet the spec, we need to implement this.
 		// For now, we'll return a not found error.
-
+		metrics.TraceFunctionData(ctx, "ParsingLinodeVolumeKey", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+			"volumeID":    volumeID,
+		}, metrics.TracingError, err)
 		metrics.RecordMetrics(metrics.NodeExpandTotal, metrics.NodeExpandDuration, metrics.Failed, functionStartTime)
 		return nil, errNotFound("volume not found: %v", err)
 	}
 	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
 	if err != nil {
+		metrics.TraceFunctionData(ctx, "ParsingLinodeVolumeKeyJSON", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+			"volumeID":    volumeID,
+		}, metrics.TracingError, err)
 		metrics.RecordMetrics(metrics.NodeExpandTotal, metrics.NodeExpandDuration, metrics.Failed, functionStartTime)
 		return nil, errInternal("marshal json filter: %v", err)
 	}
@@ -347,6 +431,9 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log.V(4).Info("Listing volumes", "volumeID", volumeID)
 	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
 		metrics.RecordMetrics(metrics.NodeExpandTotal, metrics.NodeExpandDuration, metrics.Failed, functionStartTime)
+		metrics.TraceFunctionData(ctx, "ListingVolumes", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
 

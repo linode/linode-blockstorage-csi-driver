@@ -321,7 +321,7 @@ func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string,
 // getRequestCapacitySize validates the CapacityRange and determines the optimal volume size.
 // It returns the minimum size if no range is provided, or the required size if specified.
 // It ensures that the size is not negative and does not exceed the maximum limit.
-func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
+func getRequestCapacitySize(ctx context.Context, capRange *csi.CapacityRange) (int64, error) {
 	// If no capacity range is provided, return the minimum volume size
 	if capRange == nil {
 		return MinVolumeSizeBytes, nil
@@ -352,6 +352,11 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	if maxSize < MinVolumeSizeBytes {
 		return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
 	}
+
+	metrics.TraceFunctionData(ctx, "CheckRequestedSize", map[string]string{
+		"requestSize": strconv.Itoa(int(reqSize)),
+		"maxSize":     strconv.Itoa(int(maxSize)),
+	}, metrics.TracingSubfunction, nil)
 
 	// Determine the final size
 	return determineOptimalSize(reqSize, maxSize), nil
@@ -444,7 +449,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	// Retrieve the capacity range from the request to determine the size limits for the volume.
 	capRange := req.GetCapacityRange()
 	// Get the requested size in bytes, handling any potential errors.
-	size, err := getRequestCapacitySize(capRange)
+	size, err := getRequestCapacitySize(ctx, capRange)
 	if err != nil {
 		return nil, err
 	}

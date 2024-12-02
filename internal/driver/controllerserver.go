@@ -529,6 +529,10 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 // it returns the new capacity and indicates that no node expansion is required.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (resp *csi.ControllerExpandVolumeResponse, err error) {
+	// Start a new span for the ControllerPublishVolume operation
+	_, span := metrics.Tracer.Start(ctx, "ControllerExpandVolume")
+	defer span.End()
+
 	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
 	defer done()
 
@@ -536,11 +540,19 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
+		metrics.TraceFunctionData(ctx, "GetVolumeDetails", map[string]string{
+			"volumeID":    strconv.Itoa(volumeID),
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, statusErr)
 		return nil, statusErr
 	}
 
-	size, err := getRequestCapacitySize(req.GetCapacityRange())
+	size, err := getRequestCapacitySize(ctx, req.GetCapacityRange())
 	if err != nil {
+		metrics.TraceFunctionData(ctx, "CheckRequestedSize", map[string]string{
+			"volumeID":    strconv.Itoa(int(size)),
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return resp, errInternal("get requested size from capacity range: %v", err)
 	}
 
@@ -548,6 +560,10 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	log.V(4).Info("Checking if volume exists", "volume_id", volumeID)
 	vol, err := cs.client.GetVolume(ctx, volumeID)
 	if err != nil {
+		metrics.TraceFunctionData(ctx, "GetVolume", map[string]string{
+			"volume":      metrics.SerializeRequest(vol),
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return resp, errInternal("get volume: %v", err)
 	}
 
@@ -559,6 +575,10 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	// Resize the volume
 	log.V(4).Info("Calling API to resize volume", "volume_id", volumeID)
 	if err = cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
+		metrics.TraceFunctionData(ctx, "ResizeVolume", map[string]string{
+			"volume":      metrics.SerializeRequest(vol),
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return resp, errInternal("resize volume %d: %v", volumeID, err)
 	}
 
@@ -566,6 +586,10 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	log.V(4).Info("Waiting for volume to become active", "volume_id", volumeID)
 	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
 	if err != nil {
+		metrics.TraceFunctionData(ctx, "WaitForVolumeStatus", map[string]string{
+			"volume":      metrics.SerializeRequest(vol),
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return resp, errInternal("timed out waiting for volume %d to become active: %v", volumeID, err)
 	}
 	log.V(4).Info("Volume active", "vol", vol)
