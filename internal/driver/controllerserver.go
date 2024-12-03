@@ -375,10 +375,6 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 	// Record function completion
 	metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Completed, functionStartTime)
-	metrics.TraceFunctionData(ctx, "Finishing ControllerUnpublishVolume", map[string]string{
-		"volumeID": strconv.Itoa(volumeID),
-		"nodeID":   strconv.Itoa(linodeID),
-	}, metrics.TracingSuccess, nil)
 
 	log.V(2).Info("Volume detached successfully", "volume_id", volumeID)
 	return &csi.ControllerUnpublishVolumeResponse{}, nil

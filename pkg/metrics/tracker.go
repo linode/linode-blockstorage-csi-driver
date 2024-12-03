@@ -77,6 +77,13 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort st
 
 // TraceFunctionData handles tracing for success, error, or subfunction calls.
 func TraceFunctionData(ctx context.Context, operationName string, params map[string]string, status string, err error) {
+	// Check if a span with the same operation name already exists
+	if spanFromContext := tracer.SpanFromContext(ctx); spanFromContext != nil && spanFromContext.SpanContext().IsValid() {
+		// Avoid creating a duplicate span if one already exists with the same operation name
+		klog.Warningf("A span for operation %s already exists. Skipping duplicate span creation.", operationName)
+		return
+	}
+
 	// Create a child span for the operation
 	_, span := Tracer.Start(ctx, operationName)
 	defer span.End()
