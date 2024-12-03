@@ -79,15 +79,20 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort st
 func TraceFunctionData(ctx context.Context, operationName string, params map[string]string, status string, err error) {
 	// Check if a span with the same operation name already exists
 	if spanFromContext := tracer.SpanFromContext(ctx); spanFromContext != nil && spanFromContext.SpanContext().IsValid() {
-		// Avoid creating a duplicate span if one already exists with the same operation name
-		klog.Warningf("A span for operation %s already exists. Skipping duplicate span creation.", operationName)
+		klog.Infof("Updating existing span for operation: %s", operationName)
+		updateSpanAttributes(spanFromContext, operationName, params, status, err)
 		return
 	}
 
-	// Create a child span for the operation
+	// If no active span exists, create a child span
 	_, span := Tracer.Start(ctx, operationName)
 	defer span.End()
 
+	updateSpanAttributes(span, operationName, params, status, err)
+}
+
+// updateSpanAttributes is a helper function to set attributes of a span conditionally
+func updateSpanAttributes(span tracer.Span, operationName string, params map[string]string, status string, err error) {
 	// Add attributes to the span
 	for key, value := range params {
 		span.SetAttributes(attribute.String(key, value))
