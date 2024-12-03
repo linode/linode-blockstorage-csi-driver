@@ -522,6 +522,11 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 	volumeContext[VolumeTopologyRegion] = vol.Region
 
+	metrics.TraceFunctionData(ctx, "createVolumeContext", map[string]string{
+		"requestBody":   metrics.SerializeRequest(req),
+		"volumeContext": metrics.SerializeRequest(volumeContext),
+	}, metrics.TracingSubfunction, nil)
+
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext
 }
@@ -631,6 +636,13 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 	if !validVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
 		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{volCap})
 	}
+
+	metrics.TraceFunctionData(ctx, "validateControllerPublishVolumeRequest", map[string]string{
+		"requestBody":      metrics.SerializeRequest(req),
+		"volumeCapability": metrics.SerializeRequest(volCap),
+		"linodeId":         strconv.Itoa(linodeID),
+		"volumeId":         strconv.Itoa(volumeID),
+	}, metrics.TracingSubfunction, nil)
 
 	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
 	return linodeID, volumeID, nil

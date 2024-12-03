@@ -395,23 +395,38 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
 	if statusErr != nil {
+		metrics.TraceFunctionData(ctx, "GetVolumeID", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, statusErr)
 		return &csi.ValidateVolumeCapabilitiesResponse{}, statusErr
 	}
 
 	volumeCapabilities := req.GetVolumeCapabilities()
 	if len(volumeCapabilities) == 0 {
+		metrics.TraceFunctionData(ctx, "GetVolumeCapabilities", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, errNoVolumeCapabilities)
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errNoVolumeCapabilities
 	}
 
 	if _, err := cs.client.GetVolume(ctx, volumeID); linodego.IsNotFound(err) {
+		metrics.TraceFunctionData(ctx, "GetVolumeCapabilities", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errVolumeNotFound(volumeID)
 	} else if err != nil {
+		metrics.TraceFunctionData(ctx, "GetVolumeCapabilities", map[string]string{
+			"requestBody": metrics.SerializeRequest(req),
+		}, metrics.TracingError, err)
 		return &csi.ValidateVolumeCapabilitiesResponse{}, errInternal("get volume: %v", err)
 	}
 
 	resp = &csi.ValidateVolumeCapabilitiesResponse{}
 	if validVolumeCapabilities(volumeCapabilities) {
 		resp.Confirmed = &csi.ValidateVolumeCapabilitiesResponse_Confirmed{VolumeCapabilities: volumeCapabilities}
+		metrics.TraceFunctionData(ctx, "GetVolumeID", map[string]string{
+			"volumeCapabilities": metrics.SerializeRequest(volumeCapabilities),
+		}, metrics.TracingSuccess, nil)
 	}
 	log.V(2).Info("Supported capabilities", "response", resp)
 
