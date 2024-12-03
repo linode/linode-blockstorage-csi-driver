@@ -30,7 +30,7 @@ import (
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 // Name is the name of the driver provided by this package.
@@ -134,7 +134,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	}
 	linodeDriver.cs = cs
 
-	// Set metrics config
+	// Set observability config
 	linodeDriver.enableMetrics = enableMetrics
 	linodeDriver.metricsPort = metricsPort
 
@@ -143,7 +143,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.tracingPort = tracingPort
 
 	if linodeDriver.enableTracing == True {
-		metrics.InitTracer(ctx, "linode-csi-driver", linodeDriver.vendorVersion, linodeDriver.tracingPort)
+		observability.InitTracer(ctx, "linode-csi-driver", linodeDriver.vendorVersion, linodeDriver.tracingPort)
 	}
 
 	log.V(2).Info("LinodeDriver setup completed successfully")

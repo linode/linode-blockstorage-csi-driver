@@ -16,7 +16,7 @@ import (
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -353,10 +353,10 @@ func getRequestCapacitySize(ctx context.Context, capRange *csi.CapacityRange) (i
 		return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
 	}
 
-	metrics.TraceFunctionData(ctx, "CheckRequestedSize", map[string]string{
+	observability.TraceFunctionData(ctx, "CheckRequestedSize", map[string]string{
 		"requestSize": strconv.Itoa(int(reqSize)),
 		"maxSize":     strconv.Itoa(int(maxSize)),
-	}, metrics.TracingSubfunction, nil)
+	}, observability.TracingSubfunction, nil)
 
 	// Determine the final size
 	return determineOptimalSize(reqSize, maxSize), nil
@@ -432,7 +432,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 		return errInvalidVolumeCapability(volCaps)
 	}
 
-	metrics.TraceFunctionData(ctx, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": metrics.SerializeRequest(req)}, metrics.TracingSubfunction, nil)
+	observability.TraceFunctionData(ctx, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": observability.SerializeRequest(req)}, observability.TracingSubfunction, nil)
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
 }
@@ -496,10 +496,10 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		Region:           region,
 	}
 
-	metrics.TraceFunctionData(ctx, "PrepareVolumeParams", map[string]string{
+	observability.TraceFunctionData(ctx, "PrepareVolumeParams", map[string]string{
 		"volume_name":      req.GetName(),
-		"requestBody":      metrics.SerializeRequest(req),
-		"volumeParameters": metrics.SerializeRequest(params)}, metrics.TracingSubfunction, nil)
+		"requestBody":      observability.SerializeRequest(req),
+		"volumeParameters": observability.SerializeRequest(params)}, observability.TracingSubfunction, nil)
 
 	return params, nil
 }
@@ -522,10 +522,10 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 	volumeContext[VolumeTopologyRegion] = vol.Region
 
-	metrics.TraceFunctionData(ctx, "createVolumeContext", map[string]string{
-		"requestBody":   metrics.SerializeRequest(req),
-		"volumeContext": metrics.SerializeRequest(volumeContext),
-	}, metrics.TracingSubfunction, nil)
+	observability.TraceFunctionData(ctx, "createVolumeContext", map[string]string{
+		"requestBody":   observability.SerializeRequest(req),
+		"volumeContext": observability.SerializeRequest(volumeContext),
+	}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext
@@ -561,9 +561,9 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}
 
-	metrics.TraceFunctionData(ctx, "CreateAndWaitForVolume",
+	observability.TraceFunctionData(ctx, "CreateAndWaitForVolume",
 		map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
-		metrics.TracingSubfunction, nil)
+		observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume is active", "volumeID", vol.ID)
 	return vol, nil
@@ -637,12 +637,12 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{volCap})
 	}
 
-	metrics.TraceFunctionData(ctx, "validateControllerPublishVolumeRequest", map[string]string{
-		"requestBody":      metrics.SerializeRequest(req),
-		"volumeCapability": metrics.SerializeRequest(volCap),
+	observability.TraceFunctionData(ctx, "validateControllerPublishVolumeRequest", map[string]string{
+		"requestBody":      observability.SerializeRequest(req),
+		"volumeCapability": observability.SerializeRequest(volCap),
 		"linodeId":         strconv.Itoa(linodeID),
 		"volumeId":         strconv.Itoa(volumeID),
-	}, metrics.TracingSubfunction, nil)
+	}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
 	return linodeID, volumeID, nil
@@ -684,9 +684,9 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 		return "", errRegionMismatch(volume.Region, instance.Region)
 	}
 
-	metrics.TraceFunctionData(ctx, "GetAndValidateVolume", map[string]string{
-		"volumeSpecs": metrics.SerializeRequest(volume),
-	}, metrics.TracingSubfunction, nil)
+	observability.TraceFunctionData(ctx, "GetAndValidateVolume", map[string]string{
+		"volumeSpecs": observability.SerializeRequest(volume),
+	}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
@@ -709,9 +709,9 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 		return nil, errInternal("get linode instance %d: %v", linodeID, err)
 	}
 
-	metrics.TraceFunctionData(ctx, "GetInstance", map[string]string{
-		"instanceSpecs": metrics.SerializeRequest(instance),
-	}, metrics.TracingSubfunction, nil)
+	observability.TraceFunctionData(ctx, "GetInstance", map[string]string{
+		"instanceSpecs": observability.SerializeRequest(instance),
+	}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Instance retrieved", "instance", instance)
 	return instance, nil
@@ -742,9 +742,9 @@ func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instanc
 		return errMaxVolumeAttachments(limit) // Return an error indicating the maximum volume attachments allowed.
 	}
 
-	metrics.TraceFunctionData(ctx, "CheckAttachmentCapacity", map[string]string{
-		"instanceSpecs": metrics.SerializeRequest(instance),
-	}, metrics.TracingSubfunction, nil)
+	observability.TraceFunctionData(ctx, "CheckAttachmentCapacity", map[string]string{
+		"instanceSpecs": observability.SerializeRequest(instance),
+	}, observability.TracingSubfunction, nil)
 
 	return nil // Return nil if the instance can accommodate more attachments.
 }
@@ -773,10 +773,10 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		return status.Errorf(code, "attach volume: %v", err)
 	}
 
-	metrics.TraceFunctionData(ctx, "AttachVolume", map[string]string{
+	observability.TraceFunctionData(ctx, "AttachVolume", map[string]string{
 		"volumeID": strconv.Itoa(volumeID),
 		"linodeID": strconv.Itoa(linodeID),
-	}, metrics.TracingError, nil)
+	}, observability.TracingError, nil)
 
 	return nil // Return nil if the volume is successfully attached.
 }

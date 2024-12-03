@@ -32,7 +32,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 // Defines Non blocking GRPC server interfaces
@@ -45,7 +45,7 @@ type NonBlockingGRPCServer interface {
 	Stop()
 	// Stops the service forcefully
 	ForceStop()
-	// Setter to set the metrics http server config
+	// Setter to set the observability http server config
 	SetMetricsConfig(enableMetrics, metricsPort string)
 }
 
@@ -80,9 +80,9 @@ func (s *nonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, c
 		klog.Errorf("Error parsing enableMetrics: %v", err)
 		return
 	}
-	klog.Infof("Enable metrics: %v", enableMetrics)
+	klog.Infof("Enable observability: %v", enableMetrics)
 
-	// Start metrics server if enableMetrics is true
+	// Start observability server if enableMetrics is true
 	if enableMetrics {
 		port := ":" + s.metricsPort
 		go s.startMetricsServer(port)
@@ -97,11 +97,11 @@ func (s *nonBlockingGRPCServer) Stop() {
 	s.server.GracefulStop()
 	err := s.metricsServer.Shutdown(context.Background())
 	if err != nil {
-		klog.Errorf("Failed to stop metrics server: %v", err)
+		klog.Errorf("Failed to stop observability server: %v", err)
 	}
 
-	if metrics.TracerProvider != nil {
-		traceErr := metrics.TracerProvider.Shutdown(context.Background())
+	if observability.TracerProvider != nil {
+		traceErr := observability.TracerProvider.Shutdown(context.Background())
 		if traceErr != nil {
 			klog.Errorf("Failed to shut down tracer provider: %v", traceErr)
 		}
@@ -111,7 +111,7 @@ func (s *nonBlockingGRPCServer) Stop() {
 func (s *nonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
 	if err := s.metricsServer.Close(); err != nil {
-		klog.Errorf("Failed to force stop metrics server: %v", err)
+		klog.Errorf("Failed to force stop observability server: %v", err)
 	}
 }
 
@@ -187,8 +187,8 @@ func (s *nonBlockingGRPCServer) startMetricsServer(addr string) {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	klog.V(4).Infof("Starting metrics server at %s", addr)
+	klog.V(4).Infof("Starting observability server at %s", addr)
 	if err := s.metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		klog.Fatalf("Failed to serve metrics: %v", err)
+		klog.Fatalf("Failed to serve observability: %v", err)
 	}
 }
