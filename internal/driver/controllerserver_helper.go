@@ -560,9 +560,9 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}
 
-	observability.TraceFunctionData(ctx, "CreateAndWaitForVolume",
-		map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
-		observability.TracingSubfunction, nil)
+	//observability.TraceFunctionData(ctx, "CreateAndWaitForVolume",
+	//	map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
+	//	observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume is active", "volumeID", vol.ID)
 	return vol, nil
