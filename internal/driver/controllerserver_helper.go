@@ -524,8 +524,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 	observability.TraceFunctionData(ctx, "createVolumeContext", map[string]string{
 		"requestBody":   observability.SerializeRequest(req),
-		"volumeContext": observability.SerializeRequest(volumeContext),
-	}, observability.TracingSubfunction, nil)
+		"volumeContext": observability.SerializeRequest(volumeContext)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext

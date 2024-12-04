@@ -24,8 +24,9 @@ const (
 
 // Global tracing variables
 var (
-	Tracer         tracer.Tracer
-	TracerProvider *trace.TracerProvider
+	Tracer            tracer.Tracer
+	TracerProvider    *trace.TracerProvider
+	SkipObservability bool
 )
 
 // InitOtelTracing initializes the OpenTelemetry tracing and returns an exporter.
@@ -77,6 +78,9 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort st
 
 // TraceFunctionData handles tracing for success, error, or subfunction calls.
 func TraceFunctionData(ctx context.Context, operationName string, params map[string]string, status string, err error) {
+	if SkipObservability {
+		return
+	}
 	// If no active span exists, create a child span
 	_, span := Tracer.Start(ctx, operationName)
 	defer span.End()
