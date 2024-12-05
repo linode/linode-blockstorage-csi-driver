@@ -593,7 +593,7 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 	}
 
 	observability.TraceFunctionData(span, "prepareCreateVolumeResponse", map[string]string{
-		"response": observability.SerializeRequest(resp)}, observability.TracingSubfunction, nil)
+		"response": observability.SerializeObject(resp)}, observability.TracingSubfunction, nil)
 
 	return resp
 }
@@ -632,8 +632,8 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 	}
 
 	observability.TraceFunctionData(span, "validateControllerPublishVolumeRequest", map[string]string{
-		"requestBody":      observability.SerializeRequest(req),
-		"volumeCapability": observability.SerializeRequest(volCap),
+		"requestBody":      observability.SerializeObject(req),
+		"volumeCapability": observability.SerializeObject(volCap),
 		"linodeId":         strconv.Itoa(linodeID),
 		"volumeId":         strconv.Itoa(volumeID)}, observability.TracingSubfunction, nil)
 
@@ -679,7 +679,7 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 	}
 
 	observability.TraceFunctionData(span, "GetAndValidateVolume", map[string]string{
-		"volumeSpecs": observability.SerializeRequest(volume),
+		"volumeSpecs": observability.SerializeObject(volume),
 	}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
@@ -705,7 +705,7 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 	}
 
 	observability.TraceFunctionData(span, "GetInstance", map[string]string{
-		"instanceSpecs": observability.SerializeRequest(instance),
+		"instanceSpecs": observability.SerializeObject(instance),
 	}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Instance retrieved", "instance", instance)
@@ -739,7 +739,7 @@ func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instanc
 	}
 
 	observability.TraceFunctionData(span, "CheckAttachmentCapacity", map[string]string{
-		"instanceSpecs": observability.SerializeRequest(instance),
+		"instanceSpecs": observability.SerializeObject(instance),
 	}, observability.TracingSubfunction, nil)
 
 	return nil // Return nil if the instance can accommodate more attachments.

@@ -109,9 +109,9 @@ func TraceFunctionData(span tracer.Span, operationName string, params map[string
 	span.End()
 }
 
-// SerializeRequest serializes an object to a JSON string for logging or processing.
-func SerializeRequest(req interface{}) string {
-	objBody, err := json.Marshal(req)
+// SerializeObject serializes an object to a JSON string for logging or processing.
+func SerializeObject(obj interface{}) string {
+	objBody, err := json.Marshal(obj)
 	if err != nil {
 		klog.ErrorS(err, "Failed to serialize struct to a string")
 		return fmt.Sprintf("serialization error: %v", err)
