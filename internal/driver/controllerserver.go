@@ -598,7 +598,7 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	}
 
 	ctx, span = observability.CreateSpan(ctx, "CheckRequestSize")
-	size, err := getRequestCapacitySize(ctx, req.GetCapacityRange())
+	size, err := getRequestCapacitySize(req.GetCapacityRange())
 	if err != nil {
 		observability.TraceFunctionData(span, "CheckRequestedSize", map[string]string{
 			"volumeID":    strconv.Itoa(int(size)),
