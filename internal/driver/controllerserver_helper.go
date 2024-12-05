@@ -413,7 +413,6 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 // It ensures that the volume name is not empty, that volume capabilities are provided,
 // and that the capabilities are valid. Returns an error if any validation fails.
 func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req *csi.CreateVolumeRequest) error {
-	_, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
@@ -433,8 +432,6 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 	if !validVolumeCapabilities(volCaps) {
 		return errInvalidVolumeCapability(volCaps)
 	}
-
-	observability.TraceFunctionData(span, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": observability.SerializeRequest(req)}, observability.TracingSubfunction, nil)
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
 }
@@ -443,7 +440,6 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // It extracts the capacity range from the request, calculates the size,
 // and generates a normalized volume name. Returns the volume name and size in GB.
 func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (*VolumeParams, error) {
-	_, span := observability.CreateSpan(ctx, "prepareVolumeParams")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
@@ -498,19 +494,12 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
 	}
-
-	observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
-		"volume_name":      req.GetName(),
-		"requestBody":      observability.SerializeRequest(req),
-		"volumeParameters": observability.SerializeRequest(params)}, observability.TracingSubfunction, nil)
-
 	return params, nil
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
 func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest, vol *linodego.Volume) map[string]string {
-	_, span := observability.CreateSpan(ctx, "createVolumeContext")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createVolumeContext()", "req", req)
 	defer log.V(4).Info("Exiting createVolumeContext()")
@@ -525,10 +514,6 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 	}
 
 	volumeContext[VolumeTopologyRegion] = vol.Region
-
-	observability.TraceFunctionData(span, "createVolumeContext", map[string]string{
-		"requestBody":   observability.SerializeRequest(req),
-		"volumeContext": observability.SerializeRequest(volumeContext)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
 	return volumeContext

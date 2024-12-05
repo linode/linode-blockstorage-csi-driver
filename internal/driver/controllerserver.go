@@ -74,6 +74,10 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			"volume_name": req.GetName(),
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		observability.TraceFunctionData(span, "ValidateCreateVolumeRequest", map[string]string{
+			"volume_name": req.GetName(),
+			"requestBody": observability.SerializeRequest(req)}, observability.TracingSubfunction, err)
 	}
 
 	// Prepare the volume parameters
@@ -86,6 +90,11 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			"requestBody":      observability.SerializeRequest(req),
 			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
+			"volume_name":      req.GetName(),
+			"requestBody":      observability.SerializeRequest(req),
+			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingSubfunction, err)
 	}
 
 	contentSource := req.GetVolumeContentSource()
@@ -97,9 +106,13 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "GetContentSourceVolume", map[string]string{
-			"volume_name": req.GetName(),
-			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
+			"sourceVolInfo": observability.SerializeRequest(sourceVolInfo),
+			"requestBody":   observability.SerializeRequest(req)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		observability.TraceFunctionData(span, "GetContentSourceVolume", map[string]string{
+			"sourceVolInfo": observability.SerializeRequest(sourceVolInfo),
+			"requestBody":   observability.SerializeRequest(req)}, observability.TracingSubfunction, err)
 	}
 
 	// Create the volume
@@ -108,12 +121,20 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "CreateAndWaitForVolume", map[string]string{
+			"volume":           observability.SerializeRequest(vol),
 			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
+	} else {
+		observability.TraceFunctionData(span, "CreateAndWaitForVolume", map[string]string{
+			"volume":           observability.SerializeRequest(vol),
+			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingError, err)
 	}
 
 	// Create volume context
+	ctx, span = observability.CreateSpan(ctx, "createVolumeContext")
 	volContext := cs.createVolumeContext(ctx, req, vol)
+	observability.TraceFunctionData(span, "createVolumeContext", map[string]string{
+		"volumeContext": observability.SerializeRequest(volContext)}, observability.TracingSubfunction, err)
 
 	// Prepare and return response
 	resp := cs.prepareCreateVolumeResponse(ctx, vol, params.Size, volContext, sourceVolInfo, contentSource)
