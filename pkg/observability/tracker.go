@@ -76,20 +76,14 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort st
 	klog.Infof("Tracing initialized successfully for service: %s, version: %s, port: %s", serviceName, serviceVersion, tracingPort)
 }
 
-// TraceFunctionData handles tracing for success, error, or subfunction calls.
-func TraceFunctionData(ctx context.Context, operationName string, params map[string]string, status string, err error) {
-	if SkipObservability {
-		return
-	}
-	// If no active span exists, create a child span
-	_, span := Tracer.Start(ctx, operationName)
-	defer span.End()
-
-	updateSpanAttributes(span, operationName, params, status, err)
+//nolint:spancheck // Intentional: span.End() is called outside this function.
+func CreateSpan(ctx context.Context, operationName string) (context.Context, tracer.Span) {
+	ctx, span := Tracer.Start(ctx, operationName)
+	return ctx, span
 }
 
-// updateSpanAttributes is a helper function to set attributes of a span conditionally
-func updateSpanAttributes(span tracer.Span, operationName string, params map[string]string, status string, err error) {
+// TraceFunctionData handles tracing for success, error, or subfunction calls.
+func TraceFunctionData(span tracer.Span, operationName string, params map[string]string, status string, err error) {
 	// Add attributes to the span
 	for key, value := range params {
 		span.SetAttributes(attribute.String(key, value))
@@ -112,6 +106,7 @@ func updateSpanAttributes(span tracer.Span, operationName string, params map[str
 	default:
 		klog.Warningf("Unknown status: %s for operation %s", status, operationName)
 	}
+	span.End()
 }
 
 // SerializeRequest serializes an object to a JSON string for logging or processing.

@@ -322,6 +322,7 @@ func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string,
 // It returns the minimum size if no range is provided, or the required size if specified.
 // It ensures that the size is not negative and does not exceed the maximum limit.
 func getRequestCapacitySize(ctx context.Context, capRange *csi.CapacityRange) (int64, error) {
+	_, span := observability.CreateSpan(ctx, "getRequestCapacitySize")
 	// If no capacity range is provided, return the minimum volume size
 	if capRange == nil {
 		return MinVolumeSizeBytes, nil
@@ -353,7 +354,7 @@ func getRequestCapacitySize(ctx context.Context, capRange *csi.CapacityRange) (i
 		return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
 	}
 
-	observability.TraceFunctionData(ctx, "CheckRequestedSize", map[string]string{
+	observability.TraceFunctionData(span, "CheckRequestedSize", map[string]string{
 		"requestSize": strconv.Itoa(int(reqSize)),
 		"maxSize":     strconv.Itoa(int(maxSize)),
 	}, observability.TracingSubfunction, nil)
@@ -412,6 +413,7 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 // It ensures that the volume name is not empty, that volume capabilities are provided,
 // and that the capabilities are valid. Returns an error if any validation fails.
 func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req *csi.CreateVolumeRequest) error {
+	_, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
@@ -432,7 +434,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 		return errInvalidVolumeCapability(volCaps)
 	}
 
-	observability.TraceFunctionData(ctx, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": observability.SerializeRequest(req)}, observability.TracingSubfunction, nil)
+	observability.TraceFunctionData(span, "ValidateCreateVolumeRequest", map[string]string{"volume_name": req.GetName(), "requestBody": observability.SerializeRequest(req)}, observability.TracingSubfunction, nil)
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
 }
@@ -441,6 +443,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // It extracts the capacity range from the request, calculates the size,
 // and generates a normalized volume name. Returns the volume name and size in GB.
 func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (*VolumeParams, error) {
+	_, span := observability.CreateSpan(ctx, "prepareVolumeParams")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
@@ -496,7 +499,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		Region:           region,
 	}
 
-	observability.TraceFunctionData(ctx, "PrepareVolumeParams", map[string]string{
+	observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
 		"volume_name":      req.GetName(),
 		"requestBody":      observability.SerializeRequest(req),
 		"volumeParameters": observability.SerializeRequest(params)}, observability.TracingSubfunction, nil)
@@ -507,6 +510,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 // createVolumeContext creates a context map for the volume based on the request parameters.
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
 func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest, vol *linodego.Volume) map[string]string {
+	_, span := observability.CreateSpan(ctx, "createVolumeContext")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createVolumeContext()", "req", req)
 	defer log.V(4).Info("Exiting createVolumeContext()")
@@ -522,7 +526,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 	volumeContext[VolumeTopologyRegion] = vol.Region
 
-	observability.TraceFunctionData(ctx, "createVolumeContext", map[string]string{
+	observability.TraceFunctionData(span, "createVolumeContext", map[string]string{
 		"requestBody":   observability.SerializeRequest(req),
 		"volumeContext": observability.SerializeRequest(volumeContext)}, observability.TracingSubfunction, nil)
 
@@ -533,6 +537,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
 func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, encryptionStatus string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, region string) (*linodego.Volume, error) {
+	_, span := observability.CreateSpan(ctx, "createAndWaitForVolume")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags], "encryptionStatus", encryptionStatus, "region", region)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
@@ -560,9 +565,9 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}
 
-	//observability.TraceFunctionData(ctx, "CreateAndWaitForVolume",
-	//	map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
-	//	observability.TracingSubfunction, nil)
+	observability.TraceFunctionData(span, "CreateAndWaitForVolume",
+		map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
+		observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume is active", "volumeID", vol.ID)
 	return vol, nil
@@ -571,6 +576,7 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 // prepareCreateVolumeResponse constructs a CreateVolumeResponse from the created volume details.
 // It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
 func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int64, volContext map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
+	_, span := observability.CreateSpan(ctx, "prepareCreateVolumeResponse")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
 	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
@@ -601,6 +607,9 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 		}
 	}
 
+	observability.TraceFunctionData(span, "prepareCreateVolumeResponse", map[string]string{
+		"response": observability.SerializeRequest(resp)}, observability.TracingSubfunction, nil)
+
 	return resp
 }
 
@@ -609,6 +618,7 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 // volume capability is provided and valid. If any validation fails, it returns
 // an appropriate error.
 func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (linodeID, volumeID int, err error) {
+	_, span := observability.CreateSpan(ctx, "validateControllerPublishVolumeRequest")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering validateControllerPublishVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateControllerPublishVolumeRequest()")
@@ -636,12 +646,11 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 		return 0, 0, errInvalidVolumeCapability([]*csi.VolumeCapability{volCap})
 	}
 
-	observability.TraceFunctionData(ctx, "validateControllerPublishVolumeRequest", map[string]string{
+	observability.TraceFunctionData(span, "validateControllerPublishVolumeRequest", map[string]string{
 		"requestBody":      observability.SerializeRequest(req),
 		"volumeCapability": observability.SerializeRequest(volCap),
 		"linodeId":         strconv.Itoa(linodeID),
-		"volumeId":         strconv.Itoa(volumeID),
-	}, observability.TracingSubfunction, nil)
+		"volumeId":         strconv.Itoa(volumeID)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Validation passed", "linodeID", linodeID, "volumeID", volumeID)
 	return linodeID, volumeID, nil
@@ -659,6 +668,7 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 // Additionally, it checks if the volume and instance are in the same region based on
 // the provided volume context. If they are not in the same region, it returns an internal error.
 func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (string, error) {
+	_, span := observability.CreateSpan(ctx, "getAndValidateVolume")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
@@ -683,7 +693,7 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 		return "", errRegionMismatch(volume.Region, instance.Region)
 	}
 
-	observability.TraceFunctionData(ctx, "GetAndValidateVolume", map[string]string{
+	observability.TraceFunctionData(span, "GetAndValidateVolume", map[string]string{
 		"volumeSpecs": observability.SerializeRequest(volume),
 	}, observability.TracingSubfunction, nil)
 
@@ -696,6 +706,7 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 // does not exist. If any other error occurs during retrieval, it returns
 // an internal error.
 func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*linodego.Instance, error) {
+	_, span := observability.CreateSpan(ctx, "getInstance")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getInstance()", "linodeID", linodeID)
 	defer log.V(4).Info("Exiting getInstance()")
@@ -708,7 +719,7 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 		return nil, errInternal("get linode instance %d: %v", linodeID, err)
 	}
 
-	observability.TraceFunctionData(ctx, "GetInstance", map[string]string{
+	observability.TraceFunctionData(span, "GetInstance", map[string]string{
 		"instanceSpecs": observability.SerializeRequest(instance),
 	}, observability.TracingSubfunction, nil)
 
@@ -722,6 +733,7 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 // limit is exceeded, it returns an error indicating the maximum volume
 // attachments allowed.
 func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instance *linodego.Instance) error {
+	_, span := observability.CreateSpan(ctx, "checkAttachmentCapacity")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering checkAttachmentCapacity()", "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting checkAttachmentCapacity()")
@@ -741,7 +753,7 @@ func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instanc
 		return errMaxVolumeAttachments(limit) // Return an error indicating the maximum volume attachments allowed.
 	}
 
-	observability.TraceFunctionData(ctx, "CheckAttachmentCapacity", map[string]string{
+	observability.TraceFunctionData(span, "CheckAttachmentCapacity", map[string]string{
 		"instanceSpecs": observability.SerializeRequest(instance),
 	}, observability.TracingSubfunction, nil)
 
@@ -753,6 +765,7 @@ func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instanc
 // attachment process. If the volume is already attached, it allows for a
 // retry by returning an Unavailable error.
 func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID int) error {
+	_, span := observability.CreateSpan(ctx, "attachVolume")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering attachVolume()", "volume_id", volumeID, "node_id", linodeID)
 	defer log.V(4).Info("Exiting attachVolume()")
@@ -772,10 +785,9 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		return status.Errorf(code, "attach volume: %v", err)
 	}
 
-	observability.TraceFunctionData(ctx, "AttachVolume", map[string]string{
+	observability.TraceFunctionData(span, "AttachVolume", map[string]string{
 		"volumeID": strconv.Itoa(volumeID),
-		"linodeID": strconv.Itoa(linodeID),
-	}, observability.TracingError, nil)
+		"linodeID": strconv.Itoa(linodeID)}, observability.TracingSubfunction, nil)
 
 	return nil // Return nil if the volume is successfully attached.
 }

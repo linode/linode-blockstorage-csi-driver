@@ -95,11 +95,12 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
+	_, span := observability.CreateSpan(ctx, "NodePubVol")
 	// Validate the request object
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodePublishVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateNodePublishVolumeRequest", map[string]string{
+		observability.TraceFunctionData(span, "ValidateNodePublishVolumeRequest", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -118,7 +119,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		response, err := ns.nodePublishVolumeBlock(ctx, req, options, fs)
 		if err != nil {
 			observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
-			observability.TraceFunctionData(ctx, "NodePublishVolumeBlock", map[string]string{
+			observability.TraceFunctionData(span, "NodePublishVolumeBlock", map[string]string{
 				"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		}
 		observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Completed, functionStartTime)
@@ -132,14 +133,14 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	notMnt, err := ns.ensureMountPoint(ctx, targetPath, fs)
 	if err != nil {
 		observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "EnsuringMountPath", map[string]string{
+		observability.TraceFunctionData(span, "EnsuringMountPath", map[string]string{
 			"targetPath": targetPath}, observability.TracingError, err)
 		return nil, err
 	}
 	if !notMnt {
 		log.V(4).Info("Target path is already a mount point", "volumeID", volumeID, "targetPath", targetPath)
 		observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "EnsuringMountPath", map[string]string{
+		observability.TraceFunctionData(span, "EnsuringMountPath", map[string]string{
 			"targetPath": targetPath}, observability.TracingError, err)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
@@ -152,7 +153,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	if err != nil {
 		observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "EnsuringMountPath", map[string]string{
+		observability.TraceFunctionData(span, "EnsuringMountPath", map[string]string{
 			"targetPath": targetPath}, observability.TracingError, err)
 		return nil, errInternal("NodePublishVolume could not mount %s at %s: %v", stagingTargetPath, targetPath, err)
 	}
@@ -179,9 +180,10 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	// Validate request object
 	log.V(4).Info("Validating request", "volumeID", volumeID, "targetPath", targetPath)
 
+	_, span := observability.CreateSpan(ctx, "NodeUnpubVol")
 	if err := validateNodeUnpublishVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodeUnpublishTotal, observability.NodeUnpublishDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateNodeUnpublishVolumeRequest", map[string]string{
+		observability.TraceFunctionData(span, "ValidateNodeUnpublishVolumeRequest", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -190,7 +192,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	log.V(4).Info("Unmounting and deleting target path", "volumeID", volumeID, "targetPath", targetPath)
 	if err := mount.CleanupMountPoint(targetPath, ns.mounter.Interface, true /* bind mount */); err != nil {
 		observability.RecordMetrics(observability.NodeUnpublishTotal, observability.NodeUnpublishDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "CleanupMountPoint", map[string]string{
+		observability.TraceFunctionData(span, "CleanupMountPoint", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, errInternal("NodeUnpublishVolume could not unmount %s: %v", targetPath, err)
 	}
@@ -215,9 +217,11 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// Before to functionStartTime, validate the request object (NodeStageVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID)
+	_, span := observability.CreateSpan(ctx, "NodeStageVol")
+
 	if err := validateNodeStageVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateNodeStageVolumeRequest", map[string]string{
+		observability.TraceFunctionData(span, "ValidateNodeStageVolumeRequest", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -226,7 +230,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ParseLinodeVolumeKey", map[string]string{
+		observability.TraceFunctionData(span, "ParseLinodeVolumeKey", map[string]string{
 			"volumeID":    volumeID,
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
@@ -243,7 +247,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateDevicePath", map[string]string{
+		observability.TraceFunctionData(span, "ValidateDevicePath", map[string]string{
 			"requestBody": observability.SerializeRequest(req),
 			"devicePath":  devicePath}, observability.TracingError, err)
 		return nil, err
@@ -254,7 +258,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), filesystem.NewFileSystem())
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateMountPoint", map[string]string{
+		observability.TraceFunctionData(span, "ValidateMountPoint", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -268,7 +272,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 		*/
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "MountPathInuse", map[string]string{
+		observability.TraceFunctionData(span, "MountPathInuse", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		log.V(4).Info("Staging target path is already a mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
 		return &csi.NodeStageVolumeResponse{}, nil
@@ -278,7 +282,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// Do nothing else with the mount point for stage
 	if blk := req.GetVolumeCapability().GetBlock(); blk != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateVolumeCapability", map[string]string{
+		observability.TraceFunctionData(span, "ValidateVolumeCapability", map[string]string{
 			"requestBody": observability.SerializeRequest(req),
 			"block":       observability.SerializeRequest(blk)}, observability.TracingError, err)
 		log.V(4).Info("Volume is a block volume", "volumeID", volumeID)
@@ -290,7 +294,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", req.GetStagingTargetPath())
 	if err := ns.mountVolume(ctx, devicePath, req); err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "MountVolume", map[string]string{
+		observability.TraceFunctionData(span, "MountVolume", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -316,10 +320,11 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	// Validate req (NodeUnstageVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
+	_, span := observability.CreateSpan(ctx, "NodeUnstageVol")
 	err := validateNodeUnstageVolumeRequest(ctx, req)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeUnstageVolumeTotal, observability.NodeUnstageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateRequest", map[string]string{
+		observability.TraceFunctionData(span, "ValidateRequest", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -328,7 +333,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	err = mount.CleanupMountPoint(stagingTargetPath, ns.mounter.Interface, true /* bind mount */)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeUnstageVolumeTotal, observability.NodeUnstageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateUnmountPath", map[string]string{
+		observability.TraceFunctionData(span, "ValidateUnmountPath", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, errInternal("NodeUnstageVolume failed to unmount at path %s: %v", stagingTargetPath, err)
 	}
@@ -337,7 +342,7 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	log.V(4).Info("Closing LUKS device", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 	if err := ns.closeLuksMountSource(ctx, volumeID); err != nil {
 		observability.RecordMetrics(observability.NodeUnstageVolumeTotal, observability.NodeUnstageVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "CloseLUKSservice", map[string]string{
+		observability.TraceFunctionData(span, "CloseLUKSservice", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, fmt.Errorf("closing luks to unstage volume %s: %w", volumeID, err)
 	}
@@ -359,9 +364,10 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	// Validate req (NodeExpandVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID)
+	_, span := observability.CreateSpan(ctx, "GetAndValidateVolumePath")
 	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ValidateVolumeRequest", map[string]string{
+		observability.TraceFunctionData(span, "ValidateVolumeRequest", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, err
 	}
@@ -373,7 +379,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	if err != nil {
 		// Node volume expansion is not supported yet. To meet the spec, we need to implement this.
 		// For now, we'll return a not found error.
-		observability.TraceFunctionData(ctx, "ParsingLinodeVolumeKey", map[string]string{
+		observability.TraceFunctionData(span, "ParsingLinodeVolumeKey", map[string]string{
 			"requestBody": observability.SerializeRequest(req),
 			"volumeID":    volumeID}, observability.TracingError, err)
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
@@ -381,7 +387,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
 	if err != nil {
-		observability.TraceFunctionData(ctx, "ParsingLinodeVolumeKeyJSON", map[string]string{
+		observability.TraceFunctionData(span, "ParsingLinodeVolumeKeyJSON", map[string]string{
 			"requestBody": observability.SerializeRequest(req),
 			"volumeID":    volumeID}, observability.TracingError, err)
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
@@ -391,7 +397,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log.V(4).Info("Listing volumes", "volumeID", volumeID)
 	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(ctx, "ListingVolumes", map[string]string{
+		observability.TraceFunctionData(span, "ListingVolumes", map[string]string{
 			"requestBody": observability.SerializeRequest(req)}, observability.TracingError, err)
 		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
 	}
