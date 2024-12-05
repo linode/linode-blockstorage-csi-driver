@@ -67,8 +67,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	log.V(2).Info("Processing request", "req", req)
 
 	// Validate the incoming request to ensure it meets the necessary criteria.
-	ctx, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
-	defer span.End()
+	_, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "ValidateCreateVolumeRequest", map[string]string{
@@ -82,7 +81,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Prepare the volume parameters
-	ctx, spans := observability.CreateSpan(ctx, "prepareVolumeParams")
+	_, spans := observability.CreateSpan(ctx, "prepareVolumeParams")
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
@@ -102,7 +101,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	accessibilityRequirements := req.GetAccessibilityRequirements()
 
 	// Attempt to retrieve information about a source volume
-	ctx, spanss := observability.CreateSpan(ctx, "getContentSourceVolume")
+	_, spanss := observability.CreateSpan(ctx, "getContentSourceVolume")
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
@@ -117,7 +116,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create the volume
-	ctx, spanA := observability.CreateSpan(ctx, "createAndWaitForVolume")
+	_, spanA := observability.CreateSpan(ctx, "createAndWaitForVolume")
 	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
@@ -132,7 +131,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Create volume context
-	ctx, spanB := observability.CreateSpan(ctx, "createVolumeContext")
+	_, spanB := observability.CreateSpan(ctx, "createVolumeContext")
 	volContext := cs.createVolumeContext(ctx, req, vol)
 	observability.TraceFunctionData(spanB, "createVolumeContext", map[string]string{
 		"volumeContext": observability.SerializeObject(volContext)}, observability.TracingSubfunction, err)
