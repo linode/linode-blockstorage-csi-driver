@@ -81,17 +81,17 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Prepare the volume parameters
-	ctx, span = observability.CreateSpan(ctx, "prepareVolumeParams")
+	ctx, spans := observability.CreateSpan(ctx, "prepareVolumeParams")
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
+		observability.TraceFunctionData(spans, "PrepareVolumeParams", map[string]string{
 			"volume_name":      req.GetName(),
 			"requestBody":      observability.SerializeRequest(req),
 			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
 	} else {
-		observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
+		observability.TraceFunctionData(spans, "PrepareVolumeParams", map[string]string{
 			"volume_name":      req.GetName(),
 			"requestBody":      observability.SerializeRequest(req),
 			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingSubfunction, err)
@@ -101,39 +101,39 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	accessibilityRequirements := req.GetAccessibilityRequirements()
 
 	// Attempt to retrieve information about a source volume
-	ctx, span = observability.CreateSpan(ctx, "getContentSourceVolume")
+	ctx, spanss := observability.CreateSpan(ctx, "getContentSourceVolume")
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "GetContentSourceVolume", map[string]string{
+		observability.TraceFunctionData(spanss, "GetContentSourceVolume", map[string]string{
 			"sourceVolInfo": observability.SerializeRequest(sourceVolInfo),
 			"requestBody":   observability.SerializeRequest(req)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
 	} else {
-		observability.TraceFunctionData(span, "GetContentSourceVolume", map[string]string{
+		observability.TraceFunctionData(spanss, "GetContentSourceVolume", map[string]string{
 			"sourceVolInfo": observability.SerializeRequest(sourceVolInfo),
 			"requestBody":   observability.SerializeRequest(req)}, observability.TracingSubfunction, err)
 	}
 
 	// Create the volume
-	ctx, span = observability.CreateSpan(ctx, "createAndWaitForVolume")
+	ctx, spanA := observability.CreateSpan(ctx, "createAndWaitForVolume")
 	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "CreateAndWaitForVolume", map[string]string{
+		observability.TraceFunctionData(spanA, "CreateAndWaitForVolume", map[string]string{
 			"volume":           observability.SerializeRequest(vol),
 			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
 	} else {
-		observability.TraceFunctionData(span, "CreateAndWaitForVolume", map[string]string{
+		observability.TraceFunctionData(spanA, "CreateAndWaitForVolume", map[string]string{
 			"volume":           observability.SerializeRequest(vol),
 			"volumeParameters": observability.SerializeRequest(params)}, observability.TracingError, err)
 	}
 
 	// Create volume context
-	ctx, span = observability.CreateSpan(ctx, "createVolumeContext")
+	ctx, spanB := observability.CreateSpan(ctx, "createVolumeContext")
 	volContext := cs.createVolumeContext(ctx, req, vol)
-	observability.TraceFunctionData(span, "createVolumeContext", map[string]string{
+	observability.TraceFunctionData(spanB, "createVolumeContext", map[string]string{
 		"volumeContext": observability.SerializeRequest(volContext)}, observability.TracingSubfunction, err)
 
 	// Prepare and return response
