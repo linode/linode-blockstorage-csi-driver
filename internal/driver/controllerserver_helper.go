@@ -522,7 +522,6 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
 func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, encryptionStatus string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, region string) (*linodego.Volume, error) {
-	_, span := observability.CreateSpan(ctx, "createAndWaitForVolume")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags], "encryptionStatus", encryptionStatus, "region", region)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
@@ -550,10 +549,6 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}
 
-	observability.TraceFunctionData(span, "CreateAndWaitForVolume",
-		map[string]string{"name": name, "encryption": encryptionStatus, "size": strconv.Itoa(sizeGB), "region": region},
-		observability.TracingSubfunction, nil)
-
 	log.V(4).Info("Volume is active", "volumeID", vol.ID)
 	return vol, nil
 }
@@ -561,7 +556,6 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 // prepareCreateVolumeResponse constructs a CreateVolumeResponse from the created volume details.
 // It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
 func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int64, volContext map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
-	_, span := observability.CreateSpan(ctx, "prepareCreateVolumeResponse")
 	log := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
 	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
@@ -591,9 +585,6 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 			},
 		}
 	}
-
-	observability.TraceFunctionData(span, "prepareCreateVolumeResponse", map[string]string{
-		"response": observability.SerializeObject(resp)}, observability.TracingSubfunction, nil)
 
 	return resp
 }
