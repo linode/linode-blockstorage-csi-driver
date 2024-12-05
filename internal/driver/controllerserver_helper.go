@@ -350,7 +350,6 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	if maxSize < MinVolumeSizeBytes {
 		return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
 	}
-
 	// Determine the final size
 	return determineOptimalSize(reqSize, maxSize), nil
 }
@@ -424,7 +423,6 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 	if !validVolumeCapabilities(volCaps) {
 		return errInvalidVolumeCapability(volCaps)
 	}
-
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
 }
@@ -479,13 +477,15 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
 	})
-	return &VolumeParams{
+
+	params := &VolumeParams{
 		VolumeName:       volumeName,
 		TargetSizeGB:     targetSizeGB,
 		Size:             size,
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
-	}, nil
+	}
+	return params, nil
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
@@ -651,7 +651,6 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 	if instance.Region != volume.Region {
 		return "", errRegionMismatch(volume.Region, instance.Region)
 	}
-
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
 }
