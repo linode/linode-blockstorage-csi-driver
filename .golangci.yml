@@ -119,7 +119,8 @@ linters:
     - usestdlibvars
     - varnamelen
     - whitespace
-
+  disable:
+    - spancheck
   presets:
     - bugs
     - unused
