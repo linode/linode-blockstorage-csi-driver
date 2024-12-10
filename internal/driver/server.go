@@ -123,6 +123,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 		grpc.StatsHandler(serverHandler), // Stats handler for otel
 		grpc.ChainUnaryInterceptor(
 			logger.LogGRPC, // Existing logging interceptor
+			observability.UnaryServerInterceptorWithParams(), // This gets params being passed into a grpc func
 		),
 	}
 

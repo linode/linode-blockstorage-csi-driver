@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	tracer "go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
 
@@ -99,4 +100,51 @@ func SerializeObject(obj interface{}) string {
 		return fmt.Sprintf("serialization error: %v", err)
 	}
 	return string(objBody)
+}
+
+// UnaryServerInterceptorWithParams function tries to get the parameters being input into the grpc function
+func UnaryServerInterceptorWithParams() grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		// Retrieve the existing span from the context
+		span := tracer.SpanFromContext(ctx)
+		if span == nil {
+			return handler(ctx, req) // No span, proceed normally
+		}
+
+		// Log the request parameters as attributes on the existing span
+		reqData, err := json.Marshal(req)
+		if err == nil {
+			span.SetAttributes(attribute.String("grpc.request", string(reqData)))
+		} else {
+			span.SetAttributes(attribute.String("grpc.request.error", err.Error()))
+		}
+
+		// Call the actual handler to process the request
+		resp, err := handler(ctx, req)
+
+		// Log the response parameters as attributes on the existing span
+		if resp != nil {
+			respData, er := json.Marshal(resp)
+			if er == nil {
+				span.SetAttributes(attribute.String("grpc.response", string(respData)))
+			} else {
+				span.SetAttributes(attribute.String("grpc.response.error", er.Error()))
+			}
+		}
+
+		// Log errors, if any
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		} else {
+			span.SetStatus(codes.Ok, "Success")
+		}
+
+		return resp, err
+	}
 }
