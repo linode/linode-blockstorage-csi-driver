@@ -15,7 +15,6 @@ import (
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -351,6 +350,7 @@ func getRequestCapacitySize(capRange *csi.CapacityRange) (int64, error) {
 	if maxSize < MinVolumeSizeBytes {
 		return 0, fmt.Errorf("limit bytes %v is less than minimum allowed bytes %v", maxSize, MinVolumeSizeBytes)
 	}
+
 	// Determine the final size
 	return determineOptimalSize(reqSize, maxSize), nil
 }
@@ -409,34 +409,21 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
 
-	_, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
-
-	// Set error variable
-	var err error
-
 	// Check if the volume name is empty; if so, return an error indicating no volume name was provided.
 	if req.GetName() == "" {
-		err = errNoVolumeName
+		return errNoVolumeName
 	}
 
 	// Retrieve the volume capabilities from the request.
 	volCaps := req.GetVolumeCapabilities()
 	// Check if no volume capabilities are provided; if so, return an error.
 	if len(volCaps) == 0 {
-		err = errNoVolumeCapabilities
+		return errNoVolumeCapabilities
 	}
 	// Validate the provided volume capabilities; if they are invalid, return an error.
 	if !validVolumeCapabilities(volCaps) {
-		err = errInvalidVolumeCapability(volCaps)
+		return errInvalidVolumeCapability(volCaps)
 	}
-
-	if err != nil {
-		observability.TraceFunctionData(span, "validateCreateVolumeRequest", map[string]string{
-			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
-		return err
-	}
-	observability.TraceFunctionData(span, "validateCreateVolumeRequest", map[string]string{
-		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
@@ -492,15 +479,13 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
 	})
-
-	params := &VolumeParams{
+	return &VolumeParams{
 		VolumeName:       volumeName,
 		TargetSizeGB:     targetSizeGB,
 		Size:             size,
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
-	}
-	return params, nil
+	}, nil
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
@@ -666,6 +651,7 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 	if instance.Region != volume.Region {
 		return "", errRegionMismatch(volume.Region, instance.Region)
 	}
+
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
 }

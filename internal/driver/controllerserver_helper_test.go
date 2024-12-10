@@ -16,7 +16,6 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 func TestPrepareCreateVolumeResponse(t *testing.T) {
@@ -136,8 +135,6 @@ func TestPrepareCreateVolumeResponse(t *testing.T) {
 }
 
 func TestCreateVolumeContext(t *testing.T) {
-	observability.SkipObservability = true
-
 	vol := &linodego.Volume{
 		Region: "us-east",
 	}
@@ -604,8 +601,6 @@ func TestPrepareVolumeParams_Encryption(t *testing.T) {
 }
 
 func TestValidateCreateVolumeRequest(t *testing.T) {
-	observability.SkipObservability = true
-
 	cs := &ControllerServer{}
 	ctx := context.Background()
 
