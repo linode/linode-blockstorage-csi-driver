@@ -15,13 +15,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Constants for tracing status types
-const (
-	TracingError       = "error"
-	TracingSuccess     = "success"
-	TracingSubfunction = "subfunction"
-)
-
 // Global tracing variables
 var (
 	Tracer            tracer.Tracer
@@ -76,37 +69,26 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort st
 	klog.Infof("Tracing initialized successfully for service: %s, version: %s, port: %s", serviceName, serviceVersion, tracingPort)
 }
 
-//nolint:spancheck // Intentional: span.End() is called outside this function.
-func CreateSpan(ctx context.Context, operationName string) (context.Context, tracer.Span) {
-	ctx, span := Tracer.Start(ctx, operationName)
-	return ctx, span
-}
-
 // TraceFunctionData handles tracing for success, error, or subfunction calls.
-func TraceFunctionData(span tracer.Span, operationName string, params map[string]string, status string, err error) {
+func TraceFunctionData(span tracer.Span, operationName string, params map[string]string, err error) error {
 	// Add attributes to the span
 	for key, value := range params {
 		span.SetAttributes(attribute.String(key, value))
 	}
 
-	// Record error, success, or subfunction call based on the status
-	switch status {
-	case TracingError:
-		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			span.RecordError(err)
-			klog.Errorf("Error in operation %s: %v. Params: %v", operationName, err, params)
-		}
-	case TracingSuccess:
-		span.SetStatus(codes.Ok, "operation successful")
-		klog.Infof("Operation %s succeeded. Params: %v", operationName, params)
-	case TracingSubfunction:
+	// Determine the trace type based on error
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		span.RecordError(err)
+		span.End()
+		klog.Errorf("Error in operation %s: %v. Params: %v", operationName, err, params)
+		return err
+	} else {
 		span.SetStatus(codes.Ok, "Sub-function call successful")
+		span.End()
 		klog.Infof("Sub-function call in operation %s succeeded. Params: %v", operationName, params)
-	default:
-		klog.Warningf("Unknown status: %s for operation %s", status, operationName)
+		return nil
 	}
-	span.End()
 }
 
 // SerializeObject serializes an object to a JSON string for logging or processing.
