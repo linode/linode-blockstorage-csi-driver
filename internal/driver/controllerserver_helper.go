@@ -15,6 +15,7 @@ import (
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 // MinVolumeSizeBytes is the smallest allowed size for a Linode block storage
@@ -408,21 +409,35 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
 
+	_, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
+
+	// Set error variable
+	var err error
+
 	// Check if the volume name is empty; if so, return an error indicating no volume name was provided.
 	if req.GetName() == "" {
-		return errNoVolumeName
+		err = errNoVolumeName
 	}
 
 	// Retrieve the volume capabilities from the request.
 	volCaps := req.GetVolumeCapabilities()
 	// Check if no volume capabilities are provided; if so, return an error.
 	if len(volCaps) == 0 {
-		return errNoVolumeCapabilities
+		err = errNoVolumeCapabilities
 	}
 	// Validate the provided volume capabilities; if they are invalid, return an error.
 	if !validVolumeCapabilities(volCaps) {
-		return errInvalidVolumeCapability(volCaps)
+		err = errInvalidVolumeCapability(volCaps)
 	}
+
+	if err != nil {
+		observability.TraceFunctionData(span, "validateCreateVolumeRequest", map[string]string{
+			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
+		return err
+	}
+	observability.TraceFunctionData(span, "validateCreateVolumeRequest", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
+
 	// If all checks pass, return nil indicating the request is valid.
 	return nil
 }

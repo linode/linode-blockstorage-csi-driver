@@ -604,6 +604,8 @@ func TestPrepareVolumeParams_Encryption(t *testing.T) {
 }
 
 func TestValidateCreateVolumeRequest(t *testing.T) {
+	observability.SkipObservability = true
+
 	cs := &ControllerServer{}
 	ctx := context.Background()
 

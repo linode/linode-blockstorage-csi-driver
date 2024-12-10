@@ -67,53 +67,43 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	log.V(2).Info("Processing request", "req", req)
 
 	// Validate the incoming request to ensure it meets the necessary criteria.
-	_, span := observability.CreateSpan(ctx, "validateCreateVolumeRequest")
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "ValidateCreateVolumeRequest", map[string]string{
-			"volume_name": req.GetName(),
-			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
-	} else {
-		observability.TraceFunctionData(span, "ValidateCreateVolumeRequest", map[string]string{
-			"volume_name": req.GetName(),
-			"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 	}
 
 	// Prepare the volume parameters
-	_, spans := observability.CreateSpan(ctx, "prepareVolumeParams")
+	_, span := observability.CreateSpan(ctx, "prepareVolumeParams")
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(spans, "PrepareVolumeParams", map[string]string{
+		observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
 			"volume_name":      req.GetName(),
 			"requestBody":      observability.SerializeObject(req),
 			"volumeParameters": observability.SerializeObject(params)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
-	} else {
-		observability.TraceFunctionData(spans, "PrepareVolumeParams", map[string]string{
-			"volume_name":      req.GetName(),
-			"requestBody":      observability.SerializeObject(req),
-			"volumeParameters": observability.SerializeObject(params)}, observability.TracingSubfunction, nil)
 	}
+	observability.TraceFunctionData(span, "PrepareVolumeParams", map[string]string{
+		"volume_name":      req.GetName(),
+		"requestBody":      observability.SerializeObject(req),
+		"volumeParameters": observability.SerializeObject(params)}, observability.TracingSubfunction, nil)
 
 	contentSource := req.GetVolumeContentSource()
 	accessibilityRequirements := req.GetAccessibilityRequirements()
 
 	// Attempt to retrieve information about a source volume
-	_, spans = observability.CreateSpan(ctx, "getContentSourceVolume")
+	_, span = observability.CreateSpan(ctx, "getContentSourceVolume")
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(spans, "GetContentSourceVolume", map[string]string{
+		observability.TraceFunctionData(span, "GetContentSourceVolume", map[string]string{
 			"sourceVolInfo": observability.SerializeObject(sourceVolInfo),
 			"requestBody":   observability.SerializeObject(req)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
-	} else {
-		observability.TraceFunctionData(spans, "GetContentSourceVolume", map[string]string{
-			"sourceVolInfo": observability.SerializeObject(sourceVolInfo),
-			"requestBody":   observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 	}
+	observability.TraceFunctionData(span, "GetContentSourceVolume", map[string]string{
+		"sourceVolInfo": observability.SerializeObject(sourceVolInfo),
+		"requestBody":   observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Create the volume
 	_, span = observability.CreateSpan(ctx, "createAndWaitForVolume")
@@ -124,11 +114,10 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			"volume":           observability.SerializeObject(vol),
 			"volumeParameters": observability.SerializeObject(params)}, observability.TracingError, err)
 		return &csi.CreateVolumeResponse{}, err
-	} else {
-		observability.TraceFunctionData(span, "CreateAndWaitForVolume", map[string]string{
-			"volume":           observability.SerializeObject(vol),
-			"volumeParameters": observability.SerializeObject(params)}, observability.TracingSubfunction, nil)
 	}
+	observability.TraceFunctionData(span, "CreateAndWaitForVolume", map[string]string{
+		"volume":           observability.SerializeObject(vol),
+		"volumeParameters": observability.SerializeObject(params)}, observability.TracingSubfunction, nil)
 
 	// Create volume context
 	_, span = observability.CreateSpan(ctx, "createVolumeContext")
@@ -159,8 +148,8 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	defer done()
 
 	functionStartTime := time.Now()
-	ctx, span := observability.CreateSpan(ctx, "getVolumeID")
 
+	_, span := observability.CreateSpan(ctx, "getVolumeID")
 	volID, statusErr := linodevolumes.VolumeIdAsInt("DeleteVolume", req)
 	if statusErr != nil {
 		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
@@ -168,13 +157,15 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, statusErr)
 		return &csi.DeleteVolumeResponse{}, statusErr
 	}
+	observability.TraceFunctionData(span, "getVolumeID", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	log.V(2).Info("Processing request", "req", req)
 
 	// Check if the volume exists
 	log.V(4).Info("Checking if volume exists", "volume_id", volID)
 
-	ctx, span = observability.CreateSpan(ctx, "volumeExistCheck")
+	_, span = observability.CreateSpan(ctx, "volumeExistCheck")
 	vol, err := cs.client.GetVolume(ctx, volID)
 	if linodego.IsNotFound(err) {
 		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
@@ -195,13 +186,13 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 			"volumeDetails": observability.SerializeObject(vol)}, observability.TracingError, errVolumeInUse)
 		return &csi.DeleteVolumeResponse{}, errVolumeInUse
 	}
-
-	span.End()
+	observability.TraceFunctionData(span, "volumeExistCheck", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Delete the volume
 	log.V(4).Info("Deleting volume", "volume_id", volID)
 
-	ctx, span = observability.CreateSpan(ctx, "deleteVolume")
+	_, span = observability.CreateSpan(ctx, "deleteVolume")
 	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
 		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "deleteVolume", map[string]string{
@@ -209,6 +200,8 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
 	}
+	observability.TraceFunctionData(span, "deleteVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Record function completion
 	observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Completed, functionStartTime)
@@ -229,7 +222,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	log.V(2).Info("Processing request", "req", req)
 
 	// Validate the request and get Linode ID and Volume ID
-	ctx, span := observability.CreateSpan(ctx, "ValidateControllerPublishVolume")
+	_, span := observability.CreateSpan(ctx, "ValidateControllerPublishVolume")
 	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
@@ -237,22 +230,24 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return resp, err
 	}
+	observability.TraceFunctionData(span, "ValidateControllerPublishVolumeRequest", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingError, nil)
 
 	// Retrieve and validate the instance associated with the Linode ID
-	ctx, span = observability.CreateSpan(ctx, "GetInstance")
+	_, span = observability.CreateSpan(ctx, "GetInstance")
 	instance, err := cs.getInstance(ctx, linodeID)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "GetInstance", map[string]string{
 			"linodeID": strconv.Itoa(linodeID)}, observability.TracingError, err)
 		return resp, err
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "GetInstance", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Check if the volume exists and is valid.
 	// If the volume is already attached to the specified instance, it returns its device path.
-	ctx, span = observability.CreateSpan(ctx, "GetAndValidateVolume")
+	_, span = observability.CreateSpan(ctx, "GetAndValidateVolume")
 	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
@@ -260,13 +255,15 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 			"volumeID": strconv.Itoa(volumeID),
 			"linodeID": strconv.Itoa(linodeID)}, observability.TracingError, err)
 		return resp, err
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "GetAndValidateVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
+
 	// If devicePath is not empty, the volume is already attached
-	ctx, span = observability.CreateSpan(ctx, "GetAndValidateVolumePath")
+	_, span = observability.CreateSpan(ctx, "GetAndValidateVolumePath")
 	if devicePath != "" {
-		span.End()
+		observability.TraceFunctionData(span, "GetAndValidateVolumePath", map[string]string{
+			"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 		return &csi.ControllerPublishVolumeResponse{
 			PublishContext: map[string]string{
 				devicePathKey: devicePath,
@@ -281,31 +278,31 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 
 	// Check if the instance can accommodate the volume attachment
-	ctx, span = observability.CreateSpan(ctx, "CheckAttachmentCapacity")
+	_, span = observability.CreateSpan(ctx, "CheckAttachmentCapacity")
 	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "CheckAttachmentCapacity", map[string]string{
 			"linodeID": strconv.Itoa(linodeID)}, observability.TracingError, capErr)
 		return resp, capErr
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "CheckAttachmentCapacity", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Attach the volume to the specified instance
-	ctx, span = observability.CreateSpan(ctx, "AttachVolume")
+	_, span = observability.CreateSpan(ctx, "AttachVolume")
 	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		observability.TraceFunctionData(span, "AttachVolume", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 			"linodeID": strconv.Itoa(linodeID)}, observability.TracingError, attachErr)
 		return resp, attachErr
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "AttachVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
 	// Wait for the volume to be successfully attached to the instance
-	ctx, span = observability.CreateSpan(ctx, "WaitForVolume")
+	_, span = observability.CreateSpan(ctx, "WaitForVolumeLinodeID")
 	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
@@ -313,9 +310,9 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 			"volumeID": strconv.Itoa(volumeID),
 			"linodeID": strconv.Itoa(linodeID)}, observability.TracingError, err)
 		return resp, err
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "WaitForVolumeLinodeID", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Record function completion
 	observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Completed, functionStartTime)
@@ -345,7 +342,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	functionStartTime := time.Now()
 	log.V(2).Info("Processing request", "req", req)
 
-	ctx, span := observability.CreateSpan(ctx, "UnpublishVolume")
+	_, span := observability.CreateSpan(ctx, "GetVolumeID")
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
@@ -354,7 +351,10 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		}, observability.TracingError, statusErr)
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
+	observability.TraceFunctionData(span, "GetVolumeID", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
+	_, span = observability.CreateSpan(ctx, "GetNodeID")
 	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
@@ -363,12 +363,16 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		}, observability.TracingError, statusErr)
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
+	observability.TraceFunctionData(span, "GetNodeID", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Checking if volume is attached", "volume_id", volumeID, "node_id", linodeID)
+
+	_, span = observability.CreateSpan(ctx, "GetVolume")
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "VolumeNotFound", map[string]string{
+		observability.TraceFunctionData(span, "GetVolume", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 		}, observability.TracingError, err)
 		log.V(4).Info("Volume not found, skipping", "volume_id", volumeID)
@@ -380,44 +384,56 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		}, observability.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
+	observability.TraceFunctionData(span, "GetVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
+	_, span = observability.CreateSpan(ctx, "CheckVolumeAttachments")
 	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "VolumeAttachedToDifferentNode", map[string]string{
+		observability.TraceFunctionData(span, "CheckVolumeAttachments", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 			"nodeID":   strconv.Itoa(*volume.LinodeID),
 		}, observability.TracingError, errVolumeInUse)
 		log.V(4).Info("Volume attached to different instance, skipping", "volume_id", volumeID, "attached_node_id", *volume.LinodeID, "requested_node_id", linodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
+	observability.TraceFunctionData(span, "CheckVolumeAttachments", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Executing detach volume", "volume_id", volumeID, "node_id", linodeID)
+
+	_, span = observability.CreateSpan(ctx, "DetachVolume")
 	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "ErrorInDetachVolume", map[string]string{
+		observability.TraceFunctionData(span, "DetachVolume", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 			"nodeID":   strconv.Itoa(*volume.LinodeID),
 		}, observability.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "ErrorInDetachVolume", map[string]string{
+		observability.TraceFunctionData(span, "DetachVolume", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 			"nodeID":   strconv.Itoa(*volume.LinodeID),
 		}, observability.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
 	}
+	observability.TraceFunctionData(span, "DetachVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Waiting for volume to detach", "volume_id", volumeID, "node_id", linodeID)
+
+	_, span = observability.CreateSpan(ctx, "VolumeDetaching")
 	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		observability.TraceFunctionData(span, "VolumeAttachedToDifferentNode", map[string]string{
+		observability.TraceFunctionData(span, "VolumeDetaching", map[string]string{
 			"volumeID": strconv.Itoa(volumeID),
 			"nodeID":   strconv.Itoa(*volume.LinodeID),
 		}, observability.TracingError, err)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
 	}
-
+	observability.TraceFunctionData(span, "VolumeDetaching", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 	// Record function completion
 	observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Completed, functionStartTime)
 
@@ -586,41 +602,41 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 	log.V(2).Info("Processing request", "req", req)
 
-	ctx, span := observability.CreateSpan(ctx, "GetVolumeDetails")
+	_, span := observability.CreateSpan(ctx, "GetVolumeDetails")
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
 		observability.TraceFunctionData(span, "GetVolumeDetails", map[string]string{
 			"volumeID":    strconv.Itoa(volumeID),
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, statusErr)
 		return nil, statusErr
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "GetVolumeDetails", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
-	ctx, span = observability.CreateSpan(ctx, "CheckRequestSize")
+	_, span = observability.CreateSpan(ctx, "CheckRequestSize")
 	size, err := getRequestCapacitySize(req.GetCapacityRange())
 	if err != nil {
 		observability.TraceFunctionData(span, "CheckRequestedSize", map[string]string{
 			"volumeID":    strconv.Itoa(int(size)),
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return resp, errInternal("get requested size from capacity range: %v", err)
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "CheckRequestSize", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Get the volume
 	log.V(4).Info("Checking if volume exists", "volume_id", volumeID)
 
-	ctx, span = observability.CreateSpan(ctx, "GetVolume")
+	_, span = observability.CreateSpan(ctx, "GetVolume")
 	vol, err := cs.client.GetVolume(ctx, volumeID)
 	if err != nil {
 		observability.TraceFunctionData(span, "GetVolume", map[string]string{
 			"volume":      observability.SerializeObject(vol),
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return resp, errInternal("get volume: %v", err)
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "GetVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Is the caller trying to resize the volume to be smaller than it currently is?
 	if vol.Size > bytesToGB(size) {
@@ -630,29 +646,29 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	// Resize the volume
 	log.V(4).Info("Calling API to resize volume", "volume_id", volumeID)
 
-	ctx, span = observability.CreateSpan(ctx, "ResizeVolume")
+	_, span = observability.CreateSpan(ctx, "ResizeVolume")
 	if err = cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
 		observability.TraceFunctionData(span, "ResizeVolume", map[string]string{
 			"volume":      observability.SerializeObject(vol),
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return resp, errInternal("resize volume %d: %v", volumeID, err)
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "ResizeVolume", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	// Wait for the volume to become active
 	log.V(4).Info("Waiting for volume to become active", "volume_id", volumeID)
 
-	ctx, span = observability.CreateSpan(ctx, "WaitForVolumeStatus")
+	_, span = observability.CreateSpan(ctx, "WaitForVolumeStatus")
 	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
 	if err != nil {
 		observability.TraceFunctionData(span, "WaitForVolumeStatus", map[string]string{
 			"volume":      observability.SerializeObject(vol),
 			"requestBody": observability.SerializeObject(req)}, observability.TracingError, err)
 		return resp, errInternal("timed out waiting for volume %d to become active: %v", volumeID, err)
-	} else {
-		span.End()
 	}
+	observability.TraceFunctionData(span, "WaitForVolumeStatus", map[string]string{
+		"requestBody": observability.SerializeObject(req)}, observability.TracingSubfunction, nil)
 
 	log.V(4).Info("Volume active", "vol", vol)
 
