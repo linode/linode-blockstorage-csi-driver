@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -147,4 +149,34 @@ func UnaryServerInterceptorWithParams() grpc.UnaryServerInterceptor {
 
 		return resp, err
 	}
+}
+
+// StartFunctionSpan creates a tracing span using the calling function's name
+func StartFunctionSpan(ctx context.Context) (context.Context, tracer.Span) {
+	if SkipObservability {
+		return ctx, nil
+	}
+
+	// Get the name of the current function
+	pc, file, line, ok := runtime.Caller(1) // Retrieve all outputs
+
+	if !ok {
+		klog.Warning("Failed to retrieve function name from runtime.Caller")
+		functionName := "unknown_function"
+		return Tracer.Start(ctx, functionName)
+	}
+
+	// Log the file and line number for debugging purposes
+	klog.V(4).Infof("Tracing function from %s:%d", file, line)
+
+	// Extract the function name
+	functionName := runtime.FuncForPC(pc).Name()
+
+	// Extract only the function name (removing package path)
+	if idx := strings.LastIndex(functionName, "."); idx != -1 {
+		functionName = functionName[idx+1:]
+	}
+
+	// Start and return the span
+	return Tracer.Start(ctx, functionName)
 }
