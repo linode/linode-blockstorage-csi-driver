@@ -22,7 +22,7 @@ import (
 var (
 	Tracer            tracer.Tracer
 	TracerProvider    *trace.TracerProvider
-	SkipObservability bool
+	SkipObservability = true
 )
 
 // InitOtelTracing initializes the OpenTelemetry tracing and returns an exporter.
@@ -153,10 +153,6 @@ func UnaryServerInterceptorWithParams() grpc.UnaryServerInterceptor {
 
 // StartFunctionSpan creates a tracing span using the calling function's name
 func StartFunctionSpan(ctx context.Context) (context.Context, tracer.Span) {
-	if SkipObservability {
-		return ctx, nil
-	}
-
 	// Get the name of the current function
 	pc, file, line, ok := runtime.Caller(1) // Retrieve all outputs
 

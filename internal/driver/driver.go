@@ -144,6 +144,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 
 	if linodeDriver.enableTracing == True {
 		observability.InitTracer(ctx, "linode-csi-driver", linodeDriver.vendorVersion, linodeDriver.tracingPort)
+		observability.SkipObservability = false
 	}
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
