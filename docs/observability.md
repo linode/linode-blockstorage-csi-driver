@@ -1,6 +1,6 @@
-# Observability with Grafana Dashboard
+# Observability for CSI Driver
 
-This document explains how to use the `grafana-dashboard` make target to install and configure observability tools, including Prometheus and Grafana, on your Kubernetes cluster. The setup uses Helm charts to install Prometheus and Grafana, provides a Prometheus data source, and applies a Grafana dashboard configuration.
+This document explains how to use the `grafana-dashboard`, `setup-tracing` make targets to install and configure observability tools.
 
 ## Prerequisites
 
@@ -184,3 +184,54 @@ kubectl logs <grafana-pod-name> -n monitoring
 This setup provides a quick and easy way to enable observability using Grafana dashboards, ensuring that you have visibility into your Kubernetes cluster and CSI driver operations.
 
 ---
+
+## Steps to Opt-In for Tracing in the CSI Driver
+
+To enable the tracing for the Linode CSI driver, follow the steps below. These steps involve exporting a new Helm template with tracing enabled, deleting the current CSI driver release, and applying the newly generated configuration.
+
+### 1. Export the Helm Template for the CSI Driver with Tracing Enabled
+
+First, you need to generate a new Helm template for the Linode CSI driver with the `enableTracing` flag set to `true`. You will also have to specify an address that isn't in use for the otel server to run on. By default, the port is set to `4318`.
+
+```bash
+helm template linode-csi-driver \
+	  --set apiToken="${LINODE_API_TOKEN}" \
+	  --set region="${REGION}" \
+	  --set enableTracing="true" \
+	  --set tracingPort="4318" \
+	  helm-chart/csi-driver --namespace kube-system > csi.yaml
+```
+
+### 2. Delete the Existing Release of the CSI Driver
+
+Before applying the new configuration, you need to delete the current release of the Linode CSI driver. This step is necessary because the default CSI driver installation does not have tracing enabled, and Helm doesn’t handle changes to some components gracefully without a clean reinstall.
+
+```bash
+kubectl delete -f csi.yaml --namespace kube-system
+```
+
+### 3. Apply the Newly Generated Template
+
+Once the old CSI driver installation is deleted, you can apply the newly generated template that includes the tracing configuration.
+
+```bash
+kubectl apply -f csi.yaml
+```
+
+## Steps to Install otel and jaeger for visualizing traces
+
+### 1. Run the Tracing setup
+
+The make target `setup-tracing` installs `otel-collector` and `jaeger` for visualizing the traces.
+
+```bash
+make setup-tracing
+```
+
+### 2. Access the Jaeger Dashboard
+
+Once the setup is complete, you can access the jaeger dashboard through the configured LoadBalancer service. After the setup script runs, the external IP of the LoadBalancer is printed, and you can access Jaeger by opening the following URL in your browser:
+
+```
+http://<LoadBalancer-EXTERNAL-IP>:16686
+```

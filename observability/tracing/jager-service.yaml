@@ -6,6 +6,7 @@ metadata:
   labels:
     app: jaeger
 spec:
+  type: LoadBalancer
   selector:
     app: jaeger
   ports:
