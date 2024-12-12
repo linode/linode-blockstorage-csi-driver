@@ -214,7 +214,6 @@ install-grafana:
 setup-dashboard:
 	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-dashboard.sh --namespace=monitoring --dashboard-file=observability/metrics/dashboard.json
 
-
 .PHONY: setup-tracing
 setup-tracing:
 	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-tracing.sh

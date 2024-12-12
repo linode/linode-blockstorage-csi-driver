@@ -73,7 +73,7 @@ func InitTracer(ctx context.Context, serviceName, serviceVersion, tracingPort st
 }
 
 // TraceFunctionData handles tracing for success, error, or subfunction calls.
-func TraceFunctionData(span tracer.Span, operationName string, params map[string]string, err error) error {
+func TraceFunctionData(span tracer.Span, operationName string, params map[string]string, err error) {
 	// Add attributes to the span
 	for key, value := range params {
 		span.SetAttributes(attribute.String(key, value))
@@ -85,12 +85,10 @@ func TraceFunctionData(span tracer.Span, operationName string, params map[string
 		span.RecordError(err)
 		span.End()
 		klog.Errorf("Error in operation %s: %v. Params: %v", operationName, err, params)
-		return err
 	} else {
 		span.SetStatus(codes.Ok, "Sub-function call successful")
 		span.End()
 		klog.Infof("Sub-function call in operation %s succeeded. Params: %v", operationName, params)
-		return nil
 	}
 }
 
