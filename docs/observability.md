@@ -218,6 +218,8 @@ Once the old CSI driver installation is deleted, you can apply the newly generat
 kubectl apply -f csi.yaml
 ```
 
+Now, that we have the configuration ready, we must install otel and jaeger to visualize the traces.
+
 ## Steps to Install otel and jaeger for visualizing traces
 
 ### 1. Run the Tracing setup
