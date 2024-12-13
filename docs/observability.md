@@ -235,3 +235,21 @@ Once the setup is complete, you can access the jaeger dashboard through the conf
 ```
 http://<LoadBalancer-EXTERNAL-IP>:16686
 ```
+
+### 3. Development Setup (Optional)
+
+In case you want to use Jaeger in a dev environment run the following port-forward command:
+
+```bash
+kubectl port-forward svc/jaeger-collector 16686:16686 -n kube-system
+```
+
+You can access jaeger now by opening the following URL in your browser:
+
+```
+http://localhost:16686
+```
+
+Note: If you have made changes to the port, ensure that you change them while running this command.
+
+---
