@@ -32,7 +32,7 @@ helm template linode-csi-driver \
   helm-chart/csi-driver --namespace kube-system > csi.yaml
 ```
 
-### 2. Delete the Existing Release of the CSI Driver
+### 2. Delete the Existing Release of the CSI Driver (Needed only if the CSI driver is already installed on your cluster)
 
 Before applying the new configuration, you need to delete the current release of the Linode CSI driver. This step is necessary because the default CSI driver installation does not have metrics enabled, and Helm doesn’t handle changes to some components gracefully without a clean reinstall.
 
@@ -202,7 +202,7 @@ helm template linode-csi-driver \
 	  helm-chart/csi-driver --namespace kube-system > csi.yaml
 ```
 
-### 2. Delete the Existing Release of the CSI Driver
+### 2. Delete the Existing Release of the CSI Driver (Needed only if the CSI driver is already installed on your cluster)
 
 Before applying the new configuration, you need to delete the current release of the Linode CSI driver. This step is necessary because the default CSI driver installation does not have tracing enabled, and Helm doesn’t handle changes to some components gracefully without a clean reinstall.
 
