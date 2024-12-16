@@ -4,6 +4,7 @@ set -euf -o pipefail
 
 # Default Values
 NAMESPACE="kube-system"
+RETRIES=5
 TRACING_FILES=("observability/tracing/otel-configmap.yaml"
                "observability/tracing/otel-deployment.yaml"
                "observability/tracing/otel-service.yaml"
@@ -32,18 +33,25 @@ done
 
 # Retrieve and print the Jaeger LoadBalancer IP
 get_jaeger_lb_ip() {
-  kubectl get svc jaeger-collector -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+  kubectl get svc jaeger-collector -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo ""
 }
 
 echo "Waiting for Jaeger LoadBalancer to get an external IP..."
 EXTERNAL_IP=""
-while [[ -z "$EXTERNAL_IP" ]]; do
+attempt=0
+while [[ -z "$EXTERNAL_IP" && $attempt -lt $RETRIES ]]; do
   EXTERNAL_IP=$(get_jaeger_lb_ip)
   if [[ -z "$EXTERNAL_IP" ]]; then
-    echo "Waiting for LoadBalancer external IP..."
+    echo "Attempt $((attempt + 1))/$RETRIES: Waiting for LoadBalancer external IP..."
+    attempt=$((attempt + 1))
     sleep 10
   fi
 done
+
+if [[ -z "$EXTERNAL_IP" ]]; then
+  echo "Error: Failed to retrieve Jaeger LoadBalancer external IP after $RETRIES attempts. Exiting..."
+  exit 1
+fi
 
 echo "------------------------------------------------------------"
 echo "Jaeger Dashboard Setup Complete!"

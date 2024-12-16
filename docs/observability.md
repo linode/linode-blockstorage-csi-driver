@@ -1,6 +1,6 @@
 # Observability for CSI Driver
 
-This document explains how to use the `grafana-dashboard`, `setup-tracing` make targets to install and configure observability tools.
+This document explains how to use the `grafana-dashboard` and `setup-tracing` make targets to install and configure observability tools.
 
 ## Prerequisites
 
