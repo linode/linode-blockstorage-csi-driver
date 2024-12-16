@@ -30,6 +30,7 @@ import (
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 // Name is the name of the driver provided by this package.
@@ -54,6 +55,8 @@ type LinodeDriver struct {
 	ready         bool
 	enableMetrics string
 	metricsPort   string
+	enableTracing string
+	tracingPort   string
 }
 
 // MaxVolumeLabelPrefixLength is the maximum allowed length of a volume label
@@ -86,6 +89,8 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	encrypt Encryption,
 	enableMetrics string,
 	metricsPort string,
+	enableTracing string,
+	tracingPort string,
 ) error {
 	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
 	defer done()
@@ -129,9 +134,18 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	}
 	linodeDriver.cs = cs
 
-	// Set metrics config
+	// Set observability config
 	linodeDriver.enableMetrics = enableMetrics
 	linodeDriver.metricsPort = metricsPort
+
+	// Set tracing config
+	linodeDriver.enableTracing = enableTracing
+	linodeDriver.tracingPort = tracingPort
+
+	if linodeDriver.enableTracing == True {
+		observability.InitTracer(ctx, "linode-csi-driver", linodeDriver.vendorVersion, linodeDriver.tracingPort)
+		observability.SkipObservability = false
+	}
 
 	log.V(2).Info("LinodeDriver setup completed successfully")
 	return nil

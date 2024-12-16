@@ -5,11 +5,18 @@ apiToken: ""
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
 
-# enable: This variable must be set to true to get metrics
+# enableMetrics: This variable must be set to true to get metrics
 enableMetrics: false
 
 # default metrics address port
 metricsPort: 8081
+
+# enableTracing: This variable must be set to true to get metrics
+enableTracing: false
+
+# default tracing address port
+tracingPort: 4318
+
 # (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""
 
