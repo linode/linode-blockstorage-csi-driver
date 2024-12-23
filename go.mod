@@ -23,7 +23,7 @@ require (
 	golang.org/x/net v0.32.0
 	golang.org/x/sys v0.28.0
 	google.golang.org/grpc v1.69.0
-	google.golang.org/protobuf v1.35.2
+	google.golang.org/protobuf v1.36.1
 	k8s.io/apimachinery v0.32.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/mount-utils v0.32.0
