@@ -705,11 +705,6 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 		return "", errVolumeAttached(volumeID, instance.ID)
 	}
 
-	// check if the volume and instance are in the same region
-	if instance.Region != volume.Region {
-		return "", errRegionMismatch(volume.Region, instance.Region)
-	}
-
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
 	return "", nil
 }
