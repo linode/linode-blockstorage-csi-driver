@@ -42,8 +42,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/linode/go-metadata v0.2.1 h1:fioxMUqvN6RGLthKINr/XAKsKvg6qdff1dTwoucfpJc=
 github.com/linode/go-metadata v0.2.1/go.mod h1:6DcmVDcRTMWa+jYAP7R82GWfHE3cNP7tNbWoRwcD3lE=
-github.com/linode/linodego v1.44.0 h1:JZLLWzCAx3CmHSV9NmCoXisuqKtrmPhfY9MrgvaHMUY=
-github.com/linode/linodego v1.44.0/go.mod h1:umdoNOmtbqAdGQbmQnPFZ2YS4US+/mU/1bA7MjoKAvg=
+github.com/linode/linodego v1.44.1 h1:+O1KUjJLe4Y6hVXFgN4+VZh+06JaPTsZHonup/pHPN0=
+github.com/linode/linodego v1.44.1/go.mod h1:gbgZweiU1LFyaCKI12wUlwDTeha/JTGruoKj751Ix5Q=
 github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6 h1:YDjLk3wsL5ZLhLC4TIwIvT2NkSCAdAV6pzzZaRfj4jk=
 github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6/go.mod h1:gZoZ0+POlM1ge/VUxWpMmZVNPzzMJ7l436CgkQ5+qzU=
 github.com/moby/sys/mountinfo v0.7.2 h1:1shs6aH5s4o5H2zQLn796ADW1wMrIwHsyJ2v9KouLrg=
