@@ -91,7 +91,7 @@ spec:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
             - name: LINODE_URL
-              value: https://api.linode.com/v4
+              value: https://api.linode.com
             - name: LINODE_VOLUME_LABEL_PREFIX
               value: {{ .Values.volumeLabelPrefix | default "" | quote }}
             - name: NODE_NAME
@@ -112,6 +112,9 @@ spec:
               value: {{.Values.enableTracing | quote}}
             - name: OTEL_TRACING_PORT
               value: {{.Values.tracingPort | quote}}
+            {{- with .Values.csiLinodePlugin.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
           name: csi-linode-plugin
@@ -122,6 +125,9 @@ spec:
               name: get-linode-id
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
+            {{- with .Values.csiLinodePlugin.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       initContainers:
         - command:
             - /scripts/get-linode-id.sh
@@ -167,3 +173,6 @@ spec:
             path: /dev
             type: Directory
           name: dev
+        {{- with .Values.csiLinodePlugin.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
