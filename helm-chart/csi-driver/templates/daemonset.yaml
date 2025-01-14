@@ -42,7 +42,7 @@ spec:
         - name: CSI_ENDPOINT
           value: unix:///csi/csi.sock
         - name: LINODE_URL
-          value: https://api.linode.com/v4
+          value: https://api.linode.com
         - name: NODE_NAME
           valueFrom:
             fieldRef:
@@ -56,6 +56,9 @@ spec:
           value: {{ .Values.enableMetrics | quote}}
         - name: METRICS_PORT
           value: {{ .Values.metricsPort | quote}}
+        {{- with .Values.csiLinodePlugin.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
         name: csi-linode-plugin
@@ -79,6 +82,9 @@ spec:
           name: device-dir
         - mountPath: /tmp
           name: tmp
+        {{- with .Values.csiLinodePlugin.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       hostNetwork: true
       initContainers:
       - command:
@@ -158,3 +164,6 @@ spec:
           path: /tmp
           type: Directory
         name: tmp
+      {{- with .Values.csiLinodePlugin.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
