@@ -5,18 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	metadata "github.com/linode/go-metadata"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // Metadata contains metadata about the node/instance the CSI node plugin
@@ -37,7 +35,7 @@ var NewMetadataClient = func(ctx context.Context) (MetadataClient, error) {
 }
 
 // GetNodeMetadata retrieves metadata about the current node/instance.
-func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem) (Metadata, error) {
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem, nodeName string) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
 	// Step 1: Attempt to create the metadata client
@@ -63,7 +61,6 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 
 	// Step 3: Fall back to Kubernetes API
 	log.V(4).Info("Attempting to get metadata from Kubernetes API")
-	nodeName := os.Getenv("NODE_NAME")
 	if nodeName == "" {
 		return Metadata{}, fmt.Errorf("NODE_NAME environment variable not set")
 	}
