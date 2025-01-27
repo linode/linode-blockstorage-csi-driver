@@ -9,4 +9,3 @@ resources:
 - csi-storageclass.yaml
 - ss-csi-linode-controller.yaml
 - ds-csi-linode-node.yaml
-- cm-get-linode-id.yaml
