@@ -388,7 +388,7 @@ func TestGetNodeMetadata(t *testing.T) {
 			defer func() { NewMetadataClient = oldNewClient }()
 
 			// Execute the function under test
-			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem)
+			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem, "test-node")
 
 			// Check results
 			if tt.expectedErr != "" {
