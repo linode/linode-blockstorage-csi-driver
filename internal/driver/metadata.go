@@ -5,13 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
+	"strings"
 
 	metadata "github.com/linode/go-metadata"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // Metadata contains metadata about the node/instance the CSI node plugin
@@ -32,9 +37,6 @@ var NewMetadataClient = func(ctx context.Context) (MetadataClient, error) {
 }
 
 // GetNodeMetadata retrieves metadata about the current node/instance.
-// It first attempts to use the Linode Metadata Service, and if that fails,
-// it falls back to using the Linode API. This function ensures that valid
-// metadata is obtained before returning.
 func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
@@ -46,7 +48,7 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 		linodeMetadataClient = nil
 	}
 
-	// Step 2: Try to get metadata
+	// Step 2: Try to get metadata from metadata service
 	var nodeMetadata Metadata
 	if linodeMetadataClient != nil {
 		log.V(4).Info("Attempting to get metadata from metadata service")
@@ -55,19 +57,59 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 			log.Error(err, "Failed to get metadata from metadata service")
 		}
 	}
-
-	// Step 3: Fall back to API if necessary
-	if linodeMetadataClient == nil || err != nil {
-		log.V(4).Info("Falling back to API for metadata")
-		nodeMetadata, err = GetMetadataFromAPI(ctx, cloudProvider, fileSystem)
-		if err != nil {
-			return Metadata{}, fmt.Errorf("failed to get metadata from API: %w", err)
-		}
+	if nodeMetadata.ID != 0 {
+		return nodeMetadata, nil
 	}
 
-	// Step 4: Verify we have valid metadata
-	if nodeMetadata.ID == 0 {
-		return Metadata{}, errors.New("failed to obtain valid node metadata")
+	// Step 3: Fall back to Kubernetes API
+	log.V(4).Info("Attempting to get metadata from Kubernetes API")
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		return Metadata{}, fmt.Errorf("NODE_NAME environment variable not set")
+	}
+
+	// Create kubernetes client using in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Get node information
+	node, err := kubeClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get node %s: %w", nodeName, err)
+	}
+
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		return Metadata{}, fmt.Errorf("provider ID not found for node %s", nodeName)
+	}
+
+	// Extract Linode ID from provider ID (format: linode://12345)
+	if !strings.HasPrefix(providerID, "linode://") {
+		return Metadata{}, fmt.Errorf("invalid provider ID format: %s", providerID)
+	}
+
+	linodeID, err := strconv.Atoi(strings.TrimPrefix(providerID, "linode://"))
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse Linode ID from provider ID: %w", err)
+	}
+
+	instance, err := cloudProvider.GetInstance(ctx, linodeID)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get instance details: %w", err)
+	}
+
+	nodeMetadata = Metadata{
+		ID:     linodeID,
+		Label:  instance.Label,
+		Region: instance.Region,
+		Memory: memoryToBytes(instance.Specs.Memory),
 	}
 
 	log.V(4).Info("Successfully obtained node metadata",

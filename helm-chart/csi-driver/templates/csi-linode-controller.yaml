@@ -119,39 +119,11 @@ spec:
           imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
           name: csi-linode-plugin
           volumeMounts:
-            - mountPath: /linode-info
-              name: linode-info
-            - mountPath: /scripts
-              name: get-linode-id
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
             {{- with .Values.csiLinodePlugin.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-      initContainers:
-        - command:
-            - /scripts/get-linode-id.sh
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
-          image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
-          securityContext:
-            allowPrivilegeEscalation: true
-            capabilities:
-              add:
-                - SYS_ADMIN
-            privileged: true
-          name: init
-          volumeMounts:
-            - mountPath: /dev
-              name: dev
-            - mountPath: /linode-info
-              name: linode-info
-            - mountPath: /scripts
-              name: get-linode-id
       serviceAccount: csi-controller-sa
       tolerations:
         - effect: NoSchedule
@@ -163,8 +135,6 @@ spec:
       volumes:
         - emptyDir: {}
           name: socket-dir
-        - emptyDir: {}
-          name: linode-info
         - configMap:
             defaultMode: 493
             name: get-linode-id
