@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	metadata "github.com/linode/go-metadata"
-
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	metadata "github.com/linode/go-metadata"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // Metadata contains metadata about the node/instance the CSI node plugin
