@@ -15,13 +15,13 @@ import (
 
 	metadata "github.com/linode/go-metadata"
 	gomock "go.uber.org/mock/gomock"
+	v1 "k8s.io/api/core/v1"
 )
 
 // MockMetadataClient is a mock of MetadataClient interface.
 type MockMetadataClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockMetadataClientMockRecorder
-	isgomock struct{}
 }
 
 // MockMetadataClientMockRecorder is the mock recorder for MockMetadataClient.
@@ -54,4 +54,42 @@ func (m *MockMetadataClient) GetInstance(ctx context.Context) (*metadata.Instanc
 func (mr *MockMetadataClientMockRecorder) GetInstance(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstance", reflect.TypeOf((*MockMetadataClient)(nil).GetInstance), ctx)
+}
+
+// MockKubeClient is a mock of KubeClient interface.
+type MockKubeClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockKubeClientMockRecorder
+}
+
+// MockKubeClientMockRecorder is the mock recorder for MockKubeClient.
+type MockKubeClientMockRecorder struct {
+	mock *MockKubeClient
+}
+
+// NewMockKubeClient creates a new mock instance.
+func NewMockKubeClient(ctrl *gomock.Controller) *MockKubeClient {
+	mock := &MockKubeClient{ctrl: ctrl}
+	mock.recorder = &MockKubeClientMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockKubeClient) EXPECT() *MockKubeClientMockRecorder {
+	return m.recorder
+}
+
+// GetNode mocks base method.
+func (m *MockKubeClient) GetNode(ctx context.Context, name string) (*v1.Node, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNode", ctx, name)
+	ret0, _ := ret[0].(*v1.Node)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNode indicates an expected call of GetNode.
+func (mr *MockKubeClientMockRecorder) GetNode(ctx, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNode", reflect.TypeOf((*MockKubeClient)(nil).GetNode), ctx, name)
 }

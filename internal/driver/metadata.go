@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	metadata "github.com/linode/go-metadata"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -35,8 +36,34 @@ var NewMetadataClient = func(ctx context.Context) (MetadataClient, error) {
 	return metadata.NewClient(ctx)
 }
 
+type KubeClient interface {
+	GetNode(ctx context.Context, name string) (*corev1.Node, error)
+}
+
+type kubeClient struct {
+	client kubernetes.Interface
+}
+
+func (k *kubeClient) GetNode(ctx context.Context, name string) (*corev1.Node, error) {
+	return k.client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+}
+
+var newKubeClient = func(ctx context.Context) (KubeClient, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	return &kubeClient{client: client}, nil
+}
+
 // GetNodeMetadata retrieves metadata about the current node/instance.
-func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem, nodeName string) (Metadata, error) {
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
 	// Step 1: Attempt to create the metadata client
@@ -66,19 +93,14 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 		return Metadata{}, fmt.Errorf("NODE_NAME environment variable not set")
 	}
 
-	// Create kubernetes client using in-cluster config
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return Metadata{}, fmt.Errorf("failed to get cluster config: %w", err)
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(config)
+	// Replace the direct k8s client creation with the new interface
+	k8sClient, err := newKubeClient(ctx)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Get node information
-	node, err := kubeClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	// Get node information using the interface
+	node, err := k8sClient.GetNode(ctx, nodeName)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get node %s: %w", nodeName, err)
 	}

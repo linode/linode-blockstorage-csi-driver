@@ -12,6 +12,7 @@ import (
 	metadata "github.com/linode/go-metadata"
 	"github.com/linode/linodego"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
@@ -274,20 +275,18 @@ func TestGetNodeMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockCloudProvider := mocks.NewMockLinodeClient(ctrl)
-	mockFileSystem := mocks.NewMockFileSystem(ctrl)
 	mockMetadataClient := mocks.NewMockMetadataClient(ctrl)
 
 	tests := []struct {
 		name               string
-		setupMocks         func()
+		setupMocks         func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient)
 		expectedMetadata   Metadata
 		expectedErr        string
 		metadataClientFunc func(context.Context) (MetadataClient, error)
 	}{
 		{
 			name: "Successful retrieval from metadata service",
-			setupMocks: func() {
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient) {
 				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(&metadata.InstanceData{
 					ID:     123,
 					Label:  "test-instance",
@@ -309,14 +308,12 @@ func TestGetNodeMetadata(t *testing.T) {
 		},
 		{
 			name: "Failure to create metadata client, successful retrieval from API",
-			setupMocks: func() {
-				mockFile := mocks.NewMockFileInterface(ctrl)
-				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				mockFileSystem.EXPECT().Open(LinodeIDPath).Return(mockFile, nil)
-				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "456"), io.EOF
-				})
-				mockFile.EXPECT().Close().Return(nil)
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient) {
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode://456",
+					},
+				}, nil).Times(1)
 				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(456)).Return(&linodego.Instance{
 					ID:     456,
 					Label:  "api-instance",
@@ -336,17 +333,13 @@ func TestGetNodeMetadata(t *testing.T) {
 		},
 		{
 			name: "Failure from metadata service, successful retrieval from API",
-			setupMocks: func() {
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient) {
 				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
-
-				mockFile := mocks.NewMockFileInterface(ctrl)
-				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				mockFileSystem.EXPECT().Open(LinodeIDPath).Return(mockFile, nil)
-				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "789"), io.EOF
-				})
-				mockFile.EXPECT().Close().Return(nil)
-
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode://789",
+					},
+				}, nil).Times(1)
 				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(789)).Return(&linodego.Instance{
 					ID:     789,
 					Label:  "fallback-instance",
@@ -365,12 +358,55 @@ func TestGetNodeMetadata(t *testing.T) {
 			},
 		},
 		{
-			name: "Failure from both metadata service and API",
-			setupMocks: func() {
+			name: "Successful retrieval from Kubernetes API but unsuccessful retrieval from Linode API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient) {
 				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
-				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, errors.New("file not found"))
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode://789",
+					},
+				}, nil).Times(1)
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(789)).Return(nil, errors.New("linode API error"))
 			},
-			expectedErr: "failed to get metadata from API: stat /linode-info/linode-id: file not found",
+			expectedMetadata: Metadata{
+				ID:     789,
+				Label:  "fallback-instance",
+				Region: "ap-south",
+				Memory: 8 << 30, // 8 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			expectedErr: "failed to get instance details: linode API error",
+		},
+		{
+			name: "Successful retrieval from Kubernetes API, but invalid provider id string format",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode:///789",
+					},
+				}, nil).Times(1)
+			},
+			expectedMetadata: Metadata{
+				ID:     789,
+				Label:  "fallback-instance",
+				Region: "ap-south",
+				Memory: 8 << 30, // 8 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			expectedErr: "failed to parse Linode ID from provider ID: strconv.Atoi: parsing \"/789\": invalid syntax",
+		},
+		{
+			name: "Failure from both metadata service and API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(nil, errors.New("kube client error"))
+			},
+			expectedErr: "failed to get node test-node: kube client error",
 			metadataClientFunc: func(context.Context) (MetadataClient, error) {
 				return mockMetadataClient, nil
 			},
@@ -379,16 +415,28 @@ func TestGetNodeMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockKubeClient := mocks.NewMockKubeClient(ctrl)
+			mockCloudProvider := mocks.NewMockLinodeClient(ctrl)
+
 			// Setup mocks
-			tt.setupMocks()
+			tt.setupMocks(mockKubeClient, mockCloudProvider)
 
 			// Override the metadata.NewClient function for testing
 			oldNewClient := NewMetadataClient
+			oldNewKubeClient := newKubeClient
+
 			NewMetadataClient = tt.metadataClientFunc
-			defer func() { NewMetadataClient = oldNewClient }()
+			newKubeClient = func(ctx context.Context) (KubeClient, error) {
+				return mockKubeClient, nil
+			}
+
+			defer func() {
+				NewMetadataClient = oldNewClient
+				newKubeClient = oldNewKubeClient
+			}()
 
 			// Execute the function under test
-			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem, "test-node")
+			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, "test-node")
 
 			// Check results
 			if tt.expectedErr != "" {
