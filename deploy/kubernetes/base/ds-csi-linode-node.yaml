@@ -76,12 +76,6 @@ spec:
             - mountPath: /tmp
               name: tmp
       volumes:
-        - name: linode-info
-          emptyDir: {}
-        - name: get-linode-id
-          configMap:
-            name: get-linode-id
-            defaultMode: 493
         - name: registration-dir
           hostPath:
             path: /var/lib/kubelet/plugins_registry/

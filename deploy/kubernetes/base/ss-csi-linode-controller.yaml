@@ -92,10 +92,3 @@ spec:
       volumes:
         - name: socket-dir
           emptyDir: {}
-        - name: linode-info
-          emptyDir: {}
-        - name: get-linode-id
-          configMap:
-            name: get-linode-id
-            # octal mode 755
-            defaultMode: 493

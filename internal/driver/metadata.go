@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 
@@ -14,7 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
@@ -192,78 +190,4 @@ func memoryToBytes(sizeMB int) uint {
 // Linode instance type.
 const minMemory uint = 1 << 30
 
-// LinodeIDPath is the path to a file containing only the ID of the Linode
-// instance the CSI node plugin is currently running on.
-// This file is expected to be placed into the Linode by the init container
-// provided with the CSI node plugin.
-const LinodeIDPath = "/linode-info/linode-id"
-
 var errNilClient = errors.New("nil client")
-
-// GetMetadataFromAPI attempts to retrieve metadata about the current
-// node/instance directly from the Linode API.
-func GetMetadataFromAPI(ctx context.Context, client linodeclient.LinodeClient, fs filesystem.FileSystem) (Metadata, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
-	defer done()
-
-	log.V(2).Info("Processing request")
-
-	if client == nil {
-		return Metadata{}, errNilClient
-	}
-
-	log.V(4).Info("Checking LinodeIDPath", "path", LinodeIDPath)
-	if _, err := fs.Stat(LinodeIDPath); err != nil {
-		return Metadata{}, fmt.Errorf("stat %s: %w", LinodeIDPath, err)
-	}
-
-	log.V(4).Info("Opening LinodeIDPath", "path", LinodeIDPath)
-	fileObj, err := fs.Open(LinodeIDPath)
-	if err != nil {
-		return Metadata{}, fmt.Errorf("open: %w", err)
-	}
-	defer func() {
-		err = fileObj.Close()
-	}()
-
-	log.V(4).Info("Reading LinodeID from file")
-	// Read in the file, but use a LimitReader to make sure we are not
-	// reading in junk.
-	data, err := io.ReadAll(io.LimitReader(fileObj, 1<<10))
-	if err != nil {
-		return Metadata{}, fmt.Errorf("read all: %w", err)
-	}
-
-	log.V(4).Info("Parsing LinodeID")
-	linodeID, err := strconv.Atoi(string(data))
-	if err != nil {
-		return Metadata{}, fmt.Errorf("atoi: %w", err)
-	}
-
-	log.V(4).Info("Retrieving instance data from API", "linodeID", linodeID)
-	instance, err := client.GetInstance(ctx, linodeID)
-	if err != nil {
-		return Metadata{}, fmt.Errorf("get instance: %w", err)
-	}
-
-	memory := minMemory
-	if instance.Specs != nil {
-		memory = memoryToBytes(instance.Specs.Memory)
-	}
-
-	nodeMetadata := Metadata{
-		ID:     linodeID,
-		Label:  instance.Label,
-		Region: instance.Region,
-		Memory: memory,
-	}
-
-	log.V(4).Info("Successfully retrieved metadata",
-		"instanceID", nodeMetadata.ID,
-		"instanceLabel", nodeMetadata.Label,
-		"region", nodeMetadata.Region,
-		"memory", nodeMetadata.Memory)
-
-	log.V(2).Info("Successfully completed")
-	return nodeMetadata, nil
-}
