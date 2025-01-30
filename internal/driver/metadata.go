@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
@@ -61,7 +62,7 @@ var newKubeClient = func(ctx context.Context) (KubeClient, error) {
 }
 
 // GetNodeMetadata retrieves metadata about the current node/instance.
-func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string) (Metadata, error) {
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string, fileSystem filesystem.FileSystem) (Metadata, error) {
 	log := logger.GetLogger(ctx)
 
 	// Step 1: Attempt to create the metadata client
@@ -85,7 +86,34 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 		return nodeMetadata, nil
 	}
 
-	// Step 3: Fall back to Kubernetes API
+	// New Step 3: Try product_serial file
+	log.V(4).Info("Attempting to read metadata from product_serial file")
+	linodeID, err := getLinodeIDFromProductSerial(ctx, fileSystem)
+	if err == nil {
+		instance, err := cloudProvider.GetInstance(ctx, linodeID)
+		if err != nil {
+			log.Error(err, "Failed to get instance details from cloud provider")
+		} else {
+			nodeMetadata = Metadata{
+				ID:     linodeID,
+				Label:  instance.Label,
+				Region: instance.Region,
+				Memory: memoryToBytes(instance.Specs.Memory),
+			}
+
+			log.V(4).Info("Successfully obtained node metadata from product_serial",
+				"ID", nodeMetadata.ID,
+				"Label", nodeMetadata.Label,
+				"Region", nodeMetadata.Region,
+				"Memory", nodeMetadata.Memory,
+			)
+			return nodeMetadata, nil
+		}
+	} else {
+		log.V(4).Info("Product_serial fallback failed", "error", err.Error())
+	}
+
+	// Step 4: Fall back to Kubernetes API
 	log.V(4).Info("Attempting to get metadata from Kubernetes API")
 	if nodeName == "" {
 		return Metadata{}, fmt.Errorf("NODE_NAME environment variable not set")
@@ -113,7 +141,7 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 		return Metadata{}, fmt.Errorf("invalid provider ID format: %s", providerID)
 	}
 
-	linodeID, err := strconv.Atoi(strings.TrimPrefix(providerID, "linode://"))
+	linodeID, err = strconv.Atoi(strings.TrimPrefix(providerID, "linode://"))
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse Linode ID from provider ID: %w", err)
 	}
@@ -191,3 +219,30 @@ func memoryToBytes(sizeMB int) uint {
 const minMemory uint = 1 << 30
 
 var errNilClient = errors.New("nil client")
+
+// Add this new helper function
+func getLinodeIDFromProductSerial(ctx context.Context, fs filesystem.FileSystem) (int, error) {
+	log := logger.GetLogger(ctx)
+
+	filePath := "/sys/devices/virtual/dmi/id/product_serial"
+	file, err := fs.Open(filePath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to open product_serial file: %w", err)
+	}
+	defer file.Close()
+
+	buf := make([]byte, 64)
+	n, err := file.Read(buf)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read product_serial file: %w", err)
+	}
+
+	idStr := strings.TrimSpace(string(buf[:n]))
+	linodeID, err := strconv.Atoi(idStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid linode ID format in product_serial: %w", err)
+	}
+
+	log.V(4).Info("Successfully parsed Linode ID from product_serial", "linodeID", linodeID)
+	return linodeID, nil
+}

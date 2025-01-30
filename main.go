@@ -146,7 +146,7 @@ func handle(ctx context.Context) error {
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 
-	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName)
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem)
 	if err != nil {
 		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
