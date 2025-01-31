@@ -470,17 +470,20 @@ func TestGetLinodeIDFromProductSerial(t *testing.T) {
 
 			if tt.expectedErr != "" {
 				if err == nil {
-					t.Error("Expected error but got nil")
-				} else if !strings.Contains(err.Error(), tt.expectedErr) {
-					t.Errorf("Expected error containing %q, got %q", tt.expectedErr, err.Error())
+					t.Fatal("Expected error but got nil")
 				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
+				if !strings.Contains(err.Error(), tt.expectedErr) {
+					t.Fatalf("Error message mismatch\nExpected contains: %q\nActual: %q",
+						tt.expectedErr, err.Error())
 				}
-				if id != tt.expectedID {
-					t.Errorf("Expected ID %d, got %d", tt.expectedID, id)
-				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if id != tt.expectedID {
+				t.Fatalf("ID mismatch\nExpected: %d\nActual: %d", tt.expectedID, id)
 			}
 		})
 	}

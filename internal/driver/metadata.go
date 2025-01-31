@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	metadata "github.com/linode/go-metadata"
+	"github.com/linode/linodego"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -64,6 +65,7 @@ var newKubeClient = func(ctx context.Context) (KubeClient, error) {
 // GetNodeMetadata retrieves metadata about the current node/instance.
 func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string, fileSystem filesystem.FileSystem) (Metadata, error) {
 	log := logger.GetLogger(ctx)
+	var instance *linodego.Instance
 
 	// Step 1: Attempt to create the metadata client
 	log.V(4).Info("Attempting to create metadata client")
@@ -90,7 +92,7 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 	log.V(4).Info("Attempting to read metadata from product_serial file")
 	linodeID, err := getLinodeIDFromProductSerial(ctx, fileSystem)
 	if err == nil {
-		instance, err := cloudProvider.GetInstance(ctx, linodeID)
+		instance, err = cloudProvider.GetInstance(ctx, linodeID)
 		if err != nil {
 			log.Error(err, "Failed to get instance details from cloud provider")
 		} else {
@@ -146,7 +148,7 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 		return Metadata{}, fmt.Errorf("failed to parse Linode ID from provider ID: %w", err)
 	}
 
-	instance, err := cloudProvider.GetInstance(ctx, linodeID)
+	instance, err = cloudProvider.GetInstance(ctx, linodeID)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get instance details: %w", err)
 	}
@@ -229,7 +231,12 @@ func getLinodeIDFromProductSerial(ctx context.Context, fs filesystem.FileSystem)
 	if err != nil {
 		return 0, fmt.Errorf("failed to open product_serial file: %w", err)
 	}
-	defer file.Close()
+
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			log.Error(closeErr, "Failed to close product_serial file")
+		}
+	}()
 
 	buf := make([]byte, 64)
 	n, err := file.Read(buf)
