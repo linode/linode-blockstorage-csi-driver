@@ -36,7 +36,6 @@ jobs:
       - name: Install cryptsetup
         run: |
           sudo apt-get update
-          sudo apt-get install -f
           sudo apt install libcryptsetup12 libcryptsetup-dev
       - uses: actions/checkout@v4
         with:
@@ -75,7 +74,6 @@ jobs:
       - name: Install cryptsetup
         run: |
           sudo apt-get update
-          sudo apt-get install -f
           sudo apt install libcryptsetup12 libcryptsetup-dev
       - uses: actions/checkout@v4
         with:
