@@ -16,7 +16,6 @@ limitations under the License.
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -281,6 +280,12 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeCapability := req.GetVolumeCapability()
+	volumeID := req.GetVolumeId()
+
+	volumeName, err := ns.getMountSource(ctx, volumeID)
+	if err != nil {
+		return errInternal("Failed to get volume name: %v", err)
+	}
 
 	// Retrieve the file system type and mount options from the volume capability
 	fsType, mountOptions := getFSTypeAndMountOptions(ctx, volumeCapability)
@@ -290,8 +295,8 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 	// Check if LUKS encryption is enabled and prepare the LUKS volume if needed
 	luksContext := getLuksContext(req.GetSecrets(), req.GetVolumeContext(), VolumeLifecycleNodeStageVolume)
 	if luksContext.EncryptionEnabled {
-		var err error
 		log.V(4).Info("preparing luks volume", "devicePath", devicePath)
+		luksContext.VolumeName = volumeName
 		fmtAndMountSource, err = ns.formatLUKSVolume(ctx, devicePath, &luksContext)
 		if err != nil {
 			return err
@@ -324,35 +329,20 @@ func (ns *NodeServer) formatLUKSVolume(ctx context.Context, devicePath string, l
 		return "", errInternal("Failed to validate blkid (%q): %v", devicePath, err)
 	}
 
+	// Validate the LUKS context.
+	if err = luksContext.validate(); err != nil {
+		return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
+	}
+
 	// If device is not formatted, format it
 	if !formatted {
 		log.V(4).Info("luks volume not yet formated... Attempting to format", "devicePath", devicePath)
-
-		// Validate the LUKS context.
-		if err = luksContext.validate(); err != nil {
-			return "", errInternal("Failed to luks format validation (%q): %v", devicePath, err)
-		}
 
 		// Format the volume with LUKS encryption.
 		if luksSource, err = ns.encrypt.luksFormat(ctx, luksContext, devicePath); err != nil {
 			return "", errInternal("Failed to luks format (%q): %v", devicePath, err)
 		}
 	} else {
-		// Validate the LUKS context except the volume name.
-		var err error
-		if luksContext.EncryptionKey == "" {
-			err = errors.Join(err, errors.New("no encryption key provided"))
-		}
-		if luksContext.EncryptionCipher == "" {
-			err = errors.Join(err, errors.New("no encryption cipher provided"))
-		}
-		if luksContext.EncryptionKeySize == "" {
-			err = errors.Join(err, errors.New("no encryption key size provided"))
-		}
-		if err != nil {
-			return "", errInternal("invalid LUKS context: %v (device: %q)", err, devicePath)
-		}
-
 		// If device is already formatted, perform a luks open and activation to use volume
 		if luksSource, err = ns.encrypt.luksOpen(ctx, luksContext, devicePath); err != nil {
 			return "", errInternal("Failed to luks open (%q): %v", devicePath, err)
