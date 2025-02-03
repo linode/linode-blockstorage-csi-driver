@@ -263,31 +263,6 @@ subjects:
   name: csi-controller-sa
   namespace: kube-system
 ---
-apiVersion: v1
-data:
-  get-linode-id.sh: |-
-    #!/bin/bash -efu
-    id="$(kubectl get node/"${NODE_NAME}" -o jsonpath='{.spec.providerID}')"
-    if [[ ! -z "${id}" ]]; then
-      echo "${id}"
-      if [[  "${id}" =~ "linode://" ]]; then
-        echo -n "${id:9}" > /linode-info/linode-id
-      else
-        echo "Provider ID: ${id} does not have linode:// prefix."
-        echo "Not populating /linode-info/linode-id file"
-      fi
-      exit 0
-    fi
-    echo "Provider ID not found"
-    # Exit here so that we wait for the CCM to initialize the provider ID
-    exit 1
-kind: ConfigMap
-metadata:
-  labels:
-    app: csi-linode
-  name: get-linode-id
-  namespace: kube-system
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -369,28 +344,8 @@ spec:
         image: linode/linode-blockstorage-csi-driver:latest
         name: csi-linode-plugin
         volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
-      initContainers:
-      - command:
-        - /scripts/get-linode-id.sh
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: spec.nodeName
-        image: bitnami/kubectl:1.16.3-debian-10-r36
-        name: init
-        volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
       serviceAccount: csi-controller-sa
       tolerations:
       - effect: NoSchedule
@@ -402,8 +357,6 @@ spec:
       volumes:
       - emptyDir: {}
         name: socket-dir
-      - emptyDir: {}
-        name: linode-info
       - configMap:
           defaultMode: 493
           name: get-linode-id
@@ -473,10 +426,6 @@ spec:
             - SYS_ADMIN
           privileged: true
         volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
         - mountPath: /csi
           name: plugin-dir
         - mountPath: /var/lib/kubelet
@@ -487,21 +436,6 @@ spec:
         - mountPath: /tmp
           name: tmp
       hostNetwork: true
-      initContainers:
-      - command:
-        - /scripts/get-linode-id.sh
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        image: bitnami/kubectl:1.16.3-debian-10-r36
-        name: init
-        volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
       priorityClassName: system-node-critical
       serviceAccount: csi-node-sa
       tolerations:
@@ -512,12 +446,6 @@ spec:
       - effect: NoExecute
         operator: Exists
       volumes:
-      - emptyDir: {}
-        name: linode-info
-      - configMap:
-          defaultMode: 493
-          name: get-linode-id
-        name: get-linode-id
       - hostPath:
           path: /var/lib/kubelet/plugins_registry/
           type: DirectoryOrCreate

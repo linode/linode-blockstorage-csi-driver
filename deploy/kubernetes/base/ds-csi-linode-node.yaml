@@ -17,21 +17,6 @@ spec:
     spec:
       priorityClassName: system-node-critical
       serviceAccount: csi-node-sa
-      initContainers:
-        - name: init
-          image: bitnami/kubectl:1.16.3-debian-10-r36
-          command:
-            - /scripts/get-linode-id.sh
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-          - name: linode-info
-            mountPath: /linode-info
-          - name: get-linode-id
-            mountPath: /scripts
       hostNetwork: true
       containers:
         - name: csi-node-driver-registrar
@@ -79,10 +64,6 @@ spec:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
           volumeMounts:
-            - name: linode-info
-              mountPath: /linode-info
-            - name: get-linode-id
-              mountPath: /scripts
             - name: plugin-dir
               mountPath: /csi
             - name: pods-mount-dir
@@ -95,12 +76,6 @@ spec:
             - mountPath: /tmp
               name: tmp
       volumes:
-        - name: linode-info
-          emptyDir: {}
-        - name: get-linode-id
-          configMap:
-            name: get-linode-id
-            defaultMode: 493
         - name: registration-dir
           hostPath:
             path: /var/lib/kubelet/plugins_registry/

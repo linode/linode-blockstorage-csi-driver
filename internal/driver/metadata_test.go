@@ -3,18 +3,17 @@ package driver
 import (
 	"context"
 	"errors"
-	"io"
-	"io/fs"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	metadata "github.com/linode/go-metadata"
 	"github.com/linode/linodego"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
-	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 )
 
 func TestMemoryToBytes(t *testing.T) {
@@ -34,27 +33,6 @@ func TestMemoryToBytes(t *testing.T) {
 		if got := memoryToBytes(tt.input); tt.want != got {
 			t.Errorf("%d: want=%d got=%d", tt.input, tt.want, got)
 		}
-	}
-}
-
-func TestGetMetadataFromAPINilCheck(t *testing.T) {
-	// Make sure GetMetadataFromAPI fails when it's given a nil client.
-	t.Run("NilClient", func(t *testing.T) {
-		_, err := GetMetadataFromAPI(context.Background(), nil, filesystem.OSFileSystem{})
-		if err == nil {
-			t.Fatal("should have failed")
-		}
-		if !errors.Is(err, errNilClient) {
-			t.Errorf("wrong error returned\n\twanted=%q\n\tgot=%q", errNilClient, err)
-		}
-	})
-
-	// GetMetadataFromAPI depends on the LinodeIDPath file to exist, so we
-	// should skip the rest of this test if it cannot be found.
-	if _, err := os.Stat(LinodeIDPath); errors.Is(err, fs.ErrNotExist) {
-		t.Skipf("%s does not exist", LinodeIDPath)
-	} else if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -135,159 +113,23 @@ func TestGetMetadata(t *testing.T) {
 	}
 }
 
-func TestGetMetadataFromAPI(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockFS := mocks.NewMockFileSystem(ctrl)
-	mockFile := mocks.NewMockFileInterface(ctrl)
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-
-	tests := []struct {
-		name    string
-		setup   func(*mocks.MockLinodeClient, *mocks.MockFileSystem, *mocks.MockFileInterface)
-		want    Metadata
-		wantErr bool
-	}{
-		{
-			name: "Happy path",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				fs.EXPECT().Open(LinodeIDPath).Return(file, nil)
-				file.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "12345"), io.EOF
-				})
-				file.EXPECT().Close().Return(nil)
-				client.EXPECT().GetInstance(gomock.Any(), 12345).Return(&linodego.Instance{
-					ID:     12345,
-					Label:  "test-instance",
-					Region: "us-east",
-					Specs:  &linodego.InstanceSpec{Memory: 2048},
-				}, nil)
-			},
-			want: Metadata{
-				ID:     12345,
-				Label:  "test-instance",
-				Region: "us-east",
-				Memory: 2048 << 20,
-			},
-			wantErr: false,
-		},
-		{
-			name: "Stat error",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, errors.New("stat error"))
-			},
-			want:    Metadata{},
-			wantErr: true,
-		},
-		{
-			name: "Open file error",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				fs.EXPECT().Open(LinodeIDPath).Return(nil, errors.New("open error"))
-			},
-			want:    Metadata{},
-			wantErr: true,
-		},
-		{
-			name: "Read error",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				fs.EXPECT().Open(LinodeIDPath).Return(file, nil)
-				file.EXPECT().Read(gomock.Any()).Return(0, errors.New("read error"))
-				file.EXPECT().Close().Return(nil)
-			},
-			want:    Metadata{},
-			wantErr: true,
-		},
-		{
-			name: "Invalid Linode ID",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				fs.EXPECT().Open(LinodeIDPath).Return(file, nil)
-				file.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "invalid"), io.EOF
-				})
-				file.EXPECT().Close().Return(nil)
-			},
-			want:    Metadata{},
-			wantErr: true,
-		},
-		{
-			name: "GetInstance error",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				fs.EXPECT().Open(LinodeIDPath).Return(file, nil)
-				file.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "12345"), io.EOF
-				})
-				file.EXPECT().Close().Return(nil)
-				client.EXPECT().GetInstance(gomock.Any(), 12345).Return(nil, errors.New("API error"))
-			},
-			want:    Metadata{},
-			wantErr: true,
-		},
-		{
-			name: "Minimum memory handling",
-			setup: func(client *mocks.MockLinodeClient, fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
-				fs.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				fs.EXPECT().Open(LinodeIDPath).Return(file, nil)
-				file.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "12345"), io.EOF
-				})
-				file.EXPECT().Close().Return(nil)
-				client.EXPECT().GetInstance(gomock.Any(), 12345).Return(&linodego.Instance{
-					ID:     12345,
-					Label:  "small-instance",
-					Region: "us-west",
-					Specs:  &linodego.InstanceSpec{Memory: 512},
-				}, nil)
-			},
-			want: Metadata{
-				ID:     12345,
-				Label:  "small-instance",
-				Region: "us-west",
-				Memory: minMemory,
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.setup(mockClient, mockFS, mockFile)
-
-			got, err := GetMetadataFromAPI(context.Background(), mockClient, mockFS)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetMetadataFromAPI() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetMetadataFromAPI() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestGetNodeMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockCloudProvider := mocks.NewMockLinodeClient(ctrl)
-	mockFileSystem := mocks.NewMockFileSystem(ctrl)
 	mockMetadataClient := mocks.NewMockMetadataClient(ctrl)
 
 	tests := []struct {
 		name               string
-		setupMocks         func()
+		setupMocks         func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem)
 		expectedMetadata   Metadata
 		expectedErr        string
 		metadataClientFunc func(context.Context) (MetadataClient, error)
+		nodeName           string
 	}{
 		{
 			name: "Successful retrieval from metadata service",
-			setupMocks: func() {
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
 				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(&metadata.InstanceData{
 					ID:     123,
 					Label:  "test-instance",
@@ -306,17 +148,17 @@ func TestGetNodeMetadata(t *testing.T) {
 			metadataClientFunc: func(context.Context) (MetadataClient, error) {
 				return mockMetadataClient, nil
 			},
+			nodeName: "test-node",
 		},
 		{
-			name: "Failure to create metadata client, successful retrieval from API",
-			setupMocks: func() {
-				mockFile := mocks.NewMockFileInterface(ctrl)
-				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				mockFileSystem.EXPECT().Open(LinodeIDPath).Return(mockFile, nil)
-				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "456"), io.EOF
-				})
-				mockFile.EXPECT().Close().Return(nil)
+			name: "Failure to create metadata client, successful retrieval from kube API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode://456",
+					},
+				}, nil).Times(1)
 				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(456)).Return(&linodego.Instance{
 					ID:     456,
 					Label:  "api-instance",
@@ -333,20 +175,18 @@ func TestGetNodeMetadata(t *testing.T) {
 			metadataClientFunc: func(context.Context) (MetadataClient, error) {
 				return nil, errors.New("failed to create metadata client")
 			},
+			nodeName: "test-node",
 		},
 		{
-			name: "Failure from metadata service, successful retrieval from API",
-			setupMocks: func() {
+			name: "Failure from metadata service & product_serial file, successful retrieval from kube API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
 				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
-
-				mockFile := mocks.NewMockFileInterface(ctrl)
-				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, nil)
-				mockFileSystem.EXPECT().Open(LinodeIDPath).Return(mockFile, nil)
-				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(p []byte) (int, error) {
-					return copy(p, "789"), io.EOF
-				})
-				mockFile.EXPECT().Close().Return(nil)
-
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode://789",
+					},
+				}, nil).Times(1)
 				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(789)).Return(&linodego.Instance{
 					ID:     789,
 					Label:  "fallback-instance",
@@ -363,32 +203,181 @@ func TestGetNodeMetadata(t *testing.T) {
 			metadataClientFunc: func(context.Context) (MetadataClient, error) {
 				return mockMetadataClient, nil
 			},
+			nodeName: "test-node",
 		},
 		{
-			name: "Failure from both metadata service and API",
-			setupMocks: func() {
+			name: "Failure from metadata service & product_serial file, successful retrieval from kube API but no provider ID found",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
 				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
-				mockFileSystem.EXPECT().Stat(LinodeIDPath).Return(nil, errors.New("file not found"))
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "",
+					},
+				}, nil).Times(1)
 			},
-			expectedErr: "failed to get metadata from API: stat /linode-info/linode-id: file not found",
+			expectedMetadata: Metadata{},
 			metadataClientFunc: func(context.Context) (MetadataClient, error) {
 				return mockMetadataClient, nil
 			},
+			nodeName:    "test-node",
+			expectedErr: "provider ID not found for node test-node",
+		},
+		{
+			name: "Successful retrieval from Kubernetes API but unsuccessful retrieval from Linode API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode://789",
+					},
+				}, nil).Times(1)
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(789)).Return(nil, errors.New("linode API error"))
+			},
+			expectedMetadata: Metadata{
+				ID:     789,
+				Label:  "fallback-instance",
+				Region: "ap-south",
+				Memory: 8 << 30, // 8 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			expectedErr: "failed to get instance details: linode API error",
+			nodeName:    "test-node",
+		},
+		{
+			name: "Successful retrieval from Kubernetes API, but invalid provider id string format",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linode:///789",
+					},
+				}, nil).Times(1)
+			},
+			expectedMetadata: Metadata{
+				ID:     789,
+				Label:  "fallback-instance",
+				Region: "ap-south",
+				Memory: 8 << 30, // 8 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			expectedErr: "failed to parse Linode ID from provider ID: strconv.Atoi: parsing \"/789\": invalid syntax",
+			nodeName:    "test-node",
+		},
+		{
+			name: "Successful retrieval from Kubernetes API, but invalid provider id string format",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{
+						ProviderID: "linde://789",
+					},
+				}, nil).Times(1)
+			},
+			expectedMetadata: Metadata{
+				ID:     789,
+				Label:  "fallback-instance",
+				Region: "ap-south",
+				Memory: 8 << 30, // 8 GB
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			expectedErr: "invalid provider ID format: linde://789",
+			nodeName:    "test-node",
+		},
+		{
+			name: "Failure from both metadata service, product_serial file, and kube API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(nil, errors.New("kube client error"))
+			},
+			expectedErr: "failed to get node test-node: kube client error",
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			nodeName: "test-node",
+		},
+		{
+			name: "Failure for metadata service and no node name provided",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+			},
+			expectedErr: "NODE_NAME environment variable not set",
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			nodeName: "",
+		},
+		{
+			name: "Fallback to product_serial after metadata service failure",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFS *mocks.MockFileSystem) {
+				// Metadata service failure
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).Return(nil, errors.New("metadata service error"))
+
+				// Successful product_serial read
+				mockFile := mocks.NewMockFileInterface(ctrl)
+				mockFS.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(mockFile, nil)
+				mockFile.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+					copy(b, "654321")
+					return 6, nil
+				})
+				mockFile.EXPECT().Close().Return(nil)
+
+				// Cloud provider returns instance
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), 654321).Return(&linodego.Instance{
+					ID:     654321,
+					Label:  "serial-instance",
+					Region: "us-central",
+					Specs:  &linodego.InstanceSpec{Memory: 4096},
+				}, nil)
+			},
+			expectedMetadata: Metadata{
+				ID:     654321,
+				Label:  "serial-instance",
+				Region: "us-central",
+				Memory: 4 << 30,
+			},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			nodeName: "test-node",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockKubeClient := mocks.NewMockKubeClient(ctrl)
+			mockCloudProvider := mocks.NewMockLinodeClient(ctrl)
+			mockFileSystem := mocks.NewMockFileSystem(ctrl)
 			// Setup mocks
-			tt.setupMocks()
+			tt.setupMocks(mockKubeClient, mockCloudProvider, mockFileSystem)
 
 			// Override the metadata.NewClient function for testing
 			oldNewClient := NewMetadataClient
+			oldNewKubeClient := newKubeClient
+
 			NewMetadataClient = tt.metadataClientFunc
-			defer func() { NewMetadataClient = oldNewClient }()
+			newKubeClient = func(ctx context.Context) (KubeClient, error) {
+				return mockKubeClient, nil
+			}
+
+			defer func() {
+				NewMetadataClient = oldNewClient
+				newKubeClient = oldNewKubeClient
+			}()
 
 			// Execute the function under test
-			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, mockFileSystem)
+			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, tt.nodeName, mockFileSystem)
 
 			// Check results
 			if tt.expectedErr != "" {
@@ -402,6 +391,99 @@ func TestGetNodeMetadata(t *testing.T) {
 				if !reflect.DeepEqual(tt.expectedMetadata, nodeMetadata) {
 					t.Errorf("Expected metadata: %+v, got: %+v", tt.expectedMetadata, nodeMetadata)
 				}
+			}
+		})
+	}
+}
+
+func TestGetLinodeIDFromProductSerial(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		setup       func(*mocks.MockFileSystem, *mocks.MockFileInterface)
+		expectedID  int
+		expectedErr string
+	}{
+		{
+			name: "Successfully read valid ID",
+			setup: func(fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
+				fs.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(file, nil)
+				file.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+					copy(b, "123456\n")
+					return 7, nil
+				})
+				file.EXPECT().Close().Return(nil)
+			},
+			expectedID: 123456,
+		},
+		{
+			name: "File not found",
+			setup: func(fs *mocks.MockFileSystem, _ *mocks.MockFileInterface) {
+				fs.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").
+					Return(nil, os.ErrNotExist)
+			},
+			expectedErr: "failed to open product_serial file: file does not exist",
+		},
+		{
+			name: "Read error",
+			setup: func(fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
+				fs.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(file, nil)
+				file.EXPECT().Read(gomock.Any()).Return(0, errors.New("read error"))
+				file.EXPECT().Close().Return(nil)
+			},
+			expectedErr: "failed to read product_serial file: read error",
+		},
+		{
+			name: "Invalid ID format",
+			setup: func(fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
+				fs.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(file, nil)
+				file.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+					copy(b, "invalid_id")
+					return 10, nil
+				})
+				file.EXPECT().Close().Return(nil)
+			},
+			expectedErr: "invalid linode ID format in product_serial: strconv.Atoi: parsing \"invalid_id\": invalid syntax",
+		},
+		{
+			name: "Empty file content",
+			setup: func(fs *mocks.MockFileSystem, file *mocks.MockFileInterface) {
+				fs.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(file, nil)
+				file.EXPECT().Read(gomock.Any()).Return(0, nil)
+				file.EXPECT().Close().Return(nil)
+			},
+			expectedErr: "invalid linode ID format in product_serial: strconv.Atoi: parsing \"\": invalid syntax",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockFS := mocks.NewMockFileSystem(ctrl)
+			mockFile := mocks.NewMockFileInterface(ctrl)
+			tt.setup(mockFS, mockFile)
+
+			id, err := getLinodeIDFromProductSerial(ctx, mockFS)
+
+			if tt.expectedErr != "" {
+				if err == nil {
+					t.Fatal("Expected error but got nil")
+				}
+				if !strings.Contains(err.Error(), tt.expectedErr) {
+					t.Fatalf("Error message mismatch\nExpected contains: %q\nActual: %q",
+						tt.expectedErr, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if id != tt.expectedID {
+				t.Fatalf("ID mismatch\nExpected: %d\nActual: %d", tt.expectedID, id)
 			}
 		})
 	}

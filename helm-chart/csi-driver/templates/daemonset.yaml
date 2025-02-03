@@ -69,10 +69,6 @@ spec:
             - SYS_ADMIN
           privileged: true
         volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
         - mountPath: /csi
           name: plugin-dir
         - mountPath: {{ .Values.csiLinodePlugin.podsMountDir }}
@@ -86,29 +82,6 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       hostNetwork: true
-      initContainers:
-      - command:
-        - /scripts/get-linode-id.sh
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
-        securityContext:
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-            - SYS_ADMIN
-          privileged: true
-        name: init
-        volumeMounts:
-        - mountPath: /dev
-          name: device-dir
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
       priorityClassName: system-node-critical
       serviceAccount: csi-node-sa
       tolerations:
@@ -119,12 +92,6 @@ spec:
       - effect: NoExecute
         operator: Exists
       volumes:
-      - emptyDir: {}
-        name: linode-info
-      - configMap:
-          defaultMode: 493
-          name: get-linode-id
-        name: get-linode-id
       - hostPath:
           path: /var/lib/kubelet/plugins_registry/
           type: DirectoryOrCreate
