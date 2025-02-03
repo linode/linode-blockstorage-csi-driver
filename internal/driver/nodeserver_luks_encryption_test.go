@@ -33,7 +33,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Success - mount LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: "123-test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -74,7 +74,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Success - already formatted",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: "123-test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -114,7 +114,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to initialize LUKS volume by path",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: "123-test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -138,7 +138,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to format LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: "123-test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -166,7 +166,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to add keyslot to LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: "123-test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -195,7 +195,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to activate LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: "123-test",
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
