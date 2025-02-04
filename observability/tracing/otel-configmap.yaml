@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: kube-system
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: "0.0.0.0:4318"
+
+    processors:
+      batch:
+
+    exporters:
+      otlphttp:
+        endpoint: "http://localhost:4318"
+      
+      debug:
+        verbosity: detailed
+
+      zipkin:
+        endpoint: "http://jaeger-collector.kube-system.svc.cluster.local:9411/api/v2/spans" # Zipkin-compatible endpoint
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlphttp, debug, zipkin]

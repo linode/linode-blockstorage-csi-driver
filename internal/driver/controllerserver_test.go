@@ -113,7 +113,7 @@ func TestCreateVolume(t *testing.T) {
 				driver: ns.driver,
 			}
 			returnedResp, err := s.CreateVolume(context.Background(), tt.req)
-			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+			if err != nil && !errors.Is(err, tt.expectedError) {
 				t.Errorf("CreateVolume error = %v, wantErr %v", err, tt.expectedError)
 			} else if returnedResp.GetVolume() != nil && tt.resp.GetVolume() != nil {
 				if returnedResp.GetVolume().GetCapacityBytes() != tt.resp.GetVolume().GetCapacityBytes() {
@@ -468,15 +468,17 @@ func TestListVolumes(t *testing.T) {
 					Region:   "danmaaag",
 					Size:     30,
 					LinodeID: createLinodeID(10),
+					Status:   linodego.VolumeActive,
 				},
 			},
 		},
 		"volume not attached": {
 			volumes: []linodego.Volume{
 				{
-					ID:    1,
-					Label: "bar",
-					Size:  30,
+					ID:     1,
+					Label:  "bar",
+					Size:   30,
+					Status: linodego.VolumeActive,
 				},
 			},
 		},
@@ -487,12 +489,14 @@ func TestListVolumes(t *testing.T) {
 					Label:    "foo",
 					Size:     30,
 					LinodeID: createLinodeID(5),
+					Status:   linodego.VolumeActive,
 				},
 				{
 					ID:       2,
 					Label:    "foo",
 					Size:     60,
 					LinodeID: createLinodeID(10),
+					Status:   linodego.VolumeActive,
 				},
 			},
 		},
@@ -503,11 +507,13 @@ func TestListVolumes(t *testing.T) {
 					Label:    "foo",
 					Size:     30,
 					LinodeID: createLinodeID(5),
+					Status:   linodego.VolumeActive,
 				},
 				{
-					ID:    2,
-					Label: "foo",
-					Size:  30,
+					ID:     2,
+					Label:  "foo",
+					Size:   30,
+					Status: linodego.VolumeActive,
 				},
 			},
 		},
@@ -840,6 +846,202 @@ func TestControllerMaxVolumeAttachments(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("got=%d want=%d", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getVolumeResponse(t *testing.T) {
+	type args struct {
+		volume *linodego.Volume
+	}
+	tests := []struct {
+		name                 string
+		args                 args
+		wantCsiVolume        *csi.Volume
+		wantPublishedNodeIds []string
+		wantVolumeCondition  *csi.VolumeCondition
+	}{
+		{
+			name: "volume attached to node",
+			args: args{
+				volume: &linodego.Volume{
+					ID:       1,
+					Label:    "foo",
+					Region:   "danmaaag",
+					Size:     30,
+					LinodeID: createLinodeID(10),
+					Status:   linodego.VolumeActive,
+				},
+			},
+			wantCsiVolume: &csi.Volume{
+				VolumeId:      "1-foo",
+				CapacityBytes: 30 << 30,
+				AccessibleTopology: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "danmaaag",
+						},
+					},
+				},
+			},
+			wantPublishedNodeIds: []string{"10"},
+			wantVolumeCondition: &csi.VolumeCondition{
+				Abnormal: false,
+				Message:  "active",
+			},
+		},
+		{
+			name: "volume not attached",
+			args: args{
+				volume: &linodego.Volume{
+					ID:     1,
+					Label:  "bar",
+					Size:   30,
+					Status: linodego.VolumeActive,
+				},
+			},
+			wantCsiVolume: &csi.Volume{
+				VolumeId:      "1-bar",
+				CapacityBytes: 30 << 30,
+			},
+			wantPublishedNodeIds: []string{},
+			wantVolumeCondition: &csi.VolumeCondition{
+				Abnormal: false,
+				Message:  "active",
+			},
+		},
+		{
+			name: "volume attached with abnormal status",
+			args: args{
+				volume: &linodego.Volume{
+					ID:       1,
+					Label:    "foo",
+					Region:   "danmaaag",
+					Size:     30,
+					LinodeID: createLinodeID(10),
+					Status:   linodego.VolumeContactSupport,
+				},
+			},
+			wantCsiVolume: &csi.Volume{
+				VolumeId:      "1-foo",
+				CapacityBytes: 30 << 30,
+				AccessibleTopology: []*csi.Topology{
+					{
+						Segments: map[string]string{
+							VolumeTopologyRegion: "danmaaag",
+						},
+					},
+				},
+			},
+			wantPublishedNodeIds: []string{"10"},
+			wantVolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  "contact_support",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCsiVolume, gotPublishedNodeIds, gotVolumeCondition := getVolumeResponse(tt.args.volume)
+			if !reflect.DeepEqual(gotCsiVolume, tt.wantCsiVolume) {
+				t.Errorf("getVolumeResponse() gotCsiVolume = %v, want %v", gotCsiVolume, tt.wantCsiVolume)
+			}
+			if !reflect.DeepEqual(gotPublishedNodeIds, tt.wantPublishedNodeIds) {
+				t.Errorf("getVolumeResponse() gotPublishedNodeIds = %v, want %v", gotPublishedNodeIds, tt.wantPublishedNodeIds)
+			}
+			if !reflect.DeepEqual(gotVolumeCondition, tt.wantVolumeCondition) {
+				t.Errorf("getVolumeResponse() gotVolumeCondition = %v, want %v", gotVolumeCondition, tt.wantVolumeCondition)
+			}
+		})
+	}
+}
+func TestControllerGetVolume(t *testing.T) {
+	tests := []struct {
+		name                    string
+		req                     *csi.ControllerGetVolumeRequest
+		resp                    *csi.ControllerGetVolumeResponse
+		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		expectedError           error
+	}{
+		{
+			name: "volume exists",
+			req: &csi.ControllerGetVolumeRequest{
+				VolumeId: "1001",
+			},
+			resp: &csi.ControllerGetVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      "1001-foo",
+					CapacityBytes: 30 << 30,
+					AccessibleTopology: []*csi.Topology{
+						{
+							Segments: map[string]string{
+								VolumeTopologyRegion: "us-east",
+							},
+						},
+					},
+				},
+				Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+					PublishedNodeIds: []string{"10"},
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: false,
+						Message:  "active",
+					},
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), 597150807).Return(&linodego.Volume{
+					ID:       1001,
+					Label:    "foo",
+					Region:   "us-east",
+					Size:     30,
+					LinodeID: createLinodeID(10),
+					Status:   linodego.VolumeActive,
+				}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "volume not found",
+			req: &csi.ControllerGetVolumeRequest{
+				VolumeId: "1002",
+			},
+			resp: &csi.ControllerGetVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), 613928426).Return(nil, &linodego.Error{Code: 404})
+			},
+			expectedError: errVolumeNotFound(613928426),
+		},
+		{
+			name: "internal error",
+			req: &csi.ControllerGetVolumeRequest{
+				VolumeId: "1003",
+			},
+			resp: &csi.ControllerGetVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), 630706045).Return(nil, fmt.Errorf("internal error"))
+			},
+			expectedError: errInternal("get volume: %v", fmt.Errorf("internal error")),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			if tt.expectLinodeClientCalls != nil {
+				tt.expectLinodeClientCalls(mockClient)
+			}
+
+			cs := &ControllerServer{
+				client: mockClient,
+			}
+			resp, err := cs.ControllerGetVolume(context.Background(), tt.req)
+			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+				t.Errorf("ControllerGetVolume error = %v, wantErr %v", err, tt.expectedError)
+			} else if !reflect.DeepEqual(resp, tt.resp) {
+				t.Errorf("ControllerGetVolume response = %v, want %v", resp, tt.resp)
 			}
 		})
 	}

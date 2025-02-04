@@ -91,7 +91,7 @@ spec:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
             - name: LINODE_URL
-              value: https://api.linode.com/v4
+              value: https://api.linode.com
             - name: LINODE_VOLUME_LABEL_PREFIX
               value: {{ .Values.volumeLabelPrefix | default "" | quote }}
             - name: NODE_NAME
@@ -108,40 +108,22 @@ spec:
               value: {{ .Values.enableMetrics | quote}}
             - name: METRICS_PORT
               value: {{ .Values.metricsPort | quote}}
+            - name: OTEL_TRACING
+              value: {{.Values.enableTracing | quote}}
+            - name: OTEL_TRACING_PORT
+              value: {{.Values.tracingPort | quote}}
+            {{- with .Values.csiLinodePlugin.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
           name: csi-linode-plugin
           volumeMounts:
-            - mountPath: /linode-info
-              name: linode-info
-            - mountPath: /scripts
-              name: get-linode-id
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
-      initContainers:
-        - command:
-            - /scripts/get-linode-id.sh
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
-          image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
-          securityContext:
-            allowPrivilegeEscalation: true
-            capabilities:
-              add:
-                - SYS_ADMIN
-            privileged: true
-          name: init
-          volumeMounts:
-            - mountPath: /dev
-              name: dev
-            - mountPath: /linode-info
-              name: linode-info
-            - mountPath: /scripts
-              name: get-linode-id
+            {{- with .Values.csiLinodePlugin.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       serviceAccount: csi-controller-sa
       tolerations:
         - effect: NoSchedule
@@ -153,8 +135,6 @@ spec:
       volumes:
         - emptyDir: {}
           name: socket-dir
-        - emptyDir: {}
-          name: linode-info
         - configMap:
             defaultMode: 493
             name: get-linode-id
@@ -163,3 +143,6 @@ spec:
             path: /dev
             type: Directory
           name: dev
+        {{- with .Values.csiLinodePlugin.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}

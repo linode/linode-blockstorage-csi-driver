@@ -2,9 +2,6 @@ package linodeclient
 
 import (
 	"context"
-	"fmt"
-	"net/url"
-	"strings"
 
 	"github.com/linode/linodego"
 )
@@ -37,46 +34,12 @@ type LinodeClient interface {
 func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
 	// Use linodego built-in http client which supports setting root CA cert
 	linodeClient := linodego.NewClient(nil)
-	linodeClient.SetUserAgent(ua)
-	linodeClient.SetToken(token)
-
-	if apiURL != "" {
-		host, version, err := getAPIURLComponents(apiURL)
-		if err != nil {
-			return nil, err
-		}
-
-		linodeClient.SetBaseURL(host)
-
-		if version != "" {
-			linodeClient.SetAPIVersion(version)
-		}
-	}
-
-	return &linodeClient, nil
-}
-
-// getAPIURLComponents returns the API URL components (base URL, api version) given an input URL.
-// This is necessary due to some recent changes with how linodego handles
-// client.SetBaseURL(...) and client.SetAPIVersion(...)
-func getAPIURLComponents(apiURL string) (host, version string, err error) {
-	urlObj, err := url.Parse(apiURL)
+	client, err := linodeClient.UseURL(apiURL)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
+	client.SetUserAgent(ua)
+	client.SetToken(token)
 
-	version = ""
-	host = fmt.Sprintf("%s://%s", urlObj.Scheme, urlObj.Host)
-
-	// Check if the URL path is not empty
-	if strings.TrimPrefix(urlObj.Path, "/") != "" {
-		// Split the path into segments
-		pathSegments := strings.Split(strings.TrimPrefix(urlObj.Path, "/"), "/")
-		// If there are any segments, the first one is the API version
-		if len(pathSegments) > 0 {
-			version = pathSegments[0]
-		}
-	}
-
-	return host, version, nil
+	return client, nil
 }

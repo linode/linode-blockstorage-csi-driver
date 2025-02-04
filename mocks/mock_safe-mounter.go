@@ -23,7 +23,6 @@ import (
 type MockMounter struct {
 	ctrl     *gomock.Controller
 	recorder *MockMounterMockRecorder
-	isgomock struct{}
 }
 
 // MockMounterMockRecorder is the mock recorder for MockMounter.
@@ -191,7 +190,6 @@ func (mr *MockMounterMockRecorder) Unmount(target any) *gomock.Call {
 type MockExecutor struct {
 	ctrl     *gomock.Controller
 	recorder *MockExecutorMockRecorder
-	isgomock struct{}
 }
 
 // MockExecutorMockRecorder is the mock recorder for MockExecutor.
@@ -268,7 +266,6 @@ func (mr *MockExecutorMockRecorder) LookPath(file any) *gomock.Call {
 type MockCommand struct {
 	ctrl     *gomock.Controller
 	recorder *MockCommandMockRecorder
-	isgomock struct{}
 }
 
 // MockCommandMockRecorder is the mock recorder for MockCommand.

@@ -15,7 +15,7 @@ import (
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/metrics"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
 type ControllerServer struct {
@@ -69,7 +69,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// Validate the incoming request to ensure it meets the necessary criteria.
 	// This includes checking for required fields and valid volume capabilities.
 	if err := cs.validateCreateVolumeRequest(ctx, req); err != nil {
-		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -77,7 +77,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// This step may involve calculations or adjustments based on the request's content.
 	params, err := cs.prepareVolumeParams(ctx, req)
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -88,14 +88,14 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// This is important for scenarios where the volume is being cloned from an existing one.
 	sourceVolInfo, err := cs.getContentSourceVolume(ctx, contentSource, accessibilityRequirements)
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
 	}
 
 	// Create the volume
 	vol, err := cs.createAndWaitForVolume(ctx, params.VolumeName, req.GetParameters(), params.EncryptionStatus, params.TargetSizeGB, sourceVolInfo, params.Region)
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.CreateVolumeResponse{}, err
 	}
 
@@ -106,7 +106,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	resp := cs.prepareCreateVolumeResponse(ctx, vol, params.Size, volContext, sourceVolInfo, contentSource)
 
 	// Record function completion
-	metrics.RecordMetrics(metrics.ControllerCreateVolumeTotal, metrics.ControllerCreateVolumeDuration, metrics.Completed, functionStartTime)
+	observability.RecordMetrics(observability.ControllerCreateVolumeTotal, observability.ControllerCreateVolumeDuration, observability.Completed, functionStartTime)
 
 	log.V(2).Info("CreateVolume response", "response", resp)
 	return resp, nil
@@ -124,7 +124,7 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	functionStartTime := time.Now()
 	volID, statusErr := linodevolumes.VolumeIdAsInt("DeleteVolume", req)
 	if statusErr != nil {
-		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.DeleteVolumeResponse{}, statusErr
 	}
 
@@ -134,26 +134,26 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	log.V(4).Info("Checking if volume exists", "volume_id", volID)
 	vol, err := cs.client.GetVolume(ctx, volID)
 	if linodego.IsNotFound(err) {
-		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.DeleteVolumeResponse{}, nil
 	} else if err != nil {
-		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.DeleteVolumeResponse{}, errInternal("get volume %d: %v", volID, err)
 	}
 	if vol.LinodeID != nil {
-		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.DeleteVolumeResponse{}, errVolumeInUse
 	}
 
 	// Delete the volume
 	log.V(4).Info("Deleting volume", "volume_id", volID)
 	if err := cs.client.DeleteVolume(ctx, volID); err != nil {
-		metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.DeleteVolumeResponse{}, errInternal("delete volume %d: %v", volID, err)
 	}
 
 	// Record function completion
-	metrics.RecordMetrics(metrics.ControllerDeleteVolumeTotal, metrics.ControllerDeleteVolumeDuration, metrics.Completed, functionStartTime)
+	observability.RecordMetrics(observability.ControllerDeleteVolumeTotal, observability.ControllerDeleteVolumeDuration, observability.Completed, functionStartTime)
 
 	log.V(2).Info("Volume deleted successfully", "volume_id", volID)
 	return &csi.DeleteVolumeResponse{}, nil
@@ -174,14 +174,14 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Validate the request and get Linode ID and Volume ID
 	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
 
 	// Retrieve and validate the instance associated with the Linode ID
 	instance, err := cs.getInstance(ctx, linodeID)
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
 
@@ -189,12 +189,12 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// If the volume is already attached to the specified instance, it returns its device path.
 	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance)
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
 	// If devicePath is not empty, the volume is already attached
 	if devicePath != "" {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerPublishVolumeResponse{
 			PublishContext: map[string]string{
 				devicePathKey: devicePath,
@@ -204,13 +204,13 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	// Check if the instance can accommodate the volume attachment
 	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, capErr
 	}
 
 	// Attach the volume to the specified instance
 	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, attachErr
 	}
 
@@ -218,12 +218,12 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Wait for the volume to be successfully attached to the instance
 	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
-		metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
 
 	// Record function completion
-	metrics.RecordMetrics(metrics.ControllerPublishVolumeTotal, metrics.ControllerPublishVolumeDuration, metrics.Completed, functionStartTime)
+	observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Completed, functionStartTime)
 
 	log.V(2).Info("Volume attached successfully", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
 
@@ -252,49 +252,49 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
 	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
 	log.V(4).Info("Checking if volume is attached", "volume_id", volumeID, "node_id", linodeID)
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		log.V(4).Info("Volume not found, skipping", "volume_id", volumeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
 	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		log.V(4).Info("Volume attached to different instance, skipping", "volume_id", volumeID, "attached_node_id", *volume.LinodeID, "requested_node_id", linodeID)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
 	log.V(4).Info("Executing detach volume", "volume_id", volumeID, "node_id", linodeID)
 	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
 	}
 
 	log.V(4).Info("Waiting for volume to detach", "volume_id", volumeID, "node_id", linodeID)
 	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
-		metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Failed, functionStartTime)
+		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
 	}
 
 	// Record function completion
-	metrics.RecordMetrics(metrics.ControllerUnpublishVolumeTotal, metrics.ControllerUnpublishVolumeDuration, metrics.Completed, functionStartTime)
+	observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Completed, functionStartTime)
 
 	log.V(2).Info("Volume detached successfully", "volume_id", volumeID)
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -377,37 +377,12 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
 	for volNum := range volumes {
-		key := linodevolumes.CreateLinodeVolumeKey(volumes[volNum].ID, volumes[volNum].Label)
-
-		// If the volume is attached to a Linode instance, add it to the
-		// list. Note that in the Linode API, volumes can only be
-		// attached to a single Linode at a time. We are storing it in
-		// a []string here, since that is what the response struct
-		// returns. We do not need to pre-allocate the slice with
-		// make(), since the CSI specification says this response field
-		// is optional, and thus it should tolerate a nil slice.
-		var publishedNodeIDs []string
-		if volumes[volNum].LinodeID != nil {
-			publishedNodeIDs = append(publishedNodeIDs, strconv.Itoa(*volumes[volNum].LinodeID))
-		}
-
+		csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(&volumes[volNum])
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
-			Volume: &csi.Volume{
-				VolumeId:      key.GetVolumeKey(),
-				CapacityBytes: gbToBytes(volumes[volNum].Size),
-				AccessibleTopology: []*csi.Topology{
-					{
-						Segments: map[string]string{
-							VolumeTopologyRegion: volumes[volNum].Region,
-						},
-					},
-				},
-			},
+			Volume: csiVol,
 			Status: &csi.ListVolumesResponse_VolumeStatus{
-				PublishedNodeIds: publishedNodeIDs,
-				VolumeCondition: &csi.VolumeCondition{
-					Abnormal: false,
-				},
+				PublishedNodeIds: publishedNodeIds,
+				VolumeCondition:  volumeCondition,
 			},
 		})
 	}
@@ -492,4 +467,83 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		NodeExpansionRequired: false,
 	}
 	return resp, nil
+}
+
+// ControllerGetVolume returns information about the specified volume.
+// It checks if the volume exists and returns its ID, size, and status.
+// For more details, refer to the CSI Driver Spec documentation.
+func (cs *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerGetVolume")
+	defer done()
+
+	log.V(2).Info("Processing request", "req", req)
+
+	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerGetVolume", req)
+	if statusErr != nil {
+		return &csi.ControllerGetVolumeResponse{}, statusErr
+	}
+
+	// Get the volume
+	log.V(4).Info("Checking if volume exists", "volume_id", volumeID)
+	vol, err := cs.client.GetVolume(ctx, volumeID)
+	if linodego.IsNotFound(err) {
+		return &csi.ControllerGetVolumeResponse{}, errVolumeNotFound(volumeID)
+	} else if err != nil {
+		return &csi.ControllerGetVolumeResponse{}, errInternal("get volume: %v", err)
+	}
+
+	csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(vol)
+	resp := &csi.ControllerGetVolumeResponse{
+		Volume: csiVol,
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: publishedNodeIds,
+			VolumeCondition:  volumeCondition,
+		},
+	}
+
+	log.V(2).Info("Volume retrieved successfully", "volume_id", volumeID, "response", resp)
+	return resp, nil
+}
+
+func getVolumeResponse(volume *linodego.Volume) (csiVolume *csi.Volume, publishedNodeIds []string, volumeCondition *csi.VolumeCondition) {
+	key := linodevolumes.CreateLinodeVolumeKey(volume.ID, volume.Label)
+
+	// If the volume is attached to a Linode instance, add it to the
+	// list. Note that in the Linode API, volumes can only be
+	// attached to a single Linode at a time. We are storing it in
+	// a []string here, since that is what the response struct
+	// returns. We do not need to pre-allocate the slice with
+	// make(), since the CSI specification says this response field
+	// is optional, and thus it should tolerate a nil slice.
+	publishedNodeIds = []string{}
+	if volume.LinodeID != nil {
+		publishedNodeIds = append(publishedNodeIds, strconv.Itoa(*volume.LinodeID))
+	}
+
+	csiVolume = &csi.Volume{
+		VolumeId:      key.GetVolumeKey(),
+		CapacityBytes: gbToBytes(volume.Size),
+	}
+
+	if volume.Region != "" {
+		csiVolume.AccessibleTopology = []*csi.Topology{
+			{
+				Segments: map[string]string{
+					VolumeTopologyRegion: volume.Region,
+				},
+			},
+		}
+	}
+
+	abnormal := false
+	if volume.Status != linodego.VolumeActive {
+		abnormal = true
+	}
+
+	volumeCondition = &csi.VolumeCondition{
+		Abnormal: abnormal,
+		Message:  string(volume.Status),
+	}
+
+	return
 }

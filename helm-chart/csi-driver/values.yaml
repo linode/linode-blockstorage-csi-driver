@@ -5,11 +5,18 @@ apiToken: ""
 # region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
 
-# enable: This variable must be set to true to get metrics
+# enableMetrics: This variable must be set to true to get metrics
 enableMetrics: false
 
 # default metrics address port
 metricsPort: 8081
+
+# enableTracing: This variable must be set to true to get metrics
+enableTracing: false
+
+# default tracing address port
+tracingPort: 4318
+
 # (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""
 
@@ -61,6 +68,19 @@ csiLinodePlugin:
   tag:  # only set if required, defaults to .Chart.AppVersion set during release or "latest" by default
   pullPolicy: IfNotPresent
   podsMountDir: /var/lib/kubelet
+  # This section adds the ability to pass environment variables to adjust CSI defaults
+  env:
+  #  - name: EXAMPLE_ENV_VAR
+  #    value: "true"
+  # This section adds the ability to pass volumes to the DaemonSet
+  volumes:
+  #  - name: test-volume
+  #    emptyDir:
+  #      sizeLimit: 500Mi
+  # this section adds the ability to pass volumeMounts to the container
+  volumeMounts:
+  #  - mountPath: /tmp/
+  #    name: test-volume
 
 kubectl:
   image: alpine/k8s  # This needs to be alpine based and have both kubectl and curl installed.

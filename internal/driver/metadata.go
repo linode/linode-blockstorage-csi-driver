@@ -4,10 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
+	"strings"
 
 	metadata "github.com/linode/go-metadata"
+	"github.com/linode/linodego"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
@@ -31,12 +36,36 @@ var NewMetadataClient = func(ctx context.Context) (MetadataClient, error) {
 	return metadata.NewClient(ctx)
 }
 
+type KubeClient interface {
+	GetNode(ctx context.Context, name string) (*corev1.Node, error)
+}
+
+type kubeClient struct {
+	client kubernetes.Interface
+}
+
+func (k *kubeClient) GetNode(ctx context.Context, name string) (*corev1.Node, error) {
+	return k.client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+}
+
+var newKubeClient = func(ctx context.Context) (KubeClient, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster config: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	return &kubeClient{client: client}, nil
+}
+
 // GetNodeMetadata retrieves metadata about the current node/instance.
-// It first attempts to use the Linode Metadata Service, and if that fails,
-// it falls back to using the Linode API. This function ensures that valid
-// metadata is obtained before returning.
-func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, fileSystem filesystem.FileSystem) (Metadata, error) {
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string, fileSystem filesystem.FileSystem) (Metadata, error) {
 	log := logger.GetLogger(ctx)
+	var instance *linodego.Instance
 
 	// Step 1: Attempt to create the metadata client
 	log.V(4).Info("Attempting to create metadata client")
@@ -46,7 +75,7 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 		linodeMetadataClient = nil
 	}
 
-	// Step 2: Try to get metadata
+	// Step 2: Try to get metadata from metadata service
 	var nodeMetadata Metadata
 	if linodeMetadataClient != nil {
 		log.V(4).Info("Attempting to get metadata from metadata service")
@@ -55,19 +84,80 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 			log.Error(err, "Failed to get metadata from metadata service")
 		}
 	}
-
-	// Step 3: Fall back to API if necessary
-	if linodeMetadataClient == nil || err != nil {
-		log.V(4).Info("Falling back to API for metadata")
-		nodeMetadata, err = GetMetadataFromAPI(ctx, cloudProvider, fileSystem)
-		if err != nil {
-			return Metadata{}, fmt.Errorf("failed to get metadata from API: %w", err)
-		}
+	if nodeMetadata.ID != 0 {
+		return nodeMetadata, nil
 	}
 
-	// Step 4: Verify we have valid metadata
-	if nodeMetadata.ID == 0 {
-		return Metadata{}, errors.New("failed to obtain valid node metadata")
+	// New Step 3: Try product_serial file
+	log.V(4).Info("Attempting to read metadata from product_serial file")
+	linodeID, err := getLinodeIDFromProductSerial(ctx, fileSystem)
+	if err == nil {
+		instance, err = cloudProvider.GetInstance(ctx, linodeID)
+		if err != nil {
+			log.Error(err, "Failed to get instance details from cloud provider")
+		} else {
+			nodeMetadata = Metadata{
+				ID:     linodeID,
+				Label:  instance.Label,
+				Region: instance.Region,
+				Memory: memoryToBytes(instance.Specs.Memory),
+			}
+
+			log.V(4).Info("Successfully obtained node metadata from product_serial",
+				"ID", nodeMetadata.ID,
+				"Label", nodeMetadata.Label,
+				"Region", nodeMetadata.Region,
+				"Memory", nodeMetadata.Memory,
+			)
+			return nodeMetadata, nil
+		}
+	} else {
+		log.V(4).Info("Product_serial fallback failed", "error", err.Error())
+	}
+
+	// Step 4: Fall back to Kubernetes API
+	log.V(4).Info("Attempting to get metadata from Kubernetes API")
+	if nodeName == "" {
+		return Metadata{}, fmt.Errorf("NODE_NAME environment variable not set")
+	}
+
+	// Replace the direct k8s client creation with the new interface
+	k8sClient, err := newKubeClient(ctx)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Get node information using the interface
+	node, err := k8sClient.GetNode(ctx, nodeName)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get node %s: %w", nodeName, err)
+	}
+
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		return Metadata{}, fmt.Errorf("provider ID not found for node %s", nodeName)
+	}
+
+	// Extract Linode ID from provider ID (format: linode://12345)
+	if !strings.HasPrefix(providerID, "linode://") {
+		return Metadata{}, fmt.Errorf("invalid provider ID format: %s", providerID)
+	}
+
+	linodeID, err = strconv.Atoi(strings.TrimPrefix(providerID, "linode://"))
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse Linode ID from provider ID: %w", err)
+	}
+
+	instance, err = cloudProvider.GetInstance(ctx, linodeID)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get instance details: %w", err)
+	}
+
+	nodeMetadata = Metadata{
+		ID:     linodeID,
+		Label:  instance.Label,
+		Region: instance.Region,
+		Memory: memoryToBytes(instance.Specs.Memory),
 	}
 
 	log.V(4).Info("Successfully obtained node metadata",
@@ -130,78 +220,36 @@ func memoryToBytes(sizeMB int) uint {
 // Linode instance type.
 const minMemory uint = 1 << 30
 
-// LinodeIDPath is the path to a file containing only the ID of the Linode
-// instance the CSI node plugin is currently running on.
-// This file is expected to be placed into the Linode by the init container
-// provided with the CSI node plugin.
-const LinodeIDPath = "/linode-info/linode-id"
-
 var errNilClient = errors.New("nil client")
 
-// GetMetadataFromAPI attempts to retrieve metadata about the current
-// node/instance directly from the Linode API.
-func GetMetadataFromAPI(ctx context.Context, client linodeclient.LinodeClient, fs filesystem.FileSystem) (Metadata, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("GetMetadataFromAPI")
-	defer done()
+// Add this new helper function
+func getLinodeIDFromProductSerial(ctx context.Context, fs filesystem.FileSystem) (int, error) {
+	log := logger.GetLogger(ctx)
 
-	log.V(2).Info("Processing request")
-
-	if client == nil {
-		return Metadata{}, errNilClient
-	}
-
-	log.V(4).Info("Checking LinodeIDPath", "path", LinodeIDPath)
-	if _, err := fs.Stat(LinodeIDPath); err != nil {
-		return Metadata{}, fmt.Errorf("stat %s: %w", LinodeIDPath, err)
-	}
-
-	log.V(4).Info("Opening LinodeIDPath", "path", LinodeIDPath)
-	fileObj, err := fs.Open(LinodeIDPath)
+	filePath := "/sys/devices/virtual/dmi/id/product_serial"
+	file, err := fs.Open(filePath)
 	if err != nil {
-		return Metadata{}, fmt.Errorf("open: %w", err)
+		return 0, fmt.Errorf("failed to open product_serial file: %w", err)
 	}
+
 	defer func() {
-		err = fileObj.Close()
+		if closeErr := file.Close(); closeErr != nil {
+			log.Error(closeErr, "Failed to close product_serial file")
+		}
 	}()
 
-	log.V(4).Info("Reading LinodeID from file")
-	// Read in the file, but use a LimitReader to make sure we are not
-	// reading in junk.
-	data, err := io.ReadAll(io.LimitReader(fileObj, 1<<10))
+	buf := make([]byte, 64)
+	n, err := file.Read(buf)
 	if err != nil {
-		return Metadata{}, fmt.Errorf("read all: %w", err)
+		return 0, fmt.Errorf("failed to read product_serial file: %w", err)
 	}
 
-	log.V(4).Info("Parsing LinodeID")
-	linodeID, err := strconv.Atoi(string(data))
+	idStr := strings.TrimSpace(string(buf[:n]))
+	linodeID, err := strconv.Atoi(idStr)
 	if err != nil {
-		return Metadata{}, fmt.Errorf("atoi: %w", err)
+		return 0, fmt.Errorf("invalid linode ID format in product_serial: %w", err)
 	}
 
-	log.V(4).Info("Retrieving instance data from API", "linodeID", linodeID)
-	instance, err := client.GetInstance(ctx, linodeID)
-	if err != nil {
-		return Metadata{}, fmt.Errorf("get instance: %w", err)
-	}
-
-	memory := minMemory
-	if instance.Specs != nil {
-		memory = memoryToBytes(instance.Specs.Memory)
-	}
-
-	nodeMetadata := Metadata{
-		ID:     linodeID,
-		Label:  instance.Label,
-		Region: instance.Region,
-		Memory: memory,
-	}
-
-	log.V(4).Info("Successfully retrieved metadata",
-		"instanceID", nodeMetadata.ID,
-		"instanceLabel", nodeMetadata.Label,
-		"region", nodeMetadata.Region,
-		"memory", nodeMetadata.Memory)
-
-	log.V(2).Info("Successfully completed")
-	return nodeMetadata, nil
+	log.V(4).Info("Successfully parsed Linode ID from product_serial", "linodeID", linodeID)
+	return linodeID, nil
 }

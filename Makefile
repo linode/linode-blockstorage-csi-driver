@@ -60,9 +60,9 @@ clean:
 
 CLUSTER_NAME         ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
 K8S_VERSION          ?= "v1.29.1"
-CAPI_VERSION         ?= "v1.6.3"
+CAPI_VERSION         ?= "v1.8.5"
 HELM_VERSION         ?= "v0.2.1"
-CAPL_VERSION         ?= "v0.6.4"
+CAPL_VERSION         ?= "v0.7.1"
 CONTROLPLANE_NODES   ?= 1
 WORKER_NODES         ?= 1
 GRAFANA_PORT ?= 3000
@@ -133,6 +133,8 @@ mgmt-cluster:
 		--wait-provider-timeout 600 \
 		--core cluster-api:${CAPI_VERSION} \
 		--addon helm:${HELM_VERSION} \
+		--bootstrap kubeadm:$(CAPI_VERSION) \
+		--control-plane kubeadm:$(CAPI_VERSION) \
 		--infrastructure linode-linode:${CAPL_VERSION}
 
 .PHONY: cleanup-cluster
@@ -213,3 +215,7 @@ install-grafana:
 .PHONY: setup-dashboard
 setup-dashboard:
 	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-dashboard.sh --namespace=monitoring --dashboard-file=observability/metrics/dashboard.json
+
+.PHONY: setup-tracing
+setup-tracing:
+	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-tracing.sh
