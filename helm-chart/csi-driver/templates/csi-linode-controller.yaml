@@ -125,6 +125,18 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       serviceAccount: csi-controller-sa
+      {{- if .Values.controller.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.controller.affinity }}
+      affinity:
+        {{- toYaml .Values.controller.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- else }}
       tolerations:
         - effect: NoSchedule
           operator: Exists
@@ -132,6 +144,7 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
+      {{- end }}
       volumes:
         - emptyDir: {}
           name: socket-dir
