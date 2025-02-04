@@ -14,6 +14,7 @@ func ControllerServiceCapabilities() []*csi.ControllerServiceCapability {
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
 		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+		csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 		csi.ControllerServiceCapability_RPC_GET_VOLUME,
 	}
 
@@ -38,6 +39,7 @@ func NodeServiceCapabilities() []*csi.NodeServiceCapability {
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+		csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 	}
 
 	cc := make([]*csi.NodeServiceCapability, 0, len(capabilities))
@@ -58,6 +60,8 @@ func NodeServiceCapabilities() []*csi.NodeServiceCapability {
 func VolumeCapabilityAccessModes() []*csi.VolumeCapability_AccessMode {
 	modes := []csi.VolumeCapability_AccessMode_Mode{
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
 	}
 
 	mm := make([]*csi.VolumeCapability_AccessMode, 0, len(modes))
