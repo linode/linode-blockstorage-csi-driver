@@ -17,6 +17,9 @@ spec:
         app: csi-linode-controller
         role: csi-linode
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - args:
             - --default-fstype=ext4
@@ -40,6 +43,11 @@ spec:
               containerPort: {{ .Values.csiProvisioner.metrics.port }}
               protocol: TCP
           {{- end}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
@@ -61,6 +69,11 @@ spec:
               containerPort: {{ .Values.csiAttacher.metrics.port }}
               protocol: TCP
           {{- end}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
@@ -82,6 +95,11 @@ spec:
               containerPort: {{ .Values.csiResizer.metrics.port }}
               protocol: TCP
           {{- end}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
@@ -118,6 +136,11 @@ spec:
           image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
           name: csi-linode-plugin
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir

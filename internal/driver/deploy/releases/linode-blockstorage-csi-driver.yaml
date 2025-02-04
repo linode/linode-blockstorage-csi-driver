@@ -296,6 +296,11 @@ spec:
         image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
         imagePullPolicy: IfNotPresent
         name: csi-provisioner
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
@@ -308,6 +313,11 @@ spec:
         image: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
         imagePullPolicy: IfNotPresent
         name: csi-attacher
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
@@ -320,6 +330,11 @@ spec:
         image: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
         imagePullPolicy: IfNotPresent
         name: csi-resizer
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
@@ -343,9 +358,17 @@ spec:
               name: linode
         image: linode/linode-blockstorage-csi-driver:latest
         name: csi-linode-plugin
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
           name: socket-dir
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccount: csi-controller-sa
       tolerations:
       - effect: NoSchedule
@@ -357,10 +380,6 @@ spec:
       volumes:
       - emptyDir: {}
         name: socket-dir
-      - configMap:
-          defaultMode: 493
-          name: get-linode-id
-        name: get-linode-id
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -395,6 +414,11 @@ spec:
               fieldPath: spec.nodeName
         image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.12.0
         name: csi-node-driver-registrar
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
@@ -424,6 +448,8 @@ spec:
           capabilities:
             add:
             - SYS_ADMIN
+            drop:
+            - ALL
           privileged: true
         volumeMounts:
         - mountPath: /csi
@@ -437,6 +463,9 @@ spec:
           name: tmp
       hostNetwork: true
       priorityClassName: system-node-critical
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccount: csi-node-sa
       tolerations:
       - effect: NoSchedule

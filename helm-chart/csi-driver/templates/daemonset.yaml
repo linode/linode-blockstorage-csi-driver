@@ -15,6 +15,9 @@ spec:
         app: csi-linode-node
         role: csi-linode
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - args:
         - --v=2
@@ -31,6 +34,11 @@ spec:
               fieldPath: spec.nodeName
         image: {{ .Values.csiNodeDriverRegistrar.image}}:{{ .Values.csiNodeDriverRegistrar.tag}}
         name: csi-node-driver-registrar
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
@@ -63,11 +71,15 @@ spec:
         imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
         name: csi-linode-plugin
         securityContext:
+          # This container must run as privileged due to the requirement for bidirectional mount propagation
+          # See https://github.com/kubernetes/kubernetes/issues/94400
+          privileged: true
           allowPrivilegeEscalation: true
           capabilities:
+            drop:
+            - ALL
             add:
             - SYS_ADMIN
-          privileged: true
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
