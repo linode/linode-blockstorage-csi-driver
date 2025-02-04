@@ -14,6 +14,7 @@ func ControllerServiceCapabilities() []*csi.ControllerServiceCapability {
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
 		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+		csi.ControllerServiceCapability_RPC_GET_VOLUME,
 	}
 
 	cc := make([]*csi.ControllerServiceCapability, 0, len(capabilities))
