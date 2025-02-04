@@ -421,8 +421,13 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 			return false
 		}
 
-		// Ensure the access mode is SINGLE_NODE_WRITER; if not, return false
-		if accMode.GetMode() != csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER {
+		// Ensure the access mode
+		switch accMode.GetMode() { //nolint:exhaustive // Only some modes are supported
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
+			continue
+		default:
 			return false
 		}
 	}

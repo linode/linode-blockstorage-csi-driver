@@ -610,13 +610,41 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "Valid request",
+			name: "Valid request SINGLE_NODE_WRITER",
 			req: &csi.CreateVolumeRequest{
 				Name: "test-volume",
 				VolumeCapabilities: []*csi.VolumeCapability{
 					{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Valid request SINGLE_NODE_MULTI_WRITER",
+			req: &csi.CreateVolumeRequest{
+				Name: "test-volume",
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+						},
+					},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Valid request SINGLE_NODE_SINGLE_WRITER",
+			req: &csi.CreateVolumeRequest{
+				Name: "test-volume",
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
 						},
 					},
 				},
