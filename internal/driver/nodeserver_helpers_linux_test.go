@@ -68,6 +68,14 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:       "Error - No volume ID",
+			devicePath: "/tmp/test_error_noluks",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId: "",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
