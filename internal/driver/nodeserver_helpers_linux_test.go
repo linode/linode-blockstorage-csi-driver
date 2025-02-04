@@ -32,7 +32,7 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			name:       "Success - Mount the volume",
 			devicePath: "/tmp/test_success_noluks",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test_success_noluks",
+				VolumeId: "123-test_success_noluks",
 			},
 			expectMounterCalls: func(m *mocks.MockMounter) {
 				m.EXPECT().MountSensitive("/tmp/test_success_noluks", "", "ext4", []string{"defaults"}, emptyStringArray).Return(nil)
@@ -52,7 +52,7 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			name:       "Error - Unable to mount the volume",
 			devicePath: "/tmp/test_error_noluks",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test_error_noluks",
+				VolumeId: "123-test_error_noluks",
 			},
 			expectMounterCalls: func(m *mocks.MockMounter) {
 				m.EXPECT().MountSensitive("/tmp/test_error_noluks", "", "ext4", []string{"defaults"}, emptyStringArray).Return(fmt.Errorf("Couldn't mount."))
@@ -65,6 +65,14 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 				// Mount_linux: Format disk
 				m.EXPECT().Command("mkfs.ext4", "-F", "-m0", "/tmp/test_error_noluks").Return(c)
 				c.EXPECT().CombinedOutput().Return([]byte("Formatted successfully"), nil)
+			},
+			wantErr: true,
+		},
+		{
+			name:       "Error - No volume ID",
+			devicePath: "/tmp/test_error_noluks",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId: "",
 			},
 			wantErr: true,
 		},

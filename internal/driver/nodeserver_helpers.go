@@ -280,6 +280,12 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeCapability := req.GetVolumeCapability()
+	volumeID := req.GetVolumeId()
+
+	volumeName, err := ns.getMountSource(ctx, volumeID)
+	if err != nil {
+		return errInternal("Failed to get volume name: %v", err)
+	}
 
 	// Retrieve the file system type and mount options from the volume capability
 	fsType, mountOptions := getFSTypeAndMountOptions(ctx, volumeCapability)
@@ -289,8 +295,8 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 	// Check if LUKS encryption is enabled and prepare the LUKS volume if needed
 	luksContext := getLuksContext(req.GetSecrets(), req.GetVolumeContext(), VolumeLifecycleNodeStageVolume)
 	if luksContext.EncryptionEnabled {
-		var err error
 		log.V(4).Info("preparing luks volume", "devicePath", devicePath)
+		luksContext.VolumeName = volumeName
 		fmtAndMountSource, err = ns.formatLUKSVolume(ctx, devicePath, &luksContext)
 		if err != nil {
 			return err

@@ -18,6 +18,7 @@ import (
 
 func TestNodeServer_mountVolume_luks(t *testing.T) {
 	var emptyStringArray []string
+	volumeID := "123-test"
 	tests := []struct {
 		name                   string
 		devicePath             string
@@ -33,7 +34,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Success - mount LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: volumeID,
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -74,7 +75,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Success - already formatted",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: volumeID,
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -114,7 +115,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to initialize LUKS volume by path",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: volumeID,
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -138,7 +139,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to format LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: volumeID,
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -166,7 +167,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to add keyslot to LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: volumeID,
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
@@ -195,7 +196,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 			name:       "Error - unable to activate LUKS volume",
 			devicePath: "/tmp/test",
 			req: &csi.NodeStageVolumeRequest{
-				VolumeId: "test",
+				VolumeId: volumeID,
 				VolumeContext: map[string]string{
 					LuksEncryptedAttribute: "true",
 					LuksCipherAttribute:    "aes-xts-plain64",
