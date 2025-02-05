@@ -1,0 +1,300 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: pod-pvc-luks-recreate-remount
+  labels:
+    all:
+    luksbasic:
+spec:
+  bindings:
+    - name: lukskey
+      value: (env('LUKS_KEY'))
+    - name: nodes
+      # number of nodes in cluster
+      value: ((env('WORKER_NODES') | to_number(@)) + (env('CONTROLPLANE_NODES') | to_number(@)))
+  steps:
+    - name: Check if CSI Driver is deployed
+      try:
+        - assert:
+            file: assert-csi-driver-resources.yaml
+    - name: Create PVC and Pod
+      try:
+        - apply:
+            file: create-pvc.yaml
+        - apply:
+            file: create-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+    - name: Check if Pod is ready and Volume is mounted
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if volume is created
+      try:
+        - script:
+            env:
+              - name: TARGET_API
+                value: api.linode.com
+              - name: TARGET_API_VERSION
+                value: v4beta
+              - name: URI
+                value: volumes
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              set -e
+              curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "X-Filter: $FILTER" \
+                -H "Content-Type: application/json" \
+                "https://api.linode.com/v4beta/volumes"
+            check:
+              ($error): ~
+              (json_parse($stdout)):
+                results: 1
+    - name: Create a file inside the pod and check it was created
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "cd data && touch testfile" && \
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "ls data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+    - name: Check if the volume is a LUKS volume
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "blkid | grep crypto_LUKS"
+            check:
+              ($error): ~
+              (contains($stdout, 'TYPE="crypto_LUKS"')): true
+    - name: Capture the Volume Metadata for volume recreation and remounting
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              # Create temp directory
+              mkdir -p /tmp/luks-test
+              
+              # Store PV name and volume handle
+              kubectl get pvc -n $NAMESPACE pvc-filesystem-luks -o jsonpath='{.spec.volumeName}' > /tmp/luks-test/pvname
+              kubectl get pv $(cat /tmp/luks-test/pvname) -o jsonpath='{.spec.csi.volumeHandle}' > /tmp/luks-test/volumehandle
+              
+              # Print the PV name and volume handle
+              echo "PV Name: $(cat /tmp/luks-test/pvname)"
+              echo "Volume Handle: $(cat /tmp/luks-test/volumehandle)"
+            check:
+              ($error): ~
+    - name: Delete the Pod
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
+    - name: Check if the volume is detached on Node resource and in Linode (using API)
+      try:
+        - script:
+            env:
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              ../check-volume-detached.sh $FILTER
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume was successfully detached')): true
+              (contains($stdout, 'Volume detached in Linode')): true
+    - name: Delete PVC
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+    - name: Delete PV
+      try:
+        - script:
+            content: |
+              kubectl delete pv $(cat /tmp/luks-test/pvname)
+            check:
+              ($error): ~
+    - name: Recreate PV
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              PV_NAME=$(cat /tmp/luks-test/pvname)
+              VOLUME_HANDLE=$(cat /tmp/luks-test/volumehandle)
+
+              echo "PV Name: $PV_NAME"
+              echo "Volume Handle: $VOLUME_HANDLE"
+              
+              # Add validation for captured values
+              if [ -z "$PV_NAME" ] || [ -z "$VOLUME_HANDLE" ]; then
+                echo "Missing PV metadata!"
+                exit 1
+              fi
+
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: PersistentVolume
+              metadata:
+                name: "${PV_NAME}"
+              spec:
+                capacity:
+                  storage: 10Gi
+                accessModes:
+                  - ReadWriteOnce
+                persistentVolumeReclaimPolicy: Retain
+                storageClassName: "linode-block-storage-luks-${NAMESPACE}"
+                volumeMode: Filesystem
+                csi:
+                  driver: linodebs.csi.linode.com
+                  fsType: ext4
+                  nodeStageSecretRef:
+                    name: csi-encrypt-example-luks-key
+                    namespace: "${NAMESPACE}"
+                  volumeAttributes:
+                    linodebs.csi.linode.com/luks-cipher: aes-xts-plain64
+                    linodebs.csi.linode.com/luks-encrypted: "true"
+                    linodebs.csi.linode.com/luks-key-size: "512"
+                  volumeHandle: "${VOLUME_HANDLE}"
+              EOF
+            check:
+              ($error): ~
+    - name: Recreate PVC
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              PV_NAME=$(cat /tmp/luks-test/pvname)
+              echo "PV Name: $PV_NAME"
+
+              # Add validation for captured values
+              if [ -z "$PV_NAME" ]; then
+                echo "Missing PV!"
+                exit 1
+              fi
+
+              cat <<EOF | kubectl apply -f -
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: pvc-filesystem-luks
+                namespace: "${NAMESPACE}"
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 10Gi
+                volumeName: "${PV_NAME}"
+              EOF
+            check:
+              ($error): ~
+    - name: Recreate Pod
+      try:
+        - apply:
+            file: create-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if Pod is ready and Volume is mounted
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check the LUKS volume is mounted
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "blkid | grep crypto_LUKS"
+            check:
+              ($error): ~
+              (contains($stdout, 'TYPE="crypto_LUKS"')): true
+    - name: Clean up all the resources
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl delete pvc -n $NAMESPACE pvc-filesystem-luks
+              kubectl delete pv $(cat /tmp/luks-test/pvname)
+            check:
+              ($error): ~
+        - script:
+            env:
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              set -e
+              # Get Volume ID
+              VOLUME_ID=$(curl -s \
+                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "X-Filter: $FILTER" \
+                "https://api.linode.com/v4/volumes" | jq -r '.data[0].id')
+              
+              if [ -n "$VOLUME_ID" ]; then
+                echo "Deleting volume $VOLUME_ID"
+                curl -s -w "%{http_code}" -X DELETE \
+                  -H "Authorization: Bearer $LINODE_TOKEN" \
+                  "https://api.linode.com/v4/volumes/$VOLUME_ID"
+                echo "Volume deletion initiated"
+              else
+                echo "No volume found with tag filter: $FILTER"
+              fi
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume deletion initiated')): true
+              (contains($stdout, '200')): true
+    - name: Check if the Volume was deleted
+      try:
+        - script:
+            env:
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              ../check-volume-deleted.sh $FILTER
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume deleted in Linode')): true
