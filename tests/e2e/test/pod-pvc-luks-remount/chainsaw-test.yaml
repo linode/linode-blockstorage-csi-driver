@@ -283,6 +283,9 @@ spec:
               else
                 echo "No volume found with tag filter: $FILTER"
               fi
+
+              # Clean up temp directory
+              rm -rf /tmp/luks-test
             check:
               ($error): ~
               (contains($stdout, 'Volume deletion initiated')): true
