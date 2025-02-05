@@ -73,6 +73,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               kubectl exec -n $NAMESPACE e2e-pod -- sh -c "cd data && touch testfile" && \
               kubectl exec -n $NAMESPACE e2e-pod -- sh -c "ls data"
             check:
@@ -85,6 +86,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               kubectl exec -n $NAMESPACE e2e-pod -- sh -c "blkid | grep crypto_LUKS"
             check:
               ($error): ~
@@ -96,6 +98,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               # Create temp directory
               mkdir -p /tmp/luks-test
               
@@ -136,6 +139,7 @@ spec:
       try:
         - script:
             content: |
+              set -e
               kubectl delete pv $(cat /tmp/luks-test/pvname)
             check:
               ($error): ~
@@ -146,6 +150,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               PV_NAME=$(cat /tmp/luks-test/pvname)
               VOLUME_HANDLE=$(cat /tmp/luks-test/volumehandle)
 
@@ -192,6 +197,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               PV_NAME=$(cat /tmp/luks-test/pvname)
               echo "PV Name: $PV_NAME"
 
@@ -243,6 +249,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               kubectl exec -n $NAMESPACE e2e-pod -- sh -c "blkid | grep crypto_LUKS"
             check:
               ($error): ~
@@ -258,6 +265,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
+              set -e
               kubectl delete pvc -n $NAMESPACE pvc-filesystem-luks
               kubectl delete pv $(cat /tmp/luks-test/pvname)
             check:
