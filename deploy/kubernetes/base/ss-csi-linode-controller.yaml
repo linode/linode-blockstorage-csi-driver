@@ -17,6 +17,9 @@ spec:
         app: csi-linode-controller
         role: csi-linode
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccount: csi-controller-sa
       containers:
         - name: csi-provisioner
@@ -32,6 +35,11 @@ spec:
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -44,6 +52,11 @@ spec:
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -56,6 +69,11 @@ spec:
           env:
           - name: ADDRESS
             value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
           - name: socket-dir
             mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -79,6 +97,11 @@ spec:
                 secretKeyRef:
                   name: linode
                   key: token
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
