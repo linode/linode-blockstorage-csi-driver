@@ -1,0 +1,36 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  name: (join('-', ['linode-block-storage-luks', $namespace]))
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Retain
+parameters:
+  linodebs.csi.linode.com/luks-encrypted: "true"
+  linodebs.csi.linode.com/luks-cipher: "aes-xts-plain64"
+  linodebs.csi.linode.com/luks-key-size: "512"
+  csi.storage.k8s.io/node-stage-secret-namespace: ($namespace)
+  csi.storage.k8s.io/node-stage-secret-name: csi-encrypt-example-luks-key
+  linodebs.csi.linode.com/volumeTags: (to_string($namespace))
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: csi-encrypt-example-luks-key
+stringData:
+  luksKey: ($lukskey)
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-filesystem-luks
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: (join('-', ['linode-block-storage-luks', $namespace]))
