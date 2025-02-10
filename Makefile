@@ -69,6 +69,7 @@ GRAFANA_PORT ?= 3000
 GRAFANA_USERNAME ?= admin
 GRAFANA_PASSWORD ?= admin
 DATA_RETENTION_PERIOD ?= 15d  # Prometheus data retention period
+KUBECONFIG ?= test-cluster-kubeconfig.yaml
 
 .PHONY: build
 build:
@@ -111,8 +112,8 @@ create-capl-cluster:
 	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > test-cluster-kubeconfig.yaml
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl wait --for=condition=Ready nodes --all --timeout=600s
-	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f -
+	KUBECONFIG=$(KUBECONFIG) kubectl wait --for=condition=Ready nodes --all --timeout=600s
+	cat tests/e2e/setup/linode-secret.yaml | envsubst | KUBECONFIG=$(KUBECONFIG) kubectl apply -f -
 
 .PHONY: generate-csi-driver-manifests
 generate-csi-driver-manifests:
@@ -120,9 +121,9 @@ generate-csi-driver-manifests:
 
 .PHONY: install-csi
 install-csi:
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl apply -f csi-manifests.yaml
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
-	KUBECONFIG=test-cluster-kubeconfig.yaml kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
+	KUBECONFIG=$(KUBECONFIG) kubectl apply -f csi-manifests.yaml
+	KUBECONFIG=$(KUBECONFIG) kubectl rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
+	KUBECONFIG=$(KUBECONFIG) kubectl rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 
 .PHONY: mgmt-cluster
 mgmt-cluster:
@@ -165,15 +166,15 @@ test:
 .PHONY: e2e-test
 e2e-test:
 	openssl rand -out luks.key 64
-	CONTROLPLANE_NODES=$(CONTROLPLANE_NODES) WORKER_NODES=$(WORKER_NODES) KUBECONFIG=test-cluster-kubeconfig.yaml LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./tests/e2e --parallel 2 --selector $(E2E_SELECTOR)
+	KUBECONFIG=$(KUBECONFIG) LUKS_KEY=$$(base64 luks.key | tr -d '\n') chainsaw test ./tests/e2e --parallel 2 --selector $(E2E_SELECTOR)
 
 .PHONY: csi-sanity-test
 csi-sanity-test:
-	KUBECONFIG=test-cluster-kubeconfig.yaml ./tests/csi-sanity/run-tests.sh
+	KUBECONFIG=$(KUBECONFIG) ./tests/csi-sanity/run-tests.sh
 
 .PHONY: upstream-e2e-tests
 upstream-e2e-tests:
-	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=test-cluster-kubeconfig.yaml ./tests/upstream-e2e/run-tests.sh
+	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=$(KUBECONFIG) ./tests/upstream-e2e/run-tests.sh
 
 #####################################################################
 # CI Setup
@@ -203,19 +204,19 @@ grafana-dashboard: install-prometheus install-grafana setup-dashboard
 #####################################################################
 .PHONY: install-prometheus
 install-prometheus:
-	KUBECONFIG=test-cluster-kubeconfig.yaml DATA_RETENTION_PERIOD=$(DATA_RETENTION_PERIOD) \
+	KUBECONFIG=$(KUBECONFIG) DATA_RETENTION_PERIOD=$(DATA_RETENTION_PERIOD) \
 		./hack/install-prometheus.sh --timeout=600s
 
 .PHONY: install-grafana
 install-grafana:
-	KUBECONFIG=test-cluster-kubeconfig.yaml GRAFANA_PORT=$(GRAFANA_PORT) \
+	KUBECONFIG=$(KUBECONFIG) GRAFANA_PORT=$(GRAFANA_PORT) \
 		GRAFANA_USERNAME=$(GRAFANA_USERNAME) GRAFANA_PASSWORD=$(GRAFANA_PASSWORD) \
 		./hack/install-grafana.sh --timeout=600s
 
 .PHONY: setup-dashboard
 setup-dashboard:
-	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-dashboard.sh --namespace=monitoring --dashboard-file=observability/metrics/dashboard.json
+	KUBECONFIG=$(KUBECONFIG) ./hack/setup-dashboard.sh --namespace=monitoring --dashboard-file=observability/metrics/dashboard.json
 
 .PHONY: setup-tracing
 setup-tracing:
-	KUBECONFIG=test-cluster-kubeconfig.yaml ./hack/setup-tracing.sh
+	KUBECONFIG=$(KUBECONFIG) ./hack/setup-tracing.sh

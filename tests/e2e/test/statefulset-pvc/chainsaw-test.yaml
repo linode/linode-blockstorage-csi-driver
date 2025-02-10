@@ -11,7 +11,11 @@ spec:
   bindings:
     - name: nodes
       # number of nodes in cluster
-      value: ((env('WORKER_NODES') | to_number(@)) + (env('CONTROLPLANE_NODES') | to_number(@)))
+      value: (length(x_k8s_list($client, 'v1', 'Node', '').items))
+    - name: linode_url
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.apiurl || base64_encode('https://api.linode.com')))
+    - name: linode_token
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.token))
   steps:
     - name: Check if CSI Driver is deployed
       try:
@@ -41,20 +45,22 @@ spec:
         - script:
             env:
               - name: TARGET_API
-                value: api.linode.com
+                value: ($linode_url)
               - name: TARGET_API_VERSION
-                value: v4beta
+                value: v4
               - name: URI
                 value: volumes
+              - name: LINODE_TOKEN
+                value: ($linode_token)
               - name: FILTER
                 value: (to_string({"tags":($namespace)}))
             content: |
               set -e
               curl -s \
-                -H "Authorization: Bearer $LINODE_TOKEN" \
+                -H "Authorization: Bearer ${LINODE_TOKEN}" \
                 -H "X-Filter: $FILTER" \
                 -H "Content-Type: application/json" \
-                "https://api.linode.com/v4beta/volumes"
+                "${TARGET_API}/${TARGET_API_VERSION}/${URI}"
             check:
               ($error): ~
               (json_parse($stdout)):
@@ -111,6 +117,14 @@ spec:
       try:
         - script:
             env:
+              - name: TARGET_API
+                value: ($linode_url)
+              - name: TARGET_API_VERSION
+                value: v4
+              - name: URI
+                value: volumes
+              - name: LINODE_TOKEN
+                value: ($linode_token)
               - name: FILTER
                 value: (to_string({"tags":($namespace)}))
             content: |
@@ -129,6 +143,14 @@ spec:
       try:
         - script:
             env:
+              - name: TARGET_API
+                value: ($linode_url)
+              - name: TARGET_API_VERSION
+                value: v4
+              - name: URI
+                value: volumes
+              - name: LINODE_TOKEN
+                value: ($linode_token)
               - name: FILTER
                 value: (to_string({"tags":($namespace)}))
             content: |
