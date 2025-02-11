@@ -186,7 +186,7 @@ spec:
                 exit 1
               fi
 
-              echo "namespace: ${NAMESPACE}"
+              echo "Namespace: ${NAMESPACE}"
 
               kubectl apply -f - <<EOF
               apiVersion: v1
