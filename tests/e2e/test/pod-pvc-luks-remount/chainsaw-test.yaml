@@ -177,6 +177,8 @@ spec:
                 exit 1
               fi
 
+              echo "namespace: ${NAMESPACE}"
+
               kubectl apply -f - <<EOF
               apiVersion: v1
               kind: PersistentVolume
@@ -234,6 +236,7 @@ spec:
                   requests:
                     storage: 10Gi
                 volumeName: "${PV_NAME}"
+                storageClassName: "linode-block-storage-luks-${NAMESPACE}"
               EOF
             check:
               ($error): ~
