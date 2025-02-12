@@ -58,7 +58,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}' | grep -q 'control-plane' && echo "true" || echo "false"
+              NODE=$(kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}')
+              kubectl get node $NODE | grep -q 'control-plane' && echo "true" || echo "false"
             check:
               ($error): ~
               (contains($stdout, 'true')): true
@@ -160,7 +161,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}' | grep -q 'control-plane' && echo "true" || echo "false"
+              NODE=$(kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}')
+              kubectl get node $NODE | grep -q 'control-plane' && echo "true" || echo "false"
             check:
               ($error): ~
               (contains($stdout, 'false')): true
@@ -240,7 +242,8 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}' | grep -q 'control-plane' && echo "true" || echo "false"
+              NODE=$(kubectl get pod -n $NAMESPACE -l app=example -o jsonpath='{.items[0].spec.nodeName}')
+              kubectl get node $NODE | grep -q 'control-plane' && echo "true" || echo "false"
             check:
               ($error): ~
               (contains($stdout, 'true')): true
