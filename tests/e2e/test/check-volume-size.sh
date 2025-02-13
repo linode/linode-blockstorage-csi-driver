@@ -7,7 +7,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 # Set environment variables (if not already set)
-TARGET_API=${TARGET_API:-api.linode.com}
+TARGET_API=${TARGET_API:-https://api.linode.com}
 TARGET_API_VERSION=${TARGET_API_VERSION:-v4}
 URI=${URI:-volumes}
 FILTER=$1
@@ -20,7 +20,7 @@ curl_command() {
         -H "Authorization: Bearer $LINODE_TOKEN" \
         -H "X-Filter: $FILTER" \
         -H "Content-Type: application/json" \
-        "https://$TARGET_API/$TARGET_API_VERSION/$URI"
+        "$TARGET_API/$TARGET_API_VERSION/$URI"
 }
 
 echo "Checking Linode API for volume status..."
