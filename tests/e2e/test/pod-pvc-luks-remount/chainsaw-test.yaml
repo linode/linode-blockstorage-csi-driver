@@ -106,15 +106,15 @@ spec:
             content: |
               set -xe
               # Create temp directory
-              mkdir -p /tmp/luks-test
+              mkdir -p /tmp/luks-test/$NAMESPACE
               
               # Store PV name and volume handle
-              kubectl get pvc -n $NAMESPACE pvc-filesystem-luks -o jsonpath='{.spec.volumeName}' > /tmp/luks-test/pvname
-              kubectl get pv $(cat /tmp/luks-test/pvname) -o jsonpath='{.spec.csi.volumeHandle}' > /tmp/luks-test/volumehandle
+              kubectl get pvc -n $NAMESPACE pvc-filesystem-luks -o jsonpath='{.spec.volumeName}' > /tmp/luks-test/$NAMESPACE/pvname
+              kubectl get pv $(cat /tmp/luks-test/$NAMESPACE/pvname) -o jsonpath='{.spec.csi.volumeHandle}' > /tmp/luks-test/$NAMESPACE/volumehandle
               
               # Print the PV name and volume handle
-              echo "PV Name: $(cat /tmp/luks-test/pvname)"
-              echo "Volume Handle: $(cat /tmp/luks-test/volumehandle)"
+              echo "PV Name: $(cat /tmp/luks-test/$NAMESPACE/pvname)"
+              echo "Volume Handle: $(cat /tmp/luks-test/$NAMESPACE/volumehandle)"
             check:
               ($error): ~
     - name: Delete the Pod
@@ -152,9 +152,12 @@ spec:
     - name: Delete PV
       try:
         - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
             content: |
               set -e
-              kubectl delete pv $(cat /tmp/luks-test/pvname)
+              kubectl delete pv $(cat /tmp/luks-test/$NAMESPACE/pvname)
             check:
               ($error): ~
     - name: Recreate PV
@@ -165,8 +168,8 @@ spec:
                 value: ($namespace)
             content: |
               set -e
-              PV_NAME=$(cat /tmp/luks-test/pvname)
-              VOLUME_HANDLE=$(cat /tmp/luks-test/volumehandle)
+              PV_NAME=$(cat /tmp/luks-test/$NAMESPACE/pvname)
+              VOLUME_HANDLE=$(cat /tmp/luks-test/$NAMESPACE/volumehandle)
 
               echo "PV Name: $PV_NAME"
               echo "Volume Handle: $VOLUME_HANDLE"
@@ -214,7 +217,7 @@ spec:
                 value: ($namespace)
             content: |
               set -e
-              PV_NAME=$(cat /tmp/luks-test/pvname)
+              PV_NAME=$(cat /tmp/luks-test/$NAMESPACE/pvname)
               echo "PV Name: $PV_NAME"
 
               # Add validation for captured values
@@ -284,7 +287,10 @@ spec:
             content: |
               set -e
               kubectl delete pvc -n $NAMESPACE pvc-filesystem-luks
-              kubectl delete pv $(cat /tmp/luks-test/pvname)
+              kubectl delete pv $(cat /tmp/luks-test/$NAMESPACE/pvname)
+
+              # Clean up temp directory
+              rm -rf /tmp/luks-test/$NAMESPACE
             check:
               ($error): ~
         - script:
@@ -316,9 +322,6 @@ spec:
               else
                 echo "No volume found with tag filter: $FILTER"
               fi
-
-              # Clean up temp directory
-              rm -rf /tmp/luks-test
             check:
               ($error): ~
               (contains($stdout, 'Volume deletion initiated')): true
