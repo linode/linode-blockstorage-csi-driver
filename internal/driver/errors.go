@@ -70,7 +70,7 @@ func errInstanceNotFound(linodeID int) error {
 }
 
 func errVolumeAttached(volumeID, linodeID int) error {
-	return status.Errorf(codes.AlreadyExists, "volume %d is already attached to linode %d", volumeID, linodeID)
+	return status.Errorf(codes.FailedPrecondition, "volume %d is already attached to linode %d", volumeID, linodeID)
 }
 
 func errVolumeNotFound(volumeID int) error {
