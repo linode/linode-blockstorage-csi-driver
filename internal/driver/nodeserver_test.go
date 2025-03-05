@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 )
 
 func TestNodePublishVolume(t *testing.T) {
@@ -137,7 +139,11 @@ func TestNodeStageVolume(t *testing.T) {
 				PublishContext: map[string]string{
 					"devicePath": "/dev/stagehappypath",
 				},
-				VolumeCapability: &csi.VolumeCapability{},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+				},
 			},
 			resp: &csi.NodeStageVolumeResponse{},
 			expectMounterCalls: func(m *mocks.MockMounter) {
@@ -148,6 +154,68 @@ func TestNodeStageVolume(t *testing.T) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
 				m.EXPECT().Stat("/dev/disk/by-id/linode-stagehappypath").Return(nil, nil)
 			},
+		},
+		{
+			name: "stageNoAccessMode",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "1000-stageNoAccessMode",
+				StagingTargetPath: "/mnt/staging",
+				PublishContext: map[string]string{
+					"devicePath": "/dev/stageNoAccessMode",
+				},
+				VolumeCapability: &csi.VolumeCapability{},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+			},
+			expectedError: ErrNoAccessMode,
+		},
+		{
+			name: "stageBadVolumeID",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "foo",
+				StagingTargetPath: "/mnt/staging",
+				PublishContext: map[string]string{
+					"devicePath": "/dev/stageBadVolumeID",
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+			},
+			expectedError: linodevolumes.ErrInvalidLinodeVolume,
+		},
+		{
+			name: "stageBlock",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "1000-stageBlock",
+				StagingTargetPath: "/mnt/staging",
+				PublishContext: map[string]string{
+					"devicePath": "/dev/stageBadVolumeID",
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Block{
+						Block: &csi.VolumeCapability_BlockVolume{},
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(true, nil).Times(1)
+			},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+				m.EXPECT().Stat("/dev/disk/by-id/linode-stageBlock").Return(nil, nil)
+			},
+			expectedError: nil,
+			resp:          &csi.NodeStageVolumeResponse{},
 		},
 	}
 
@@ -182,7 +250,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeCapability: &csi.VolumeCapability{},
 			})
 			returnedResp, err := ns.NodeStageVolume(context.Background(), tt.req)
-			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
+			if err != nil && !errors.Is(err, tt.expectedError) {
 				t.Errorf("NodeStageVolume error = %v, wantErr %v", err, tt.expectedError)
 			}
 			if !reflect.DeepEqual(returnedResp, tt.resp) {
