@@ -1,6 +1,7 @@
 package linodevolumes
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"strconv"
@@ -22,6 +23,10 @@ type (
 
 // TODO: Rename this variable
 const LinodeVolumeLabelLength = 32
+
+var (
+	ErrInvalidLinodeVolume = errors.New("invalid linode volume key")
+)
 
 func hashStringToInt(b string) int {
 	algorithm := fnv.New32a()
@@ -81,7 +86,7 @@ func CreateLinodeVolumeKey(id int, label string) LinodeVolumeKey {
 func ParseLinodeVolumeKey(key string) (*LinodeVolumeKey, error) {
 	keys := strings.SplitN(key, "-", 2)
 	if len(keys) != 2 {
-		return nil, fmt.Errorf("invalid linode volume key: %q", key)
+		return nil, ErrInvalidLinodeVolume
 	}
 
 	volumeID, err := strconv.Atoi(keys[0])

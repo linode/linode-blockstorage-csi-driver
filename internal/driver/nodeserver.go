@@ -16,6 +16,7 @@ limitations under the License.
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -24,6 +25,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
 
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
@@ -32,6 +35,10 @@ import (
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
+)
+
+var (
+	ErrNoAccessMode = errors.New("access mode is nil")
 )
 
 type NodeServer struct {
@@ -199,18 +206,30 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	ns.mux.Lock()
 	defer ns.mux.Unlock()
 
+	// Part 1: Validate request object
+
 	// Before to functionStartTime, validate the request object (NodeStageVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeStageVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	// Part 2: Get information of attached device
+
+	readonly, err := getReadOnlyFromCapability(req.GetVolumeCapability())
+	if err != nil {
+		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
+		return nil, errors.Join(errInternal("failed to get readonly from volume capability: %v", err), err)
+	}
+
+	stagingTargetPath := req.GetStagingTargetPath()
 
 	// Get the LinodeVolumeKey which we need to find the device path
 	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, err
+		return nil, errors.Join(status.Errorf(codes.InvalidArgument, "volume not found: %v", err), err)
 	}
 
 	// Get device path of attached device
@@ -224,15 +243,16 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, err
+		return nil, errInternal("failed to find device path for volume %s: %v", volumeID, err)
 	}
 
-	// Check if staging target path is a valid mount point.
-	log.V(4).Info("Ensuring staging target path is a valid mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
-	notMnt, err := ns.ensureMountPoint(ctx, req.GetStagingTargetPath(), filesystem.NewFileSystem())
+	// Part 3: check if staging target path is a valid mount point.
+
+	log.V(4).Info("Ensuring staging target path is a valid mount point", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
+	notMnt, err := ns.ensureMountPoint(ctx, stagingTargetPath, filesystem.NewFileSystem())
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, err
+		return nil, errInternal("NodeStageVolume failed to ensure staging target path %s is a valid mount point: %v", stagingTargetPath, err)
 	}
 
 	if !notMnt {
@@ -244,7 +264,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 		*/
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		log.V(4).Info("Staging target path is already a mount point", "volumeID", volumeID, "stagingTargetPath", req.GetStagingTargetPath())
+		log.V(4).Info("Staging target path is already a mount point", "volumeID", volumeID, "stagingTargetPath", stagingTargetPath)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
@@ -256,12 +276,25 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	// Mount device to stagingTargetPath
-	// If LUKS is enabled, format the device accordingly
-	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", req.GetStagingTargetPath())
+	// Part 4: Mount device and format if needed
+
+	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", stagingTargetPath)
 	if err := ns.mountVolume(ctx, devicePath, req); err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, err
+		return nil, errInternal("NodeStageVolume failed to mount device %s at path %s: %v", devicePath, stagingTargetPath, err)
+	}
+
+	// Part 5: Resize fs
+
+	if !readonly {
+		resized, err := ns.resize(devicePath, stagingTargetPath)
+		if err != nil {
+			observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
+			return nil, errInternal("failed to resize volume %s: %v", volumeID, err)
+		}
+		if resized {
+			log.V(4).Info("Successfully resized volume", "volumeID", volumeID)
+		}
 	}
 
 	// Record functionStatus metric
@@ -410,4 +443,29 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	log.V(2).Info("Processing request", "req", req)
 
 	return nodeGetVolumeStats(ctx, req)
+}
+
+func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
+	resizer := mount.NewResizeFs(ns.mounter.Exec)
+	needResize, err := resizer.NeedResize(devicePath, volumePath)
+	if err != nil {
+		return false, fmt.Errorf("could not determine if volume need resizing: %w", err)
+	}
+
+	if needResize {
+		if _, err := resizer.Resize(devicePath, volumePath); err != nil {
+			return false, fmt.Errorf("could not resize volume: %w", err)
+		}
+	}
+
+	return needResize, nil
+}
+
+func getReadOnlyFromCapability(vc *csi.VolumeCapability) (bool, error) {
+	if vc.GetAccessMode() == nil {
+		return false, ErrNoAccessMode
+	}
+	mode := vc.GetAccessMode().GetMode()
+	return (mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY), nil
 }
