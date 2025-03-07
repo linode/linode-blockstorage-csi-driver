@@ -44,6 +44,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if volume is create and size is 10 Gi
       try:
         - script:
