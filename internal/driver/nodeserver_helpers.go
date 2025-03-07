@@ -388,3 +388,12 @@ func (ns *NodeServer) getMountSource(ctx context.Context, input string) (string,
 	log.V(4).Info("Exiting getMountSource", "result", result)
 	return result, nil
 }
+
+func getReadOnlyFromCapability(vc *csi.VolumeCapability) (bool, error) {
+	if vc.GetAccessMode() == nil {
+		return false, ErrNoAccessMode
+	}
+	mode := vc.GetAccessMode().GetMode()
+	return (mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY), nil
+}
