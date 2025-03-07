@@ -32,6 +32,7 @@ import (
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
@@ -41,11 +42,12 @@ var (
 
 type NodeServer struct {
 	driver      *LinodeDriver
-	mounter     *mount.SafeFormatAndMount
+	mounter     *mountmanager.SafeFormatAndMount
 	deviceutils devicemanager.DeviceUtils
 	client      linodeclient.LinodeClient
 	metadata    Metadata
 	encrypt     Encryption
+	resizeFs    mountmanager.ResizeFSer
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
 
@@ -54,7 +56,7 @@ type NodeServer struct {
 
 var _ csi.NodeServer = &NodeServer{}
 
-func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mount.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption) (*NodeServer, error) {
+func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mountmanager.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption, resize mountmanager.ResizeFSer) (*NodeServer, error) {
 	log := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new NodeServer")
@@ -83,6 +85,7 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 		client:      client,
 		metadata:    metadata,
 		encrypt:     encrypt,
+		resizeFs:    resize,
 	}
 
 	log.V(4).Info("NodeServer created successfully")
@@ -477,14 +480,13 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 }
 
 func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
-	resizer := mount.NewResizeFs(ns.mounter.Exec)
-	needResize, err := resizer.NeedResize(devicePath, volumePath)
+	needResize, err := ns.resizeFs.NeedResize(devicePath, volumePath)
 	if err != nil {
 		return false, fmt.Errorf("could not determine if volume need resizing: %w", err)
 	}
 
 	if needResize {
-		if _, err := resizer.Resize(devicePath, volumePath); err != nil {
+		if _, err := ns.resizeFs.Resize(devicePath, volumePath); err != nil {
 			return false, fmt.Errorf("could not resize volume: %w", err)
 		}
 	}

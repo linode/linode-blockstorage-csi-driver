@@ -31,11 +31,28 @@ type Command interface {
 	exec.Cmd
 }
 
-func NewSafeMounter() *mount.SafeFormatAndMount {
+type Formater interface {
+	FormatAndMount(source string, target string, fstype string, options []string) error
+}
+
+type ResizeFSer interface {
+	Resize(devicePath string, deviceMountPath string) (bool, error)
+	NeedResize(devicePath string, deviceMountPath string) (bool, error)
+}
+
+// alias mount.SafeFormatAndMount struct to add the Formater interface
+type SafeFormatAndMount struct {
+	mount.SafeFormatAndMount
+	Formater
+}
+
+func NewSafeMounter() *SafeFormatAndMount {
 	realMounter := mount.New("")
 	realExec := exec.New()
-	return &mount.SafeFormatAndMount{
-		Interface: realMounter,
-		Exec:      realExec,
+	return &SafeFormatAndMount{
+		SafeFormatAndMount: mount.SafeFormatAndMount{
+			Interface: realMounter,
+			Exec:      realExec,
+		},
 	}
 }
