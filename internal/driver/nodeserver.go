@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -23,7 +22,6 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linodego"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -353,34 +351,67 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID)
 
+	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
+	log.V(4).Info("Processed LinodeVolumeKey", "LinodeVolumeKey", LinodeVolumeKey)
+	if err != nil {
+		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
+		return nil, errNotFound("volume not found: %v", err)
+	}
+
+	// We have no context for the partition, so we'll leave it empty
+	partition := ""
+
 	// Validate req (NodeExpandVolumeRequest)
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("validation failed: %v", err))
 	}
 
-	// Check linode to see if a give volume exists by volume ID
-	// Make call to linode api using the linode api client
-	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
-	log.V(4).Info("Processed LinodeVolumeKey", "LinodeVolumeKey", LinodeVolumeKey)
+	volumePath := req.GetVolumePath()
+	if volumePath == "" {
+		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Completed, functionStartTime)
+		return nil, status.Error(codes.InvalidArgument, "volume path must be provided")
+	}
+
+	volumeCapability := req.GetVolumeCapability()
+	// VolumeCapability is optional, if specified, use that as source of truth
+	if volumeCapability != nil {
+		if blk := volumeCapability.GetBlock(); blk != nil {
+			// Noop for Block NodeExpandVolume
+			log.V(4).Info("NodeExpandVolume: called. Since it is a block device, ignoring...", "volumeID", volumeID, "volumePath", volumePath)
+			observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Completed, functionStartTime)
+			return &csi.NodeExpandVolumeResponse{}, nil
+		}
+
+		readonly, err := getReadOnlyFromCapability(volumeCapability)
+		if err != nil {
+			observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
+			return nil, errInternal("failed to check if capability for volume %s is readonly: %v", volumeID, err)
+		}
+		if readonly {
+			log.V(4).Info("NodeExpandVolume succeeded", "volumeID", volumeID, "volumePath", volumePath)
+			observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Completed, functionStartTime)
+			return &csi.NodeExpandVolumeResponse{}, nil
+		}
+	}
+
+	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
-		// Node volume expansion is not supported yet. To meet the spec, we need to implement this.
-		// For now, we'll return a not found error.
-
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, errNotFound("volume not found: %v", err)
+		return nil, errNotFound("failed to find device path for mount %s: %v", req.GetVolumePath(), err)
 	}
-	jsonFilter, err := json.Marshal(map[string]string{"label": LinodeVolumeKey.Label})
+
+	// Resize the volume
+
+	resized, err := ns.resize(devicePath, volumePath)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, errInternal("marshal json filter: %v", err)
+		return nil, errInternal("failed to resize volume %s: %v", volumeID, err)
 	}
 
-	log.V(4).Info("Listing volumes", "volumeID", volumeID)
-	if _, err = ns.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter))); err != nil {
-		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, errVolumeNotFound(LinodeVolumeKey.VolumeID)
+	if resized {
+		log.V(4).Info("Successfully resized volume", "volumeID", volumeID)
 	}
 
 	// Record functionStatus metric
