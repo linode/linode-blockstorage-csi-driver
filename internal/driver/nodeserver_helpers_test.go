@@ -734,3 +734,62 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 		})
 	}
 }
+
+func Test_getReadOnlyFromCapability(t *testing.T) {
+	type args struct {
+		vc *csi.VolumeCapability
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "Valid request - ReadWrite",
+			args: args{
+				vc: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "Valid request - ReadOnly",
+			args: args{
+				vc: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+					},
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Error - AccessMode is nil",
+			args: args{
+				vc: &csi.VolumeCapability{
+					AccessMode: nil,
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getReadOnlyFromCapability(tt.args.vc)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getReadOnlyFromCapability() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("getReadOnlyFromCapability() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

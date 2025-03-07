@@ -460,12 +460,3 @@ func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
 
 	return needResize, nil
 }
-
-func getReadOnlyFromCapability(vc *csi.VolumeCapability) (bool, error) {
-	if vc.GetAccessMode() == nil {
-		return false, ErrNoAccessMode
-	}
-	mode := vc.GetAccessMode().GetMode()
-	return (mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY ||
-		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY), nil
-}
