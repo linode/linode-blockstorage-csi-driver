@@ -305,7 +305,7 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 
 	// Format and mount the drive
 	log.V(4).Info("formatting and mounting the volume")
-	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
+	if err := ns.mounter.Formater.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
 		return errInternal("Failed to format and mount device from (%q)---(%q) to (%q) with fstype (%q) and options (%q): %v",
 			fmtAndMountSource, devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}

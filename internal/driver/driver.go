@@ -25,11 +25,11 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/mount-utils"
 
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
@@ -80,8 +80,9 @@ func GetLinodeDriver(ctx context.Context) *LinodeDriver {
 func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	ctx context.Context,
 	linodeClient linodeclient.LinodeClient,
-	mounter *mount.SafeFormatAndMount,
+	mounter *mountmanager.SafeFormatAndMount,
 	deviceUtils devicemanager.DeviceUtils,
+	resizeFs mountmanager.ResizeFSer,
 	metadata Metadata,
 	name,
 	vendorVersion,
@@ -118,7 +119,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
 
 	log.V(2).Info("Setting up RPC Servers")
-	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt)
+	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt, resizeFs)
 	if err != nil {
 		return fmt.Errorf("new node server: %w", err)
 	}

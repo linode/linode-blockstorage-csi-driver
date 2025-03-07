@@ -14,6 +14,7 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 // compareGRPCErrors compares two gRPC errors for equality.
@@ -355,9 +356,11 @@ func TestNodeServer_ensureMountPoint(t *testing.T) {
 			}
 
 			ns := &NodeServer{
-				mounter: &mount.SafeFormatAndMount{
-					Interface: mockMounter,
-					Exec:      nil,
+				mounter: &mountmanager.SafeFormatAndMount{
+					SafeFormatAndMount: mount.SafeFormatAndMount{
+						Interface: mockMounter,
+						Exec:      nil,
+					},
 				},
 			}
 			got, err := ns.ensureMountPoint(context.Background(), tt.stagingTargetPath, mockFileSystem)
@@ -717,9 +720,11 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 			}
 
 			ns := &NodeServer{
-				mounter: &mount.SafeFormatAndMount{
-					Interface: mockMounter,
-					Exec:      nil,
+				mounter: &mountmanager.SafeFormatAndMount{
+					SafeFormatAndMount: mount.SafeFormatAndMount{
+						Interface: mockMounter,
+						Exec:      nil,
+					},
 				},
 			}
 
