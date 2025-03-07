@@ -452,6 +452,63 @@ func TestNodeExpandVolume(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "expandWithVolumeCapability",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:   "1001-volkey",
+				VolumePath: "/mnt/staging",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10,
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+			},
+			resp: &csi.NodeExpandVolumeResponse{
+				CapacityBytes: 10,
+			},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+				m.EXPECT().Stat("/dev/disk/by-id/linode-volkey").Return(nil, nil)
+			},
+			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
+				m.EXPECT().NeedResize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
+				m.EXPECT().Resize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "expandBlockVolume",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:   "1001-volkey",
+				VolumePath: "/mnt/staging",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10,
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Block{
+						Block: &csi.VolumeCapability_BlockVolume{},
+					},
+				},
+			},
+			resp: &csi.NodeExpandVolumeResponse{},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+			},
+			// expectResizeFsCall: func(m *mocks.MockResizeFSer) {
+			// 	m.EXPECT().NeedResize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
+			// 	m.EXPECT().Resize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
+			// },
+			expectedError: nil,
+		},
 	}
 
 	for _, tt := range tests {
