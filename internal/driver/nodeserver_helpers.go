@@ -16,6 +16,7 @@ limitations under the License.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,11 @@ const (
 	defaultFSType                  = "ext4"
 	rwPermission                   = os.FileMode(0o755)
 	ownerGroupReadWritePermissions = os.FileMode(0o660)
+)
+
+var (
+	ErrNoVolumeCapability = errors.New("volume capability is required")
+	ErrNoAccessMode       = errors.New("access mode is nil")
 )
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
@@ -390,6 +396,9 @@ func (ns *NodeServer) getMountSource(ctx context.Context, input string) (string,
 }
 
 func getReadOnlyFromCapability(vc *csi.VolumeCapability) (bool, error) {
+	if vc == nil {
+		return false, ErrNoVolumeCapability
+	}
 	if vc.GetAccessMode() == nil {
 		return false, ErrNoAccessMode
 	}

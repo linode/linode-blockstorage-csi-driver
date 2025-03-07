@@ -36,10 +36,6 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
-var (
-	ErrNoAccessMode = errors.New("access mode is nil")
-)
-
 type NodeServer struct {
 	driver      *LinodeDriver
 	mounter     *mountmanager.SafeFormatAndMount
@@ -236,8 +232,10 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// Get device path of attached device
 	partition := ""
 
-	if part, ok := req.GetVolumeContext()["partition"]; ok {
-		partition = part
+	if vc := req.GetVolumeContext(); vc != nil {
+		if part, ok := vc["partition"]; ok {
+			partition = part
+		}
 	}
 
 	log.V(4).Info("Finding device path", "volumeID", volumeID)
