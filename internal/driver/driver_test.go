@@ -32,7 +32,7 @@ func TestDriverSuite(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mounter := &mountmanager.SafeFormatAndMount{
-		SafeFormatAndMount: mount.SafeFormatAndMount{
+		SafeFormatAndMount: &mount.SafeFormatAndMount{
 			Interface: mocks.NewMockMounter(mockCtrl),
 			Exec:      mocks.NewMockExecutor(mockCtrl),
 		},

@@ -42,7 +42,7 @@ type ResizeFSer interface {
 
 // alias mount.SafeFormatAndMount struct to add the Formater interface
 type SafeFormatAndMount struct {
-	mount.SafeFormatAndMount
+	*mount.SafeFormatAndMount
 	Formater
 }
 
@@ -54,7 +54,7 @@ func NewSafeMounter() *SafeFormatAndMount {
 		Exec:      realExec,
 	}
 	return &SafeFormatAndMount{
-		SafeFormatAndMount: sfm,
+		SafeFormatAndMount: &sfm,
 		Formater:           &sfm,
 	}
 }

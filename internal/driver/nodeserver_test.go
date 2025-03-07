@@ -60,7 +60,7 @@ func TestNodePublishVolume(t *testing.T) {
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      mockExec,
 					},
@@ -110,7 +110,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      mockExec,
 					},
@@ -293,6 +293,31 @@ func TestNodeStageVolume(t *testing.T) {
 			expectedError: nil,
 			resp:          &csi.NodeStageVolumeResponse{},
 		},
+		{
+			name: "stageNoVolumeContext",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "1000-stageNoVolumeContext",
+				StagingTargetPath: "/mnt/staging",
+				VolumeCapability:  &csi.VolumeCapability{},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(true, nil).Times(1)
+			},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+				m.EXPECT().Stat("/dev/disk/by-id/linode-stageOkToFormatAndResize").Return(nil, nil)
+			},
+			expectFormatCalls: func(m *mocks.MockFormater) {
+				m.EXPECT().FormatAndMount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
+				m.EXPECT().NeedResize("/dev/disk/by-id/linode-stageOkToFormatAndResize", "/mnt/staging").Return(true, nil)
+				m.EXPECT().Resize("/dev/disk/by-id/linode-stageOkToFormatAndResize", "/mnt/staging").Return(true, nil)
+			},
+			expectedError: nil,
+			resp:          &csi.NodeStageVolumeResponse{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -319,7 +344,7 @@ func TestNodeStageVolume(t *testing.T) {
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      mockExec,
 					},
@@ -397,7 +422,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      mockExec,
 					},
@@ -545,7 +570,7 @@ func TestNodeExpandVolume(t *testing.T) {
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      mockExec,
 					},

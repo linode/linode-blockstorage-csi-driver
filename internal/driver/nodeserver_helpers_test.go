@@ -357,7 +357,7 @@ func TestNodeServer_ensureMountPoint(t *testing.T) {
 
 			ns := &NodeServer{
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      nil,
 					},
@@ -721,7 +721,7 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 
 			ns := &NodeServer{
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      nil,
 					},

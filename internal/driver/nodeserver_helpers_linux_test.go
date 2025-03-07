@@ -110,7 +110,7 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 			}
 			ns := &NodeServer{
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: sfm,
+					SafeFormatAndMount: &sfm,
 					Formater:           &sfm,
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem, mockCryptSetup),

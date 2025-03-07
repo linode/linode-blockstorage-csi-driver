@@ -260,7 +260,7 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 
 			ns := &NodeServer{
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: sfm,
+					SafeFormatAndMount: &sfm,
 					Formater:           &sfm,
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem, mockCryptSetupClient),
@@ -368,7 +368,7 @@ func TestNodeServer_closeLuksMountSource(t *testing.T) {
 
 			ns := &NodeServer{
 				mounter: &mountmanager.SafeFormatAndMount{
-					SafeFormatAndMount: mount.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
 						Interface: mockMounter,
 						Exec:      mockExec,
 					},
