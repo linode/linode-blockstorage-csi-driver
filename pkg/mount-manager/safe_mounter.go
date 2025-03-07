@@ -49,10 +49,12 @@ type SafeFormatAndMount struct {
 func NewSafeMounter() *SafeFormatAndMount {
 	realMounter := mount.New("")
 	realExec := exec.New()
+	sfm := mount.SafeFormatAndMount{
+		Interface: realMounter,
+		Exec:      realExec,
+	}
 	return &SafeFormatAndMount{
-		SafeFormatAndMount: mount.SafeFormatAndMount{
-			Interface: realMounter,
-			Exec:      realExec,
-		},
+		SafeFormatAndMount: sfm,
+		Formater:           &sfm,
 	}
 }
