@@ -198,8 +198,30 @@ spec:
               (contains($stdout, 'Volume detached in Linode')): true
     - name: Create Pod
       try:
-        - apply:
-            file: create-pvc-pod.yaml
+        - create:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: e2e-pod
+              spec:
+                containers:
+                - name: e2e-pod
+                  image: ubuntu
+                  command:
+                  - sleep
+                  - "1000000"
+                  volumeMounts:
+                  - mountPath: /data
+                    name: csi-volume
+                tolerations:
+                - key: "node-role.kubernetes.io/control-plane"
+                  operator: "Exists"
+                  effect: "NoSchedule"
+                volumes:
+                - name: csi-volume
+                  persistentVolumeClaim:
+                    claimName: pvc-filesystem
       catch:
         - describe:
             apiVersion: v1
@@ -207,7 +229,17 @@ spec:
     - name: Check if Pod is ready and Volume is mounted
       try:
         - assert:
-            file: assert-pvc-pod.yaml
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: e2e-pod
+              status:
+                containerStatuses:
+                - name: e2e-pod
+                  ready: true
+                  started: true
+                phase: Running
       catch:
         - describe:
             apiVersion: v1
