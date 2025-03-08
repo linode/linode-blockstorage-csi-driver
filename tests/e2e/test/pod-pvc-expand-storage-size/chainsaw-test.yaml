@@ -94,7 +94,7 @@ spec:
               kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
             check:
               ($error): ~
-              (contains($stdout, '10G')): true
+              (contains($stdout, '9.8G')): true
     - name: Create a file inside the pod and check it was created
       try:
         - script:
@@ -158,7 +158,7 @@ spec:
               kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
             check:
               ($error): ~
-              (contains($stdout, '10G')): true
+              (contains($stdout, '9.8G')): true
     - name: Check if the file still exists
       try:
         - script:
