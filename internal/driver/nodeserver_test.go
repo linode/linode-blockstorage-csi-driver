@@ -516,10 +516,29 @@ func TestNodeExpandVolume(t *testing.T) {
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
 			},
-			// expectResizeFsCall: func(m *mocks.MockResizeFSer) {
-			// 	m.EXPECT().NeedResize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
-			// 	m.EXPECT().Resize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
-			// },
+			expectedError: nil,
+		},
+		{
+			name: "expandReadOnlyVolume",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:   "1001-volkey",
+				VolumePath: "/mnt/staging",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10,
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+			},
+			resp: &csi.NodeExpandVolumeResponse{},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+			},
 			expectedError: nil,
 		},
 	}
