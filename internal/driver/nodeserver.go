@@ -349,7 +349,16 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	defer done()
 
 	functionStartTime := time.Now()
+
 	volumeID := req.GetVolumeId()
+	// Validate req (NodeExpandVolumeRequest)
+
+	log.V(4).Info("Validating request", "volumeID", volumeID)
+	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
+		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("validation failed: %v", err))
+	}
+
 	log.V(2).Info("Processing request", "volumeID", volumeID)
 
 	LinodeVolumeKey, err := linodevolumes.ParseLinodeVolumeKey(volumeID)
@@ -361,13 +370,6 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	// We have no context for the partition, so we'll leave it empty
 	partition := ""
-
-	// Validate req (NodeExpandVolumeRequest)
-	log.V(4).Info("Validating request", "volumeID", volumeID)
-	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
-		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("validation failed: %v", err))
-	}
 
 	volumePath := req.GetVolumePath()
 	if volumePath == "" {
