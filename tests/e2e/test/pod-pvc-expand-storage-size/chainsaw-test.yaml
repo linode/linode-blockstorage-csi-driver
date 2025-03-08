@@ -196,10 +196,10 @@ spec:
               ($error): ~
               (contains($stdout, 'Volume was successfully detached')): true
               (contains($stdout, 'Volume detached in Linode')): true
-    - name: create a new pod to check if the volume is still attached
+    - name: Create Pod
       try:
         - apply:
-            file: create-pod.yaml
+            file: create-pvc-pod.yaml
       catch:
         - describe:
             apiVersion: v1
@@ -207,7 +207,7 @@ spec:
     - name: Check if Pod is ready and Volume is mounted
       try:
         - assert:
-            file: assert-pod.yaml
+            file: assert-pvc-pod.yaml
       catch:
         - describe:
             apiVersion: v1
