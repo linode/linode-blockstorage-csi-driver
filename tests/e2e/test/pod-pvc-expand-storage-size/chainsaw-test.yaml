@@ -84,6 +84,17 @@ spec:
               spec:
                 capacity:
                   storage: 10Gi
+    - name: Check size
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
+            check:
+              ($error): ~
+              (contains($stdout, '10G')): true
     - name: Create a file inside the pod and check it was created
       try:
         - script:
@@ -137,6 +148,17 @@ spec:
               spec:
                 capacity:
                   storage: 20Gi
+    - name: Check size after expansion, before unmounting
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
+            check:
+              ($error): ~
+              (contains($stdout, '10G')): true
     - name: Check if the file still exists
       try:
         - script:
@@ -174,6 +196,45 @@ spec:
               ($error): ~
               (contains($stdout, 'Volume was successfully detached')): true
               (contains($stdout, 'Volume detached in Linode')): true
+    - name: create a new pod to check if the volume is still attached
+      try:
+        - apply:
+            file: create-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if Pod is ready and Volume is mounted
+      try:
+        - assert:
+            file: assert-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
+    - name: Check size after expansion, after remounting
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
+            check:
+              ($error): ~
+              (contains($stdout, '20G')): true
+    - name: Delete the Pod
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
     - name: Delete PVC
       try:
         - delete:
