@@ -33,7 +33,7 @@ type ControllerServer struct {
 //
 // [Controller Service RPC]: https://github.com/container-storage-interface/spec/blob/master/spec.md#controller-service-rpc
 func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linodeclient.LinodeClient, metadata Metadata) (*ControllerServer, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new ControllerServer")
 
@@ -60,7 +60,8 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 // This operation is idempotent, meaning multiple calls with the same parameters will not create duplicate volumes.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("CreateVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "CreateVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -118,7 +119,8 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 // function will return a success response without any error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("DeleteVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "DeleteVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -165,7 +167,8 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 // the device path if successful.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (resp *csi.ControllerPublishVolumeResponse, err error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerPublishVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ControllerPublishVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -244,7 +247,8 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 // return a successful response without error.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerUnpublishVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ControllerUnpublishVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -304,7 +308,8 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 // It returns a confirmation response if the capabilities are valid, or an error if the volume does not exist
 // or if no capabilities were provided. Refer to the @CSI Driver Spec for more details.
 func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (resp *csi.ValidateVolumeCapabilitiesResponse, err error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ValidateVolumeCapabilities")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ValidateVolumeCapabilities")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -340,7 +345,8 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 // parameters as specified in the CSI Driver Spec.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ListVolumes")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ListVolumes")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -405,7 +411,8 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 // containing the capabilities available for the CSI driver.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerGetCapabilities")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ControllerGetCapabilities")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -424,7 +431,8 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 // it returns the new capacity and indicates that no node expansion is required.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (resp *csi.ControllerExpandVolumeResponse, err error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerExpandVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ControllerExpandVolume")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -477,7 +485,8 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 // It checks if the volume exists and returns its ID, size, and status.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ControllerGetVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ControllerGetVolume")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
