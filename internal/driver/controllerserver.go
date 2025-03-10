@@ -260,29 +260,36 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
 	}
 
-	linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
-	if statusErr != nil {
-		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		return &csi.ControllerUnpublishVolumeResponse{}, statusErr
-	}
+	log = log.WithValues("volume_id", volumeID)
 
-	log.V(4).Info("Checking if volume is attached", "volume_id", volumeID, "node_id", linodeID)
+	log.V(4).Info("Checking if volume is attached")
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		log.V(4).Info("Volume not found, skipping", "volume_id", volumeID)
+		log.V(4).Info("Volume not found, skipping")
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	} else if err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
-	if volume.LinodeID != nil && *volume.LinodeID != linodeID {
-		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		log.V(4).Info("Volume attached to different instance, skipping", "volume_id", volumeID, "attached_node_id", *volume.LinodeID, "requested_node_id", linodeID)
-		return &csi.ControllerUnpublishVolumeResponse{}, nil
+
+	if req.GetNodeId() != "" {
+		linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
+		if statusErr != nil {
+			observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
+			return &csi.ControllerUnpublishVolumeResponse{}, statusErr
+		}
+
+		log = log.V(4).WithValues("node_id", linodeID)
+
+		if volume.LinodeID != nil && *volume.LinodeID != linodeID {
+			observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
+			log.V(4).Info("Volume attached to different instance, skipping", "volume_id", volumeID, "attached_node_id", *volume.LinodeID, "requested_node_id", linodeID)
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
 	}
 
-	log.V(4).Info("Executing detach volume", "volume_id", volumeID, "node_id", linodeID)
+	log.V(4).Info("Executing detach volume")
 	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -291,7 +298,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
 	}
 
-	log.V(4).Info("Waiting for volume to detach", "volume_id", volumeID, "node_id", linodeID)
+	log.V(4).Info("Waiting for volume to detach")
 	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
@@ -300,7 +307,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	// Record function completion
 	observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Completed, functionStartTime)
 
-	log.V(2).Info("Volume detached successfully", "volume_id", volumeID)
+	log.V(2).Info("Volume detached successfully")
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 

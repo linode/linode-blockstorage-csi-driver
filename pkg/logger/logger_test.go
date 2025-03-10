@@ -85,7 +85,7 @@ func TestLogger_WithMethod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l, ctx := logger.NewLogger(context.Background())
-			logger, done := logger.WithMethod(l, tt.method)
+			_, done := logger.WithMethod(l, tt.method)
 
 			if ctx == nil {
 				t.Error("Logger.WithMethod() returned nil context")
@@ -97,7 +97,7 @@ func TestLogger_WithMethod(t *testing.T) {
 			// Check if the context contains the logger
 			if ctx != nil {
 				contextLogger, ok := ctx.Value(logr.Logger{}).(logr.Logger)
-				if !ok || contextLogger != logger {
+				if !ok || contextLogger != l {
 					t.Error("Logger.WithMethod() context does not contain the correct logger")
 				}
 			}
