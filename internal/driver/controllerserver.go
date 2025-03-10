@@ -365,7 +365,6 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 				"starting token out of bounds: %q", startingToken)
 		}
 		listOpts.Page = int(startingPage)
-		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
 	// List all volumes
@@ -385,6 +384,11 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 				VolumeCondition:  volumeCondition,
 			},
 		})
+	}
+
+	// Only set nextToken if we got a full page and there might be more
+	if req.GetMaxEntries() > 0 && len(volumes) >= listOpts.PageSize {
+		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
 	resp := &csi.ListVolumesResponse{
