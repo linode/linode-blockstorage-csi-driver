@@ -179,7 +179,7 @@ func (ns *NodeServer) findDevicePath(ctx context.Context, key linodevolumes.Lino
 
 	// If no device path is found, return an error.
 	if devicePath == "" {
-		return "", errInternal("Unable to find device path out of attempted paths: %v", devicePaths)
+		return "", errNotFound("Unable to find device path out of attempted paths: %v", devicePaths)
 	}
 
 	// If a device path is found, return it.
