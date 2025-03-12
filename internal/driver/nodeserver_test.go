@@ -578,6 +578,26 @@ func TestNodeExpandVolume(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "expandBadVolumeID",
+			req: &csi.NodeExpandVolumeRequest{
+				VolumeId:   "foo",
+				VolumePath: "/mnt/staging",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10,
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+			},
+			resp:          nil,
+			expectedError: linodevolumes.ErrInvalidLinodeVolume,
+		},
 	}
 
 	for _, tt := range tests {

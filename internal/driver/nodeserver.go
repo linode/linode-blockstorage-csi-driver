@@ -365,7 +365,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log.V(4).Info("Processed LinodeVolumeKey", "LinodeVolumeKey", LinodeVolumeKey)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, errors.Join(status.Errorf(codes.InvalidArgument, "volume not found: %v", err), err)
+		return nil, errors.Join(status.Errorf(codes.NotFound, "volume not found: %v", err), err)
 	}
 
 	// We have no context for the partition, so we'll leave it empty
