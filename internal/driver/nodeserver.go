@@ -356,7 +356,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log.V(4).Info("Validating request", "volumeID", volumeID)
 	if err := validateNodeExpandVolumeRequest(ctx, req); err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("validation failed: %v", err))
+		return nil, errors.Join(status.Error(codes.InvalidArgument, fmt.Sprintf("validation failed: %v", err)), err)
 	}
 
 	log.V(2).Info("Processing request", "volumeID", volumeID)
@@ -365,7 +365,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	log.V(4).Info("Processed LinodeVolumeKey", "LinodeVolumeKey", LinodeVolumeKey)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, errNotFound("volume not found: %v", err)
+		return nil, errors.Join(status.Errorf(codes.InvalidArgument, "volume not found: %v", err), err)
 	}
 
 	// We have no context for the partition, so we'll leave it empty
@@ -402,7 +402,7 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
-		return nil, errNotFound("failed to find device path for mount %s: %v", req.GetVolumePath(), err)
+		return nil, err
 	}
 
 	// Resize the volume
