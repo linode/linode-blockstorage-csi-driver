@@ -242,7 +242,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, errInternal("failed to find device path for volume %s: %v", volumeID, err)
+		return nil, err
 	}
 
 	// Part 3: check if staging target path is a valid mount point.
@@ -251,7 +251,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	notMnt, err := ns.ensureMountPoint(ctx, stagingTargetPath, filesystem.NewFileSystem())
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, errInternal("NodeStageVolume failed to ensure staging target path %s is a valid mount point: %v", stagingTargetPath, err)
+		return nil, err
 	}
 
 	if !notMnt {
@@ -280,7 +280,7 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	log.V(4).Info("Mounting device", "volumeID", volumeID, "devicePath", devicePath, "stagingTargetPath", stagingTargetPath)
 	if err := ns.mountVolume(ctx, devicePath, req); err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
-		return nil, errInternal("NodeStageVolume failed to mount device %s at path %s: %v", devicePath, stagingTargetPath, err)
+		return nil, err
 	}
 
 	// Part 5: Resize fs
