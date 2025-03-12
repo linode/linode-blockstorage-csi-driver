@@ -306,6 +306,43 @@ func TestNodeStageVolume(t *testing.T) {
 			expectedError: ErrNoAccessMode,
 			resp:          nil,
 		},
+		{
+			name: "stagePartition",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "1000-stagePartition",
+				StagingTargetPath: "/mnt/staging",
+				PublishContext: map[string]string{
+					"devicePath": "/dev/stagePartition",
+				},
+				VolumeContext: map[string]string{
+					"partition": "1",
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(true, nil).Times(1)
+			},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+				m.EXPECT().Stat("/dev/disk/by-id/linode-stagePartition-part1").Return(nil, nil)
+			},
+			expectFormatCalls: func(m *mocks.MockFormater) {
+				m.EXPECT().FormatAndMount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
+				m.EXPECT().NeedResize("/dev/disk/by-id/linode-stagePartition-part1", "/mnt/staging").Return(false, nil)
+			},
+			expectedError: nil,
+			resp:          &csi.NodeStageVolumeResponse{},
+		},
 	}
 
 	for _, tt := range tests {
