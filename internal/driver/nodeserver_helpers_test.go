@@ -784,6 +784,14 @@ func Test_getReadOnlyFromCapability(t *testing.T) {
 			want:    false,
 			wantErr: true,
 		},
+		{
+			name: "Error - vc is nil",
+			args: args{
+				vc: nil,
+			},
+			want:    false,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
