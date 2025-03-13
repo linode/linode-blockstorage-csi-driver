@@ -133,6 +133,30 @@ spec:
                 value: ($namespace)
             content: |
               kubectl debug -n $NAMESPACE node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
+        - patch:
+            # force sts on another node with nodeAffinity
+            resource:
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: redis-test
+              spec:
+                template:
+                  spec:
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                            - matchExpressions:
+                                - key: kubernetes.io/hostname
+                                  operator: NotIn
+                                  values:
+                                    - ($nodeName)
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
+              name: redis-test-0
         - sleep:
             duration: 125s
         - wait:
