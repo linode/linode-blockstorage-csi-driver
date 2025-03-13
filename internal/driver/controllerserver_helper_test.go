@@ -913,7 +913,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 				}, nil)
 			},
 			expectedResult: "",
-			expectedError:  errVolumeAttached(123, 456),
+			expectedError:  errVolumeAttached(123, 789),
 		},
 		{
 			name:     "Volume not found",
