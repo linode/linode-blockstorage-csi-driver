@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"errors"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -53,6 +55,9 @@ var (
 	// operation was not specified, despite indicating a new volume should be
 	// created by cloning an existing one.
 	errNoSourceVolume = status.Error(codes.InvalidArgument, "no volume content source specified")
+
+	ErrNoVolumeCapability = errors.New("volume capability is required")
+	ErrNoAccessMode       = errors.New("access mode is nil")
 )
 
 // errRegionMismatch returns an error indicating a volume is in gotRegion, but

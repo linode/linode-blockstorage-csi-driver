@@ -39,10 +39,10 @@ func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest)
 		}, nil
 	case errors.Is(err, unix.ENOENT):
 		// ENOENT is returned when the volume path does not exist.
-		return nil, status.Errorf(codes.NotFound, "volume path not found: %v", err.Error())
+		return nil, errNotFound("volume path not found: %v", err.Error())
 	case err != nil:
 		// Any other error is considered an internal error.
-		return nil, status.Errorf(codes.Internal, "failed to get stats: %v", err.Error())
+		return nil, errInternal("failed to get stats: %v", err.Error())
 	}
 
 	response := &csi.NodeGetVolumeStatsResponse{

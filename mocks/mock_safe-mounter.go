@@ -23,6 +23,7 @@ import (
 type MockMounter struct {
 	ctrl     *gomock.Controller
 	recorder *MockMounterMockRecorder
+	isgomock struct{}
 }
 
 // MockMounterMockRecorder is the mock recorder for MockMounter.
@@ -190,6 +191,7 @@ func (mr *MockMounterMockRecorder) Unmount(target any) *gomock.Call {
 type MockExecutor struct {
 	ctrl     *gomock.Controller
 	recorder *MockExecutorMockRecorder
+	isgomock struct{}
 }
 
 // MockExecutorMockRecorder is the mock recorder for MockExecutor.
@@ -266,6 +268,7 @@ func (mr *MockExecutorMockRecorder) LookPath(file any) *gomock.Call {
 type MockCommand struct {
 	ctrl     *gomock.Controller
 	recorder *MockCommandMockRecorder
+	isgomock struct{}
 }
 
 // MockCommandMockRecorder is the mock recorder for MockCommand.
@@ -457,4 +460,96 @@ func (m *MockCommand) Wait() error {
 func (mr *MockCommandMockRecorder) Wait() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockCommand)(nil).Wait))
+}
+
+// MockFormater is a mock of Formater interface.
+type MockFormater struct {
+	ctrl     *gomock.Controller
+	recorder *MockFormaterMockRecorder
+	isgomock struct{}
+}
+
+// MockFormaterMockRecorder is the mock recorder for MockFormater.
+type MockFormaterMockRecorder struct {
+	mock *MockFormater
+}
+
+// NewMockFormater creates a new mock instance.
+func NewMockFormater(ctrl *gomock.Controller) *MockFormater {
+	mock := &MockFormater{ctrl: ctrl}
+	mock.recorder = &MockFormaterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockFormater) EXPECT() *MockFormaterMockRecorder {
+	return m.recorder
+}
+
+// FormatAndMount mocks base method.
+func (m *MockFormater) FormatAndMount(source, target, fstype string, options []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FormatAndMount", source, target, fstype, options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// FormatAndMount indicates an expected call of FormatAndMount.
+func (mr *MockFormaterMockRecorder) FormatAndMount(source, target, fstype, options any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FormatAndMount", reflect.TypeOf((*MockFormater)(nil).FormatAndMount), source, target, fstype, options)
+}
+
+// MockResizeFSer is a mock of ResizeFSer interface.
+type MockResizeFSer struct {
+	ctrl     *gomock.Controller
+	recorder *MockResizeFSerMockRecorder
+	isgomock struct{}
+}
+
+// MockResizeFSerMockRecorder is the mock recorder for MockResizeFSer.
+type MockResizeFSerMockRecorder struct {
+	mock *MockResizeFSer
+}
+
+// NewMockResizeFSer creates a new mock instance.
+func NewMockResizeFSer(ctrl *gomock.Controller) *MockResizeFSer {
+	mock := &MockResizeFSer{ctrl: ctrl}
+	mock.recorder = &MockResizeFSerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockResizeFSer) EXPECT() *MockResizeFSerMockRecorder {
+	return m.recorder
+}
+
+// NeedResize mocks base method.
+func (m *MockResizeFSer) NeedResize(devicePath, deviceMountPath string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NeedResize", devicePath, deviceMountPath)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NeedResize indicates an expected call of NeedResize.
+func (mr *MockResizeFSerMockRecorder) NeedResize(devicePath, deviceMountPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NeedResize", reflect.TypeOf((*MockResizeFSer)(nil).NeedResize), devicePath, deviceMountPath)
+}
+
+// Resize mocks base method.
+func (m *MockResizeFSer) Resize(devicePath, deviceMountPath string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Resize", devicePath, deviceMountPath)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Resize indicates an expected call of Resize.
+func (mr *MockResizeFSerMockRecorder) Resize(devicePath, deviceMountPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resize", reflect.TypeOf((*MockResizeFSer)(nil).Resize), devicePath, deviceMountPath)
 }

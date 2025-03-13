@@ -14,6 +14,7 @@ import (
 	"k8s.io/utils/exec"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 func TestNodeServer_mountVolume_linux(t *testing.T) {
@@ -103,10 +104,14 @@ func TestNodeServer_mountVolume_linux(t *testing.T) {
 				tt.expectCryptSetupCalls(mockDevice)
 			}
 
+			sfm := mount.SafeFormatAndMount{
+				Interface: mockMounter,
+				Exec:      mockExec,
+			}
 			ns := &NodeServer{
-				mounter: &mount.SafeFormatAndMount{
-					Interface: mockMounter,
-					Exec:      mockExec,
+				mounter: &mountmanager.SafeFormatAndMount{
+					SafeFormatAndMount: &sfm,
+					Formater:           &sfm,
 				},
 				encrypt: NewLuksEncryption(mockExec, mockFileSystem, mockCryptSetup),
 			}

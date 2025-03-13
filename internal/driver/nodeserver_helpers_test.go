@@ -14,6 +14,7 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 // compareGRPCErrors compares two gRPC errors for equality.
@@ -355,9 +356,11 @@ func TestNodeServer_ensureMountPoint(t *testing.T) {
 			}
 
 			ns := &NodeServer{
-				mounter: &mount.SafeFormatAndMount{
-					Interface: mockMounter,
-					Exec:      nil,
+				mounter: &mountmanager.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
+						Interface: mockMounter,
+						Exec:      nil,
+					},
 				},
 			}
 			got, err := ns.ensureMountPoint(context.Background(), tt.stagingTargetPath, mockFileSystem)
@@ -717,9 +720,11 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 			}
 
 			ns := &NodeServer{
-				mounter: &mount.SafeFormatAndMount{
-					Interface: mockMounter,
-					Exec:      nil,
+				mounter: &mountmanager.SafeFormatAndMount{
+					SafeFormatAndMount: &mount.SafeFormatAndMount{
+						Interface: mockMounter,
+						Exec:      nil,
+					},
 				},
 			}
 
@@ -730,6 +735,73 @@ func TestNodeServer_nodePublishVolumeBlock(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NodeServer.nodePublishVolumeBlock() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getReadOnlyFromCapability(t *testing.T) {
+	type args struct {
+		vc *csi.VolumeCapability
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "Valid request - ReadWrite",
+			args: args{
+				vc: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "Valid request - ReadOnly",
+			args: args{
+				vc: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+					},
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "Error - AccessMode is nil",
+			args: args{
+				vc: &csi.VolumeCapability{
+					AccessMode: nil,
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "Error - vc is nil",
+			args: args{
+				vc: nil,
+			},
+			want:    false,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getReadOnlyFromCapability(tt.args.vc)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getReadOnlyFromCapability() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("getReadOnlyFromCapability() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/linode/linodego"
 	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
@@ -145,6 +146,7 @@ func handle(ctx context.Context) error {
 	deviceUtils := devicemanager.NewDeviceUtils(fileSystem, mounter.Exec)
 	cryptSetup := cryptsetupclient.NewCryptSetup()
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
+	resizer := mount.NewResizeFs(mounter.Exec)
 
 	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem)
 	if err != nil {
@@ -156,6 +158,7 @@ func handle(ctx context.Context) error {
 		cloudProvider,
 		mounter,
 		deviceUtils,
+		resizer,
 		nodeMetadata,
 		driver.Name,
 		vendorVersion,
