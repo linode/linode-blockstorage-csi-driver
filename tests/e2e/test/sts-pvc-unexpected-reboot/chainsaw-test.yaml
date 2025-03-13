@@ -21,74 +21,34 @@ spec:
       try:
         - assert:
             file: assert-csi-driver-resources.yaml
-    - name: Create PVC and Pod
+
+    - name: Create STS
       try:
         - apply:
-            file: create-pvc-pod.yaml
-      catch:
-        - describe:
-            apiVersion: v1
-            kind: Pod
-        - describe:
-            apiVersion: v1
-            kind: PersistentVolumeClaim
-    - name: Check if Pod is ready and Volume is mounted
-      try:
+            file: create-sts.yaml
         - assert:
-            file: assert-pvc-pod.yaml
+            file: assert-sts.yaml
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "cd data && touch testfile"
+            check:
+              ($error): ~
       catch:
         - describe:
-            apiVersion: v1
-            kind: PersistentVolumeClaim
-        - describe:
-            apiVersion: v1
-            kind: Pod
-    - name: Check if volume is create
-      try:
-        - script:
-            env:
-              - name: TARGET_API
-                value: ($linode_url)
-              - name: TARGET_API_VERSION
-                value: v4
-              - name: URI
-                value: volumes
-              - name: LINODE_TOKEN
-                value: ($linode_token)
-              - name: FILTER
-                value: (to_string({"tags":($namespace)}))
-            content: |
-              set -e
-              curl -s \
-                -H "Authorization: Bearer ${LINODE_TOKEN}" \
-                -H "X-Filter: $FILTER" \
-                -H "Content-Type: application/json" \
-                "${TARGET_API}/${TARGET_API_VERSION}/${URI}"
-            check:
-              ($error): ~
-              (json_parse($stdout)):
-                results: 1
-    - name: Create a file inside the pod and check it was created
-      try:
-        - script:
-            env:
-              - name: NAMESPACE
-                value: ($namespace)
-            content: |
-              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "cd data && touch testfile" && \
-              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "ls data"
-            check:
-              ($error): ~
-              (contains($stdout, 'testfile')): true
+            apiVersion: apps/v1
+            kind: StatefulSet
     
-    - name: Reboot the Node of the Pod e2e-pod
+    - name: Reboot the Node of the STS
       try:
         - script:
             env:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl get pod e2e-pod -n $NAMESPACE -o jsonpath='{.spec.nodeName}'
+              kubectl get pod redis-test-0 -n $NAMESPACE -o jsonpath='{.spec.nodeName}'
             outputs:
               - name: nodeName
                 value: ($stdout)
@@ -113,6 +73,25 @@ spec:
                 value: ($namespace)
             content: |
               kubectl debug -n $NAMESPACE node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
+        - patch:
+            # force sts on another node with nodeAffinity
+            resource:
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: redis-test
+              spec:
+                template:
+                  spec:
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                            - matchExpressions:
+                                - key: kubernetes.io/hostname
+                                  operator: NotIn
+                                  values:
+                                    - ($nodeName)
         - sleep:
             duration: 125s
         - wait:
@@ -135,20 +114,20 @@ spec:
               ($error): ~
               ($stdout != ($bootId)): true
 
-    - name: Check if Pod is ready after reboot
+    - name: Validate STS after reboot
       try:
         - assert:
-            file: assert-pod.yaml
+            file: assert-sts.yaml
         - script:
             env:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "ls data"
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "ls data"
             check:
               ($error): ~
               (contains($stdout, 'testfile')): true
       catch:
         - describe:
-            apiVersion: v1
-            kind: Pod
+            apiVersion: apps/v1
+            kind: StatefulSet
