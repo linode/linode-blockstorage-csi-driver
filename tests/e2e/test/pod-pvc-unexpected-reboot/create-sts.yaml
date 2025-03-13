@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-test
+  labels:
+    app.kubernetes.io/name: redis-test
+    app.kubernetes.io/instance: redis-test
+spec:
+  serviceName: redis-test
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis-test
+  template:
+    metadata:
+      name: redis-test
+      labels:
+        app.kubernetes.io/name: redis-test
+    spec:
+      securityContext:
+        fsGroup: 1001
+      automountServiceAccountToken: false
+      containers:
+        - name: redis-test
+          image: bitnami/redis
+          env:
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "true"
+          securityContext:
+            runAsUser: 1001
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: (join('-', ['linode-block-storage', $namespace]))
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

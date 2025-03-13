@@ -80,6 +80,27 @@ spec:
             check:
               ($error): ~
               (contains($stdout, 'testfile')): true
+
+    - name: Create STS
+      try:
+        - apply:
+            file: create-sts.yaml
+        - assert:
+            file: assert-sts.yaml
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "cd data && touch testfile"
+            check:
+              ($error): ~
+
+      catch:
+        - describe:
+            apiVersion: apps/v1
+            kind: StatefulSet
+    
     - name: Reboot the Node of the Pod e2e-pod
       try:
         - script:
@@ -131,14 +152,11 @@ spec:
             check:
               ($error): ~
               ($stdout != ($bootId)): true
-    - name: Check if Pod is ready and Volume is mounted
+    - name: Check if Pod is ready
       try:
         - assert:
-            file: assert-pvc-pod.yaml
+            file: assert-pod.yaml
       catch:
-        - describe:
-            apiVersion: v1
-            kind: PersistentVolumeClaim
         - describe:
             apiVersion: v1
             kind: Pod
@@ -157,3 +175,21 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+
+    - name: Check STS after reboot
+      try:
+        - assert:
+            file: assert-sts.yaml
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "ls data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+      catch:
+        - describe:
+            apiVersion: apps/v1
+            kind: StatefulSet
