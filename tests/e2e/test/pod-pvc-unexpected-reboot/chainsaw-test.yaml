@@ -8,6 +8,7 @@ metadata:
     all:
     basic:
 spec:
+  concurrent: false
   bindings:
     - name: nodes
       # number of nodes in cluster
