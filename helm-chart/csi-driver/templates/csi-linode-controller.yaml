@@ -54,6 +54,7 @@ spec:
         - args:
             - --v=2
             - --csi-address=$(ADDRESS)
+            - --timeout=30s
             {{- if .Values.enableMetrics}}
             - --metrics-address={{ .Values.csiAttacher.metrics.address }}
             {{- end }}
