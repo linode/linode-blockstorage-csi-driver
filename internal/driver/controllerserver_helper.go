@@ -707,7 +707,7 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
 			return volume.FilesystemPath, nil
 		}
-		return "", errVolumeAttached(volumeID, instance.ID)
+		return "", errVolumeAttached(volumeID, *volume.LinodeID)
 	}
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
