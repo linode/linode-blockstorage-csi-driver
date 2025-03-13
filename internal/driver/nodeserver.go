@@ -478,18 +478,3 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	return nodeGetVolumeStats(ctx, req)
 }
-
-func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
-	needResize, err := ns.resizeFs.NeedResize(devicePath, volumePath)
-	if err != nil {
-		return false, fmt.Errorf("could not determine if volume need resizing: %w", err)
-	}
-
-	if needResize {
-		if _, err := ns.resizeFs.Resize(devicePath, volumePath); err != nil {
-			return false, fmt.Errorf("could not resize volume: %w", err)
-		}
-	}
-
-	return needResize, nil
-}

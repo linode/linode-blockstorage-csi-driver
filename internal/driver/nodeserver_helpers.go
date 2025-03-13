@@ -16,7 +16,6 @@ limitations under the License.
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,11 +33,6 @@ const (
 	defaultFSType                  = "ext4"
 	rwPermission                   = os.FileMode(0o755)
 	ownerGroupReadWritePermissions = os.FileMode(0o660)
-)
-
-var (
-	ErrNoVolumeCapability = errors.New("volume capability is required")
-	ErrNoAccessMode       = errors.New("access mode is nil")
 )
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
@@ -405,4 +399,19 @@ func getReadOnlyFromCapability(vc *csi.VolumeCapability) (bool, error) {
 	mode := vc.GetAccessMode().GetMode()
 	return (mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY ||
 		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY), nil
+}
+
+func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
+	needResize, err := ns.resizeFs.NeedResize(devicePath, volumePath)
+	if err != nil {
+		return false, fmt.Errorf("could not determine if volume need resizing: %w", err)
+	}
+
+	if needResize {
+		if _, err := ns.resizeFs.Resize(devicePath, volumePath); err != nil {
+			return false, fmt.Errorf("could not resize volume: %w", err)
+		}
+	}
+
+	return needResize, nil
 }
