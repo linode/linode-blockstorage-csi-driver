@@ -129,8 +129,10 @@ spec:
             env:
               - name: NODE_NAME
                 value: ($nodeName)
+              - name: NAMESPACE
+                value: ($namespace)
             content: |
-              kubectl debug node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
+              kubectl debug -n $NAMESPACE node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
         - sleep:
             duration: 125s
         - wait:
