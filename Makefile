@@ -220,3 +220,16 @@ setup-dashboard:
 .PHONY: setup-tracing
 setup-tracing:
 	KUBECONFIG=$(KUBECONFIG) ./hack/setup-tracing.sh
+
+.PHONY: lke-test
+lke-test:
+	# Set temporary image tag using ttl.sh
+	$(eval DEV_TAG_EXTENSION := $(shell git rev-parse --short HEAD))
+	$(eval TEMP_IMAGE_TAG := ttl.sh/$(IMAGE_NAME)-$(IMAGE_VERSION)-$(DEV_TAG_EXTENSION):1h)
+
+	# Build and push the image with the temporary tag
+	IMAGE_TAG=$(TEMP_IMAGE_TAG) $(MAKE) docker-build docker-push
+
+	# Update the image in the DaemonSet and StatefulSet
+	kubectl -n kube-system set image ds csi-linode-node csi-linode-plugin=$(TEMP_IMAGE_TAG)
+	kubectl -n kube-system set image sts csi-linode-controller csi-linode-plugin=$(TEMP_IMAGE_TAG)
