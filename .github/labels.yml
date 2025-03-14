@@ -26,6 +26,12 @@
 - name: ignore-for-release
   description: PRs you do not want to render in the changelog.
   color: 7b8eac
+- name: deprecated
+  description: for deprecated features in the changelog.
+  color: e4e669
+- name: security
+  description: for security fixes in the changelog.
+  color: dd4739
 # Issue Labels
 - name: enhancement
   description: issues that request a enhancement.
