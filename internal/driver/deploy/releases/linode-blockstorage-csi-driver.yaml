@@ -310,7 +310,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
+        image: registry.k8s.io/sig-storage/csi-attacher:v4.8.1
         imagePullPolicy: IfNotPresent
         name: csi-attacher
         securityContext:
@@ -324,6 +324,7 @@ spec:
       - args:
         - --v=2
         - --csi-address=$(ADDRESS)
+        - --timeout=30s
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
