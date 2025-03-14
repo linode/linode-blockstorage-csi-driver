@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: e2e-pod
+status:
+  containerStatuses:
+  - name: e2e-pod
+    ready: true
+    started: true
+  phase: Running
