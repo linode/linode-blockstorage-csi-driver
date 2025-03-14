@@ -43,6 +43,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if encrypted volume is created and encrypted
       try:
         - script:

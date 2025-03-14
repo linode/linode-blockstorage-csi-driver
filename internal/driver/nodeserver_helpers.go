@@ -305,7 +305,7 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 
 	// Format and mount the drive
 	log.V(4).Info("formatting and mounting the volume")
-	if err := ns.mounter.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
+	if err := ns.mounter.Formater.FormatAndMount(fmtAndMountSource, stagingTargetPath, fsType, mountOptions); err != nil {
 		return errInternal("Failed to format and mount device from (%q)---(%q) to (%q) with fstype (%q) and options (%q): %v",
 			fmtAndMountSource, devicePath, stagingTargetPath, fsType, mountOptions, err)
 	}
@@ -387,4 +387,31 @@ func (ns *NodeServer) getMountSource(ctx context.Context, input string) (string,
 	result := parts[1]
 	log.V(4).Info("Exiting getMountSource", "result", result)
 	return result, nil
+}
+
+func getReadOnlyFromCapability(vc *csi.VolumeCapability) (bool, error) {
+	if vc == nil {
+		return false, ErrNoVolumeCapability
+	}
+	if vc.GetAccessMode() == nil {
+		return false, ErrNoAccessMode
+	}
+	mode := vc.GetAccessMode().GetMode()
+	return (mode == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY ||
+		mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY), nil
+}
+
+func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
+	needResize, err := ns.resizeFs.NeedResize(devicePath, volumePath)
+	if err != nil {
+		return false, fmt.Errorf("could not determine if volume need resizing: %w", err)
+	}
+
+	if needResize {
+		if _, err := ns.resizeFs.Resize(devicePath, volumePath); err != nil {
+			return false, fmt.Errorf("could not resize volume: %w", err)
+		}
+	}
+
+	return needResize, nil
 }

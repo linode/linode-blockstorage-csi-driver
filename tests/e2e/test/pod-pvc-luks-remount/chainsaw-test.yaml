@@ -47,6 +47,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if volume is created
       try:
         - script:
@@ -262,6 +268,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check the LUKS volume is mounted
       try:
         - script:

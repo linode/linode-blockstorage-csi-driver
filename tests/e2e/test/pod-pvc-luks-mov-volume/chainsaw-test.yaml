@@ -51,6 +51,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if the pod is scheduled on control plane node
       try:
         - script:
@@ -154,6 +160,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if the pod is scheduled on worker node
       try:
         - script:
@@ -235,6 +247,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if the pod is scheduled on control plane node
       try:
         - script:

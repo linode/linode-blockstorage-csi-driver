@@ -44,6 +44,12 @@ spec:
         - describe:
             apiVersion: v1
             kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
     - name: Check if volume is create and size is 10 Gi
       try:
         - script:
@@ -78,6 +84,17 @@ spec:
               spec:
                 capacity:
                   storage: 10Gi
+    - name: Check size
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
+            check:
+              ($error): ~
+              (contains($stdout, '9.8G')): true
     - name: Create a file inside the pod and check it was created
       try:
         - script:
@@ -131,6 +148,17 @@ spec:
               spec:
                 capacity:
                   storage: 20Gi
+    - name: Check size after expansion, before unmounting
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
+            check:
+              ($error): ~
+              (contains($stdout, '9.8G')): true
     - name: Check if the file still exists
       try:
         - script:
@@ -168,6 +196,77 @@ spec:
               ($error): ~
               (contains($stdout, 'Volume was successfully detached')): true
               (contains($stdout, 'Volume detached in Linode')): true
+    - name: Create Pod
+      try:
+        - create:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: e2e-pod
+              spec:
+                containers:
+                - name: e2e-pod
+                  image: ubuntu
+                  command:
+                  - sleep
+                  - "1000000"
+                  volumeMounts:
+                  - mountPath: /data
+                    name: csi-volume
+                tolerations:
+                - key: "node-role.kubernetes.io/control-plane"
+                  operator: "Exists"
+                  effect: "NoSchedule"
+                volumes:
+                - name: csi-volume
+                  persistentVolumeClaim:
+                    claimName: pvc-filesystem
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+    - name: Check if Pod is ready and Volume is mounted
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: e2e-pod
+              status:
+                containerStatuses:
+                - name: e2e-pod
+                  ready: true
+                  started: true
+                phase: Running
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
+    - name: Check size after expansion, after remounting
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "df -h /data"
+            check:
+              ($error): ~
+              (contains($stdout, '20G')): true
+    - name: Delete the Pod
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
     - name: Delete PVC
       try:
         - delete:

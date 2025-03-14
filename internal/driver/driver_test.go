@@ -11,6 +11,7 @@ import (
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
 var (
@@ -30,14 +31,17 @@ func TestDriverSuite(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	mounter := &mount.SafeFormatAndMount{
-		Interface: mocks.NewMockMounter(mockCtrl),
-		Exec:      mocks.NewMockExecutor(mockCtrl),
+	mounter := &mountmanager.SafeFormatAndMount{
+		SafeFormatAndMount: &mount.SafeFormatAndMount{
+			Interface: mocks.NewMockMounter(mockCtrl),
+			Exec:      mocks.NewMockExecutor(mockCtrl),
+		},
 	}
 	deviceUtils := mocks.NewMockDeviceUtils(mockCtrl)
 	fileSystem := mocks.NewMockFileSystem(mockCtrl)
 	cryptSetup := mocks.NewMockCryptSetupClient(mockCtrl)
 	encrypt := NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
+	resizeFs := mocks.NewMockResizeFSer(mockCtrl)
 
 	fakeCloudProvider, err := linodeclient.NewLinodeClient("dummy", fmt.Sprintf("LinodeCSI/%s", vendorVersion), "")
 	if err != nil {
@@ -57,7 +61,7 @@ func TestDriverSuite(t *testing.T) {
 	metricsPort := "10251"
 	enableTracing := "true"
 	tracingPort := "4318"
-	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort, enableTracing, tracingPort); err != nil {
+	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, resizeFs, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort, enableTracing, tracingPort); err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 
