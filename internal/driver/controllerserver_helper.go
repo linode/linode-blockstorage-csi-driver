@@ -102,7 +102,7 @@ type VolumeParams struct {
 // Whether or not another volume can be attached is based on how many instance
 // disks and block storage volumes are currently attached to the instance.
 func (cs *ControllerServer) canAttach(ctx context.Context, instance *linodego.Instance) (canAttach bool, err error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Checking if volume can be attached", "instance_id", instance.ID)
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -128,7 +128,7 @@ func (cs *ControllerServer) canAttach(ctx context.Context, instance *linodego.In
 // maxAllowedVolumeAttachments calculates the maximum number of volumes that can be attached to a Linode instance,
 // taking into account the instance's memory and currently attached disks.
 func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, instance *linodego.Instance) (int, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Calculating max volume attachments")
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -154,7 +154,7 @@ func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, ins
 // getContentSourceVolume retrieves information about the Linode volume to clone from.
 // It returns a LinodeVolumeKey if a valid source volume is found, or an error if the source is invalid.
 func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentSource *csi.VolumeContentSource, accessibilityRequirements *csi.TopologyRequirement) (volKey *linodevolumes.LinodeVolumeKey, err error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to get content source volume")
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -213,7 +213,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 // It checks for existing volumes with the same label and either returns the existing
 // volume or creates a new one, optionally cloning from a source volume.
 func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label, tags, volumeEncryption string, sizeGB int, sourceVolume *linodevolumes.LinodeVolumeKey, region string) (*linodego.Volume, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Attempting to create Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags, "encryptionStatus", volumeEncryption, "region", region)
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -268,7 +268,7 @@ func getRegionFromTopology(requirements *csi.TopologyRequirement) string {
 // createLinodeVolume creates a new Linode volume with the specified label, size, and tags.
 // It returns the created volume or an error if the creation fails.
 func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags, encryptionStatus string, sizeGB int, region string) (*linodego.Volume, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Creating Linode volume", "label", label, "sizeGB", sizeGB, "tags", tags, "encryptionStatus", encryptionStatus, "region", region)
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -301,7 +301,7 @@ func (cs *ControllerServer) createLinodeVolume(ctx context.Context, label, tags,
 // isEncryptionSupported is a helper function that checks if the specified region supports volume encryption.
 // It returns true or false based on the support for encryption in that region.
 func (cs *ControllerServer) isEncryptionSupported(ctx context.Context, region string) (bool, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Checking if encryption is supported for region", "region", region)
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -329,7 +329,7 @@ func (cs *ControllerServer) isEncryptionSupported(ctx context.Context, region st
 // cloneLinodeVolume clones a Linode volume using the specified source ID and label.
 // It returns the cloned volume or an error if the cloning fails.
 func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string, sourceID int) (*linodego.Volume, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Cloning Linode volume", "label", label, "source_vol_id", sourceID)
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -439,7 +439,7 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 // It ensures that the volume name is not empty, that volume capabilities are provided,
 // and that the capabilities are valid. Returns an error if any validation fails.
 func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req *csi.CreateVolumeRequest) error {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
 	if !observability.SkipObservability {
@@ -471,7 +471,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // It extracts the capacity range from the request, calculates the size,
 // and generates a normalized volume name. Returns the volume name and size in GB.
 func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (*VolumeParams, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
 	if !observability.SkipObservability {
@@ -534,7 +534,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 // createVolumeContext creates a context map for the volume based on the request parameters.
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
 func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest, vol *linodego.Volume) map[string]string {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createVolumeContext()", "req", req)
 	defer log.V(4).Info("Exiting createVolumeContext()")
 	if !observability.SkipObservability {
@@ -560,7 +560,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 // createAndWaitForVolume attempts to create a new volume and waits for it to become active.
 // It logs the process and handles any errors that occur during creation or waiting.
 func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name string, parameters map[string]string, encryptionStatus string, sizeGB int, sourceInfo *linodevolumes.LinodeVolumeKey, region string) (*linodego.Volume, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering createAndWaitForVolume()", "name", name, "sizeGB", sizeGB, "tags", parameters[VolumeTags], "encryptionStatus", encryptionStatus, "region", region)
 	defer log.V(4).Info("Exiting createAndWaitForVolume()")
 	if !observability.SkipObservability {
@@ -598,7 +598,7 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 // prepareCreateVolumeResponse constructs a CreateVolumeResponse from the created volume details.
 // It includes the volume ID, capacity, accessible topology, and any relevant context or content source.
 func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol *linodego.Volume, size int64, volContext map[string]string, sourceInfo *linodevolumes.LinodeVolumeKey, contentSource *csi.VolumeContentSource) *csi.CreateVolumeResponse {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering prepareCreateVolumeResponse()", "vol", vol)
 	defer log.V(4).Info("Exiting prepareCreateVolumeResponse()")
 	if !observability.SkipObservability {
@@ -640,7 +640,7 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 // volume capability is provided and valid. If any validation fails, it returns
 // an appropriate error.
 func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (linodeID, volumeID int, err error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering validateControllerPublishVolumeRequest()", "req", req)
 	defer log.V(4).Info("Exiting validateControllerPublishVolumeRequest()")
 	if !observability.SkipObservability {
@@ -687,7 +687,7 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 // Additionally, it checks if the volume and instance are in the same region based on
 // the provided volume context. If they are not in the same region, it returns an internal error.
 func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (string, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
 	if !observability.SkipObservability {
@@ -719,7 +719,7 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 // does not exist. If any other error occurs during retrieval, it returns
 // an internal error.
 func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*linodego.Instance, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getInstance()", "linodeID", linodeID)
 	defer log.V(4).Info("Exiting getInstance()")
 	if !observability.SkipObservability {
@@ -745,7 +745,7 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 // limit is exceeded, it returns an error indicating the maximum volume
 // attachments allowed.
 func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instance *linodego.Instance) error {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering checkAttachmentCapacity()", "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting checkAttachmentCapacity()")
 	if !observability.SkipObservability {
@@ -775,7 +775,7 @@ func (cs *ControllerServer) checkAttachmentCapacity(ctx context.Context, instanc
 // attachment process. If the volume is already attached, it allows for a
 // retry by returning an Unavailable error.
 func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID int) error {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering attachVolume()", "volume_id", volumeID, "node_id", linodeID)
 	defer log.V(4).Info("Exiting attachVolume()")
 	if !observability.SkipObservability {

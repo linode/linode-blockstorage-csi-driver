@@ -19,7 +19,7 @@ import (
 var unixStatfs = unix.Statfs
 
 func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 
 	if req.GetVolumeId() == "" || req.GetVolumePath() == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID or path empty")

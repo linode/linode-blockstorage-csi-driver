@@ -124,7 +124,7 @@ func getLuksContext(secrets, volContext map[string]string, lifecycle VolumeLifec
 }
 
 func (e *Encryption) luksFormat(ctx context.Context, luksCtx *LuksContext, source string) (devicePath string, err error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 	devicePath = "/dev/mapper/" + luksCtx.VolumeName
 
 	// Set params
@@ -174,7 +174,7 @@ func (e *Encryption) luksFormat(ctx context.Context, luksCtx *LuksContext, sourc
 }
 
 func (e *Encryption) luksOpen(ctx context.Context, luksCtx *LuksContext, source string) (string, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 
 	// Initialize the device using the path
 	log.V(4).Info("Initializing device to perform luks open", "source", source)
@@ -208,7 +208,7 @@ func (e *Encryption) luksOpen(ctx context.Context, luksCtx *LuksContext, source 
 }
 
 func (e *Encryption) luksClose(ctx context.Context, volumeName string) error {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 	// Initialize the device by name
 	log.V(4).Info("Initializing device to perform luks close", "volumeName", volumeName)
 	newLuksDeviceByName, err := cryptsetupclient.NewLuksDeviceByName(e.CryptSetup, volumeName)
@@ -236,7 +236,7 @@ func (e *Encryption) luksClose(ctx context.Context, volumeName string) error {
 }
 
 func (e *Encryption) blkidValid(ctx context.Context, source string) (bool, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 	log.V(4).Info("Entering blkidValid", "source", source)
 	if source == "" {
 		return false, errors.New("invalid source")

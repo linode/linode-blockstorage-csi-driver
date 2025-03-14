@@ -64,7 +64,8 @@ type LinodeDriver struct {
 const MaxVolumeLabelPrefixLength = 12
 
 func GetLinodeDriver(ctx context.Context) *LinodeDriver {
-	log, _, done := logger.GetLogger(ctx).WithMethod("GetLinodeDriver")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "GetLinodeDriver")
 	defer done()
 
 	log.V(2).Info("Creating LinodeDriver")
@@ -93,7 +94,8 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	enableTracing string,
 	tracingPort string,
 ) error {
-	log, _, done := logger.GetLogger(ctx).WithMethod("SetupLinodeDriver")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "SetupLinodeDriver")
 	defer done()
 
 	log.V(2).Info("Setting up LinodeDriver")
@@ -153,7 +155,8 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 }
 
 func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.Context, rpcType csi.ControllerServiceCapability_RPC_Type) error {
-	log, _, done := logger.GetLogger(ctx).WithMethod("ValidateControllerServiceRequest")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "ValidateControllerServiceRequest")
 	defer done()
 
 	log.V(4).Info("Validating controller service request", "type", rpcType)
@@ -174,7 +177,8 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.C
 }
 
 func (linodeDriver *LinodeDriver) Run(ctx context.Context, endpoint string) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("Run")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "Run")
 	defer done()
 
 	log.V(2).Info("Starting LinodeDriver", "name", linodeDriver.name)

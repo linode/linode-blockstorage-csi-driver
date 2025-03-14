@@ -53,7 +53,7 @@ type NodeServer struct {
 var _ csi.NodeServer = &NodeServer{}
 
 func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mountmanager.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, client linodeclient.LinodeClient, metadata Metadata, encrypt Encryption, resize mountmanager.ResizeFSer) (*NodeServer, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new NodeServer")
 
@@ -89,7 +89,8 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 }
 
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodePublishVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodePublishVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -159,7 +160,8 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 }
 
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnpublishVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeUnpublishVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -193,7 +195,8 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeStageVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeStageVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -304,7 +307,8 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeUnstageVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeUnstageVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -345,7 +349,8 @@ func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeExpandVolume")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeExpandVolume")
 	defer done()
 
 	functionStartTime := time.Now()
@@ -427,7 +432,8 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 }
 
 func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeGetCapabilities")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeGetCapabilities")
 	defer done()
 
 	log.V(2).Info("Processing request")
@@ -438,7 +444,8 @@ func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeGetInfo")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeGetInfo")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)
@@ -471,7 +478,8 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 }
 
 func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("NodeGetVolumeStats")
+	log, ctx := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "NodeGetVolumeStats")
 	defer done()
 
 	log.V(2).Info("Processing request", "req", req)

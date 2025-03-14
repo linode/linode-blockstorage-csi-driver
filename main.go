@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-logr/logr"
 	"github.com/ianschenck/envflag"
 	"github.com/linode/linodego"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -89,9 +90,7 @@ func loadConfig() configuration {
 
 func main() {
 	// Create a base context with the logger
-	ctx := context.Background()
-	log := logger.NewLogger(ctx)
-	ctx = context.WithValue(ctx, logger.LoggerKey{}, log)
+	log, ctx := logger.NewLogger(context.Background())
 
 	klog.InitFlags(nil)
 	if err := flag.Set("logtostderr", "true"); err != nil {
@@ -109,9 +108,9 @@ func main() {
 	os.Exit(0)
 }
 
-func maxProcs(log *logger.Logger) {
+func maxProcs(log logr.Logger) {
 	undoMaxprocs, maxprocsError := maxprocs.Set(maxprocs.Logger(func(msg string, keysAndValues ...interface{}) {
-		log.Klogr.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
+		log.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
 	}))
 	defer undoMaxprocs()
 	if maxprocsError != nil {
@@ -120,7 +119,7 @@ func maxProcs(log *logger.Logger) {
 }
 
 func handle(ctx context.Context) error {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 
 	if vendorVersion == "" {
 		return errors.New("vendorVersion must be set at compile time")
