@@ -36,7 +36,7 @@ type IdentityServer struct {
 // NewIdentityServer creates and initializes a new IdentityServer.
 // It takes a context and a LinodeDriver as input and returns a pointer to IdentityServer and an error.
 func NewIdentityServer(ctx context.Context, linodeDriver *LinodeDriver) (*IdentityServer, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new IdentityServer")
 
@@ -57,7 +57,8 @@ func NewIdentityServer(ctx context.Context, linodeDriver *LinodeDriver) (*Identi
 // This method is REQUIRED for the Identity service as per the CSI spec.
 // It returns the name and version of the CSI plugin.
 func (linodeIdentity *IdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("GetPluginInfo")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "GetPluginInfo")
 	defer done()
 
 	log.V(2).Info("Processing request")
@@ -76,7 +77,8 @@ func (linodeIdentity *IdentityServer) GetPluginInfo(ctx context.Context, req *cs
 // This method is REQUIRED for the Identity service as per the CSI spec.
 // It informs the CO of the supported features by this plugin.
 func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("GetPluginCapabilities")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "GetPluginCapabilities")
 	defer done()
 
 	log.V(2).Info("Processing request")
@@ -117,7 +119,8 @@ func (linodeIdentity *IdentityServer) GetPluginCapabilities(ctx context.Context,
 // This method is REQUIRED for the Identity service as per the CSI spec.
 // It allows the CO to check the readiness of the plugin.
 func (linodeIdentity *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	log, _, done := logger.GetLogger(ctx).WithMethod("Probe")
+	log, _ := logger.GetLogger(ctx)
+	log, done := logger.WithMethod(log, "Probe")
 	defer done()
 
 	log.V(2).Info("Processing request")

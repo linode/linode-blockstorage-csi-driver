@@ -64,7 +64,7 @@ var newKubeClient = func(ctx context.Context) (KubeClient, error) {
 
 // GetNodeMetadata retrieves metadata about the current node/instance.
 func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string, fileSystem filesystem.FileSystem) (Metadata, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 	var instance *linodego.Instance
 
 	// Step 1: Attempt to create the metadata client
@@ -175,7 +175,7 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 // function otherwise returns a non-nil error, callers should call
 // [GetMetadataFromAPI].
 func GetMetadata(ctx context.Context, client MetadataClient) (Metadata, error) {
-	log := logger.GetLogger(ctx)
+	log, ctx := logger.GetLogger(ctx)
 
 	log.V(2).Info("Processing request")
 	if client == nil {
@@ -224,7 +224,7 @@ var errNilClient = errors.New("nil client")
 
 // Add this new helper function
 func getLinodeIDFromProductSerial(ctx context.Context, fs filesystem.FileSystem) (int, error) {
-	log := logger.GetLogger(ctx)
+	log, _ := logger.GetLogger(ctx)
 
 	filePath := "/sys/devices/virtual/dmi/id/product_serial"
 	file, err := fs.Open(filePath)

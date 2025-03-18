@@ -1,13 +1,16 @@
-package logger
+package logger_test
 
 import (
 	"context"
 	"reflect"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 func TestLogGRPC(t *testing.T) {
@@ -53,7 +56,7 @@ func TestLogGRPC(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := LogGRPC(context.Background(), tt.args.req, tt.args.info, tt.args.handler)
+			got, err := logger.LogGRPC(context.Background(), tt.args.req, tt.args.info, tt.args.handler)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LogGRPC() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -81,12 +84,9 @@ func TestLogger_WithMethod(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := NewLogger(context.Background())
-			logger, ctx, done := l.WithMethod(tt.method)
+			l, ctx := logger.NewLogger(context.Background())
+			_, done := logger.WithMethod(l, tt.method)
 
-			if logger == nil {
-				t.Error("Logger.WithMethod() returned nil logger")
-			}
 			if ctx == nil {
 				t.Error("Logger.WithMethod() returned nil context")
 			}
@@ -96,8 +96,8 @@ func TestLogger_WithMethod(t *testing.T) {
 
 			// Check if the context contains the logger
 			if ctx != nil {
-				contextLogger, ok := ctx.Value(LoggerKey{}).(*Logger)
-				if !ok || contextLogger != logger {
+				contextLogger, ok := ctx.Value(logr.Logger{}).(logr.Logger)
+				if !ok || contextLogger != l {
 					t.Error("Logger.WithMethod() context does not contain the correct logger")
 				}
 			}

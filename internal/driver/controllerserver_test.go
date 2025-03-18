@@ -267,6 +267,19 @@ func TestControllerUnPublishVolume(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "unplubishOptionnalNodeID",
+			req: &csi.ControllerUnpublishVolumeRequest{
+				VolumeId: "1003",
+			},
+			resp: &csi.ControllerUnpublishVolumeResponse{},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().DetachVolume(gomock.Any(), 630706045).Return(nil)
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
