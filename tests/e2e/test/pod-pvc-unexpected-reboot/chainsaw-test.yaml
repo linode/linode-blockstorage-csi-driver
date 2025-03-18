@@ -81,7 +81,7 @@ spec:
             check:
               ($error): ~
               (contains($stdout, 'testfile')): true
-    
+
     - name: Reboot the Node of the Pod e2e-pod
       try:
         - script:
@@ -114,8 +114,18 @@ spec:
                 value: ($namespace)
             content: |
               kubectl debug -n $NAMESPACE node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
-        - sleep:
-            duration: 125s
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              reason: NodeNotReady
+              source:
+                component: node-controller
+              involvedObject:
+                apiVersion: v1
+                kind: Pod
+                name: e2e-pod
+                namespace: ($namespace)
         - wait:
             apiVersion: v1
             kind: Node

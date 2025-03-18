@@ -41,7 +41,7 @@ spec:
         - describe:
             apiVersion: apps/v1
             kind: StatefulSet
-    
+
     - name: Reboot the Node of the STS
       try:
         - script:
@@ -93,8 +93,18 @@ spec:
                                   operator: NotIn
                                   values:
                                     - ($nodeName)
-        - sleep:
-            duration: 125s
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              reason: NodeNotReady
+              source:
+                component: node-controller
+              involvedObject:
+                apiVersion: v1
+                kind: Pod
+                name: redis-test-0
+                namespace: ($namespace)
         - wait:
             apiVersion: v1
             kind: Node
