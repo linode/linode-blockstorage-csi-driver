@@ -1,0 +1,152 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: sts-pvc-unexpected-reboot
+  labels:
+    all:
+    basic:
+spec:
+  concurrent: false
+  bindings:
+    - name: nodes
+      # number of nodes in cluster
+      value: (length(x_k8s_list($client, 'v1', 'Node', '').items))
+    - name: linode_url
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.apiurl || base64_encode('https://api.linode.com')))
+    - name: linode_token
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.token))
+  steps:
+    - name: Check if CSI Driver is deployed
+      try:
+        - assert:
+            file: assert-csi-driver-resources.yaml
+
+    - name: Create STS
+      try:
+        - apply:
+            file: create-sts.yaml
+        - assert:
+            file: assert-sts.yaml
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "cd data && touch testfile"
+            check:
+              ($error): ~
+      catch:
+        - describe:
+            apiVersion: apps/v1
+            kind: StatefulSet
+
+    - name: Reboot the Node of the STS
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl get pod redis-test-0 -n $NAMESPACE -o jsonpath='{.spec.nodeName}'
+            outputs:
+              - name: nodeName
+                value: ($stdout)
+
+        # get bootid of the node
+        - script:
+            env:
+              - name: NODE_NAME
+                value: ($nodeName)
+            content: |
+              kubectl get node $NODE_NAME -o jsonpath='{.status.nodeInfo.bootID}'
+            check:
+              ($error): ~
+            outputs:
+              - name: bootId
+                value: ($stdout)
+        - script:
+            env:
+              - name: NODE_NAME
+                value: ($nodeName)
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl debug -n $NAMESPACE node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
+        - patch:
+            # force sts on another node with nodeAffinity
+            resource:
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: redis-test
+              spec:
+                template:
+                  spec:
+                    affinity:
+                      nodeAffinity:
+                        requiredDuringSchedulingIgnoredDuringExecution:
+                          nodeSelectorTerms:
+                            - matchExpressions:
+                                - key: kubernetes.io/hostname
+                                  operator: NotIn
+                                  values:
+                                    - ($nodeName)
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Event
+              reason: NodeNotReady
+              source:
+                component: node-controller
+              involvedObject:
+                apiVersion: v1
+                kind: Pod
+                name: redis-test-0
+                namespace: ($namespace)
+        - wait:
+            apiVersion: v1
+            kind: Node
+            timeout: 120s
+            name: ($nodeName)
+            for:
+              condition:
+                name: Ready
+                value: "true"
+        # validate the bootid of the node changed
+        - script:
+            env:
+              - name: NODE_NAME
+                value: ($nodeName)
+            content: |
+              kubectl get node $NODE_NAME -o jsonpath='{.status.nodeInfo.bootID}'
+            check:
+              ($error): ~
+              ($stdout != ($bootId)): true
+
+    - name: Validate STS after reboot
+      try:
+        - wait:
+            apiVersion: v1
+            kind: Pod
+            name: redis-test-0
+            namespace: ($namespace)
+            timeout: 120s
+            for:
+              condition:
+                name: Ready
+                value: "true"
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "ls data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+      catch:
+        - describe:
+            apiVersion: apps/v1
+            kind: StatefulSet
