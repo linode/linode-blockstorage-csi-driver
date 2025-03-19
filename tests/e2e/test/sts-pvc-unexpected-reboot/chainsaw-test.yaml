@@ -127,8 +127,16 @@ spec:
 
     - name: Validate STS after reboot
       try:
-        - assert:
-            file: assert-sts.yaml
+        - wait:
+            apiVersion: v1
+            kind: Pod
+            name: redis-test-0
+            namespace: ($namespace)
+            timeout: 120s
+            for:
+              condition:
+                name: Ready
+                value: "true"
         - script:
             env:
               - name: NAMESPACE

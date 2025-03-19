@@ -148,8 +148,16 @@ spec:
 
     - name: Check if Pod is ready after reboot
       try:
-        - assert:
-            file: assert-pod.yaml
+        - wait:
+            apiVersion: v1
+            kind: Pod
+            name: e2e-pod
+            namespace: ($namespace)
+            timeout: 120s
+            for:
+              condition:
+                name: Ready
+                value: "true"
         - script:
             env:
               - name: NAMESPACE
