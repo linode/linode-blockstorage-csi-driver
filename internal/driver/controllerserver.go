@@ -461,6 +461,11 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 		return resp, errNotFound("get volume: %v", err)
 	}
 
+	// Check if the volume is already monted to a Linode
+	if vol.LinodeID != nil {
+		return resp, errVolumeInUse
+	}
+
 	// Is the caller trying to resize the volume to be smaller than it currently is?
 	if vol.Size > bytesToGB(size) {
 		return resp, errResizeDown
