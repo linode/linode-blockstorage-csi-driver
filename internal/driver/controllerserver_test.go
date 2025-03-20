@@ -424,7 +424,7 @@ func TestControllerExpandVolume(t *testing.T) {
 		expectedError           error
 	}{
 		{
-			name: "expandvolume",
+			name: "expandvolumeInUse",
 			req: &csi.ControllerExpandVolumeRequest{
 				VolumeId: "1003",
 				CapacityRange: &csi.CapacityRange{
@@ -437,8 +437,25 @@ func TestControllerExpandVolume(t *testing.T) {
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+			},
+			expectedError: errVolumeInUse,
+		},
+		{
+			name: "expandvolume",
+			req: &csi.ControllerExpandVolumeRequest{
+				VolumeId: "1003",
+				CapacityRange: &csi.CapacityRange{
+					LimitBytes: 20 << 30, // 20 GiB
+				},
+			},
+			resp: &csi.ControllerExpandVolumeResponse{
+				CapacityBytes:         10 << 30,
+				NodeExpansionRequired: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ResizeVolume(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
 			},
 			expectedError: nil,
 		},
