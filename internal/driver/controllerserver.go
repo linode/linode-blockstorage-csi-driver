@@ -409,7 +409,8 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		NextToken: nextToken,
 	}
 
-	log.V(2).Info("Volumes listed", "response", resp)
+	log.V(2).Info("Volumes listed")
+	log.V(6).Info("Volumes listed", "response", resp)
 	return resp, nil
 }
 
@@ -483,7 +484,7 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	log.V(2).Info("Volume resized successfully", "volume_id", volumeID)
 	resp = &csi.ControllerExpandVolumeResponse{
 		CapacityBytes:         size,
-		NodeExpansionRequired: false,
+		NodeExpansionRequired: true,
 	}
 	return resp, nil
 }

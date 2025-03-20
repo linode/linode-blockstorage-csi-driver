@@ -410,6 +410,32 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, err
 	}
 
+	// Check if size in API is different from actual size
+	// it means the volume has been resized offline
+	linodeVolumeID, err := linodevolumes.VolumeIdAsInt("NodeExpandVolume", req)
+	if err != nil {
+		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
+		return nil, errInternal("failed to get volume id: %v", err)
+	}
+
+	volume, err := ns.client.GetVolume(ctx, linodeVolumeID)
+	if err != nil {
+		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
+		return nil, errInternal("failed to get volume %d: %v", volume.ID, err)
+	}
+
+	diskSize, err := ns.getDeviceSize(devicePath)
+	if err != nil {
+		observability.RecordMetrics(observability.NodeExpandTotal, observability.NodeExpandDuration, observability.Failed, functionStartTime)
+		return nil, errInternal("failed to get device size: %v", err)
+	}
+
+	const GiB uint64 = 1 << 30
+	if uint64(volume.Size)*GiB != diskSize {
+		log.V(4).Info("Volume size is different from disk siz", "volumeID", volumeID, "volumeSize", volume.Size, "diskSize", diskSize)
+		return nil, status.Error(codes.FailedPrecondition, "volume has been resized, but volume has not been detach / attach")
+	}
+
 	// Resize the volume
 
 	resized, err := ns.resize(devicePath, volumePath)
