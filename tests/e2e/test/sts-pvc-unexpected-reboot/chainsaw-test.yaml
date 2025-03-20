@@ -74,6 +74,19 @@ spec:
                 value: ($namespace)
             content: |
               kubectl debug -n $NAMESPACE node/$NODE_NAME --profile=sysadmin --image=busybox -- chroot /host/ reboot --force
+        - assert:
+            timeout: 5m
+            resource:
+              apiVersion: v1
+              kind: Event
+              reason: NodeNotReady
+              source:
+                component: node-controller
+              involvedObject:
+                apiVersion: v1
+                kind: Pod
+                name: redis-test-0
+                namespace: ($namespace)
         - patch:
             # force sts on another node with nodeAffinity
             resource:
@@ -93,22 +106,10 @@ spec:
                                   operator: NotIn
                                   values:
                                     - ($nodeName)
-        - assert:
-            resource:
-              apiVersion: v1
-              kind: Event
-              reason: NodeNotReady
-              source:
-                component: node-controller
-              involvedObject:
-                apiVersion: v1
-                kind: Pod
-                name: redis-test-0
-                namespace: ($namespace)
         - wait:
             apiVersion: v1
             kind: Node
-            timeout: 120s
+            timeout: 5m
             name: ($nodeName)
             for:
               condition:
@@ -148,5 +149,11 @@ spec:
               (contains($stdout, 'testfile')): true
       catch:
         - describe:
-            apiVersion: apps/v1
-            kind: StatefulSet
+            apiVersion: v1
+            kind: Pod
+            name: redis-test-0
+            namespace: ($namespace)
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            namespace: ($namespace)
