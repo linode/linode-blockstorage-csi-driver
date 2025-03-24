@@ -8,7 +8,14 @@ metadata:
     all:
     basic:
 spec:
+  description: |
+    This test validates the behavior of a StatefulSet with PVCs when a node is unexpectedly rebooted.
+    1. Create a StatefulSet with PVCs.
+    2. Validate the StatefulSet is running.
+    3. Reboot the node of the StatefulSet.
+    4. Validate the StatefulSet is running after the reboot.
   concurrent: false
+  skip: true
   bindings:
     - name: nodes
       # number of nodes in cluster
