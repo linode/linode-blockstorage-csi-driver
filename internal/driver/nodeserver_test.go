@@ -478,6 +478,7 @@ func TestNodeExpandVolume(t *testing.T) {
 		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
 		expectFormatCalls       func(m *mocks.MockFormater)
 		expectResizeFsCall      func(m *mocks.MockResizeFSer)
+		expectExecCalls         func(m *mocks.MockExecutor, ctrl *gomock.Controller)
 		expectedError           error
 	}{
 		{
@@ -495,6 +496,17 @@ func TestNodeExpandVolume(t *testing.T) {
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
 				m.EXPECT().Stat("/dev/disk/by-id/linode-volkey").Return(nil, nil)
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), 1001).Return(&linodego.Volume{
+					ID:   1001,
+					Size: 10,
+				}, nil)
+			},
+			expectExecCalls: func(m *mocks.MockExecutor, ctrl *gomock.Controller) {
+				command := mocks.NewMockCommand(ctrl)
+				m.EXPECT().Command("blockdev", "--getsize64", "/dev/disk/by-id/linode-volkey").Return(command)
+				command.EXPECT().CombinedOutput().Return([]byte("10737418240"), nil)
 			},
 			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
 				m.EXPECT().NeedResize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
@@ -525,6 +537,17 @@ func TestNodeExpandVolume(t *testing.T) {
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
 				m.EXPECT().Stat("/dev/disk/by-id/linode-volkey").Return(nil, nil)
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetVolume(gomock.Any(), 1001).Return(&linodego.Volume{
+					ID:   1001,
+					Size: 10,
+				}, nil)
+			},
+			expectExecCalls: func(m *mocks.MockExecutor, ctrl *gomock.Controller) {
+				command := mocks.NewMockCommand(ctrl)
+				m.EXPECT().Command("blockdev", "--getsize64", "/dev/disk/by-id/linode-volkey").Return(command)
+				command.EXPECT().CombinedOutput().Return([]byte("10737418240"), nil)
 			},
 			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
 				m.EXPECT().NeedResize("/dev/disk/by-id/linode-volkey", "/mnt/staging").Return(true, nil)
@@ -630,6 +653,9 @@ func TestNodeExpandVolume(t *testing.T) {
 			}
 			if tt.expectResizeFsCall != nil {
 				tt.expectResizeFsCall(mockResizeFS)
+			}
+			if tt.expectExecCalls != nil {
+				tt.expectExecCalls(mockExec, ctrl)
 			}
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
