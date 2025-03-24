@@ -8,6 +8,13 @@ metadata:
     all:
     basic:
 spec:
+  description:
+    This test validates the behavior of a Pod with PVC when a node is unexpectedly rebooted.
+    1. Create a Pod with PVC.
+    2. Validate the Pod is running.
+    3. Reboot the node of the Pod.
+    4. Validate the Pod is running after the reboot.
+  skip: true
   concurrent: false
   bindings:
     - name: nodes
