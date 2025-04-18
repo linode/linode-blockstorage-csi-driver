@@ -93,6 +93,10 @@ spec:
         {{- with .Values.csiLinodePlugin.volumeMounts }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- with .Values.csiLinodePlugin.resources }}
+        resources:
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       hostNetwork: true
       priorityClassName: system-node-critical
       serviceAccount: csi-node-sa
