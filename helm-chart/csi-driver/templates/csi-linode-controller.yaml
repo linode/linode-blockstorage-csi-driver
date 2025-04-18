@@ -148,6 +148,10 @@ spec:
             {{- with .Values.csiLinodePlugin.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- with .Values.csiLinodePlugin.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       serviceAccount: csi-controller-sa
       {{- if .Values.controller.nodeSelector }}
       nodeSelector:

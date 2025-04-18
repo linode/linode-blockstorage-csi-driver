@@ -81,6 +81,8 @@ csiLinodePlugin:
   volumeMounts:
   #  - mountPath: /tmp/
   #    name: test-volume
+  # This section adds the ability to pass resources to the container
+  resources:
 
 kubectl:
   image: alpine/k8s  # This needs to be alpine based and have both kubectl and curl installed.
