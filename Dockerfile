@@ -20,7 +20,7 @@ FROM alpine:3.20.3
 LABEL maintainers="Linode"
 LABEL description="Linode CSI Driver"
 
-RUN apk add --no-cache e2fsprogs e2fsprogs-extra findmnt blkid cryptsetup
+RUN apk add --no-cache e2fsprogs e2fsprogs-extra findmnt blkid cryptsetup lsblk
 RUN apk add --no-cache xfsprogs=6.2.0-r2 xfsprogs-extra=6.2.0-r2 --repository=http://dl-cdn.alpinelinux.org/alpine/v3.18/main
 
 COPY --from=builder /bin/linode-blockstorage-csi-driver /linode

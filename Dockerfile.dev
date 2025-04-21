@@ -8,6 +8,7 @@ WORKDIR /linode
 
 RUN apk add \
     blkid \
+    lsblk \
     cryptsetup \
     cryptsetup-libs \
     cryptsetup-dev \
