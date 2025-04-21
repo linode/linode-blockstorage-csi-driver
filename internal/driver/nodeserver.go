@@ -15,8 +15,10 @@ limitations under the License.
 */
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"sync"
 	"time"
@@ -48,6 +50,14 @@ type NodeServer struct {
 	mux sync.Mutex
 
 	csi.UnimplementedNodeServer
+}
+
+type BlockDevice struct {
+	Name string `json:"name"`
+}
+
+type LsblkOutput struct {
+	BlockDevices []BlockDevice `json:"blockdevices"`
 }
 
 var _ csi.NodeServer = &NodeServer{}
@@ -469,6 +479,10 @@ func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 	}, nil
 }
 
+func execRunner(name string, arg ...string) ([]byte, error) {
+	return exec.Command(name, arg...).CombinedOutput()
+}
+
 func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	log, ctx := logger.GetLogger(ctx)
 	log, done := logger.WithMethod(log, "NodeGetInfo")
@@ -484,13 +498,18 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// This is what the spec wants us to report: the actual number of volumes
 	// that can be attached, and not the theoretical maximum number of
 	// devices that can be attached.
-	log.V(4).Info("Listing instance disks", "nodeID", ns.metadata.ID)
-	disks, err := ns.client.ListInstanceDisks(ctx, ns.metadata.ID, nil)
-	if err != nil {
-		return &csi.NodeGetInfoResponse{}, errInternal("list instance disks: %v", err)
-	}
-	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(disks)
+	log.V(4).Info("Listing attached block devices", "nodeID", ns.metadata.ID)
 
+	lsblkOutput, err := execRunner("lsblk", "-J", "--nodeps")
+	if err != nil {
+		return &csi.NodeGetInfoResponse{}, errInternal("lsblk: %v", err)
+	}
+	var lsblkData LsblkOutput
+	if err := json.Unmarshal(lsblkOutput, &lsblkData); err != nil {
+		return &csi.NodeGetInfoResponse{}, errInternal("error unmarshaling lsblk json output: %w", err)
+	}
+
+	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(lsblkData.BlockDevices)
 	log.V(2).Info("functionStatusfully completed")
 	return &csi.NodeGetInfoResponse{
 		NodeId:            strconv.Itoa(ns.metadata.ID),
