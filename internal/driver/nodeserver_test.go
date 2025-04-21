@@ -755,13 +755,6 @@ func TestNodeGetInfo(t *testing.T) {
 					},
 				},
 			},
-			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
-				m.EXPECT().ListInstanceDisks(gomock.Any(), gomock.Any(), gomock.Any()).Return([]linodego.InstanceDisk{
-					{
-						ID: 1,
-					},
-				}, nil)
-			},
 			expectedError: nil,
 		},
 	}
@@ -771,9 +764,6 @@ func TestNodeGetInfo(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			mockClient := mocks.NewMockLinodeClient(ctrl)
-			if tt.expectLinodeClientCalls != nil {
-				tt.expectLinodeClientCalls(mockClient)
-			}
 			ns := &NodeServer{
 				driver: &LinodeDriver{},
 				client: mockClient,
