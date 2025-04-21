@@ -500,13 +500,13 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// devices that can be attached.
 	log.V(4).Info("Listing attached block devices", "nodeID", ns.metadata.ID)
 
-	lsblkOutput, err := execRunner("lsblk", "-J", "--nodeps")
+	lsblkOutput, err := execRunner("lsblk", "-J", "--nodeps", "-e7")
 	if err != nil {
 		return &csi.NodeGetInfoResponse{}, errInternal("lsblk: %v", err)
 	}
 	var lsblkData LsblkOutput
 	if err := json.Unmarshal(lsblkOutput, &lsblkData); err != nil {
-		return &csi.NodeGetInfoResponse{}, errInternal("error unmarshaling lsblk json output: %w", err)
+		return &csi.NodeGetInfoResponse{}, errInternal("error unmarshaling lsblk json output: %s", err)
 	}
 
 	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - len(lsblkData.BlockDevices)
