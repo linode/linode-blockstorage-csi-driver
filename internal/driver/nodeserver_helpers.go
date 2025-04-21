@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -415,19 +414,4 @@ func (ns *NodeServer) resize(devicePath, volumePath string) (bool, error) {
 	}
 
 	return needResize, nil
-}
-
-// getDeviceSize returns the size of the device at the given path.
-// size is returned in bytes.
-func (ns *NodeServer) getDeviceSize(devicePath string) (uint64, error) {
-	output, err := ns.mounter.Exec.Command("blockdev", "--getsize64", devicePath).CombinedOutput()
-	outStr := strings.TrimSpace(string(output))
-	if err != nil {
-		return 0, fmt.Errorf("failed to read size of device %s: %w: %s", devicePath, err, outStr)
-	}
-	size, err := strconv.ParseUint(outStr, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse size of device %s %s: %w", devicePath, outStr, err)
-	}
-	return size, nil
 }

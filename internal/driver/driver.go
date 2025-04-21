@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/hwinfo"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -121,7 +122,9 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
 
 	log.V(2).Info("Setting up RPC Servers")
-	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, linodeClient, metadata, encrypt, resizeFs)
+
+	hw := hwinfo.NewHardwareInfo()
+	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, metadata, encrypt, resizeFs, hw)
 	if err != nil {
 		return fmt.Errorf("new node server: %w", err)
 	}

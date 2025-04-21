@@ -87,6 +87,8 @@ spec:
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
             - name: LINODE_URL
               value: https://api.linode.com/v4
+            - name: DRIVER_ROLE
+              value: controller
             - name: LINODE_BS_PREFIX
             - name: NODE_NAME
               valueFrom:
