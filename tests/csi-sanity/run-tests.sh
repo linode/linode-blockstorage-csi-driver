@@ -10,16 +10,19 @@ DELETE_DIRECTORY="./tests/csi-sanity/rmdir_in_pod.sh"
 
 # Define the list of tests to skip as an array
 SKIP_TESTS=(
-  "WithCapacity"
-  # Need to skip it because we do not support volume snapshots
-  "should fail when the volume source volume is not found" 
-  # This case fails because we currently do not support read only volume creation on the linode side
-  # but we are supporting it in the CSI driver by mounting the volume as read only
-  "should fail when the volume is already published but is incompatible"
+   "WithCapacity"
+   # Need to skip it because we do not support volume snapshots
+   "should fail when the volume source volume is not found"
+   # This case fails because we currently do not support read only volume creation on the linode side
+   # but we are supporting it in the CSI driver by mounting the volume as read only
+   "should fail when the volume is already published but is incompatible"
 )
 
 # Join the array into a single string with '|' as the separator
-SKIP_TESTS_STRING=$(IFS='|'; echo "${SKIP_TESTS[*]}")
+SKIP_TESTS_STRING=$(
+                    IFS='|'
+                             echo "${SKIP_TESTS[*]}"
+)
 
 # Install the latest version of csi-sanity
 go install github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@latest
@@ -30,8 +33,44 @@ kubectl apply -f tests/csi-sanity/socat.yaml
 # Wait for pod to be ready
 kubectl wait --for=condition=ready --timeout=60s pods/csi-socat-0
 
+# Patch the NodeServer daemonset and add the LINODE_TOKEN and LINODE_API env vars.
+# The csi-sanity check require CrateVolume and ListVolume calls to be working.
+
+# Warning: This patch expects the csi-linode-plugin container to be the 2nd container
+# in the manifest
+kubectl patch daemonset csi-linode-node \
+   -n kube-system \
+   --type='json' \
+   -p='[
+    {
+      "op": "add",
+      "path": "/spec/template/spec/containers/1/env/-",
+      "value": {
+        "name": "LINODE_URL",
+        "value": "https://api.linode.com/v4"
+      }
+    },
+    {
+      "op": "add",
+      "path": "/spec/template/spec/containers/1/env/-",
+      "value": {
+        "name": "LINODE_TOKEN",
+        "valueFrom": {
+          "secretKeyRef": {
+            "name": "linode",
+            "key": "token"
+          }
+        }
+      }
+    }
+  ]'
+
+echo "Waiting for daemonset csi-linode-node to be ready"
+kubectl rollout status daemonset/csi-linode-node -n kube-system
+kubectl wait --namespace kube-system --for=condition=Ready pods --selector=app=csi-linode-node --timeout=180s
+
 # Start the port forwarding in the background and log output to a file
-nohup kubectl port-forward pods/csi-socat-0 10000:10000 > port-forward.log 2>&1 &
+nohup kubectl port-forward pods/csi-socat-0 10000:10000 >port-forward.log  2>&1 &
 
 # Run the csi-sanity tests with the specified parameters
 csi-sanity --ginkgo.vv --ginkgo.trace --ginkgo.skip "$SKIP_TESTS_STRING" --csi.endpoint="$CSI_ENDPOINT" --csi.createstagingpathcmd="$CREATE_DIRECTORY" --csi.createmountpathcmd="$CREATE_DIRECTORY" --csi.removestagingpathcmd="$DELETE_DIRECTORY" --csi.removemountpathcmd="$DELETE_DIRECTORY"
@@ -41,10 +80,10 @@ PID=$(lsof -t -i :10000 -sTCP:LISTEN)
 
 # Check if a PID was found and kill the process if it exists
 if [ -z "$PID" ]; then
-  echo "No process found on port 10000."
+   echo "No process found on port 10000."
 else
-  kill -9 "$PID"
-  echo "Process on port 10000 with PID $PID has been killed."
+   kill -9 "$PID"
+   echo "Process on port 10000 with PID $PID has been killed."
 fi
 
 # Remove the socat statefulset
