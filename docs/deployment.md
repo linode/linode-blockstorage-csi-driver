@@ -167,9 +167,16 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
     - The volume must be unmounted from all nodes before resizing.
       It could be unmounted by deleting the pod using the volume or by using the `kubectl delete pod <pod-name>` command.
 
-5. Driver role
+5. Driver Role Configuration
 
-The environment variable DRIVER_ROLE can be either nodeserver or controller
+Set the `DRIVER_ROLE` environment variable to control which CSI components load:
 
-    - When set to controller the LINODE_TOKEN is mandatory, and starts the controller and access to the Linode API is required.
-    - When set to nodeserver the controller start LINODE_TOKEN and access to the Linode API is not required.
+- **controller**
+  - **Prerequisite**: `LINODE_TOKEN` **must** be defined.
+  - **Behavior**: Boots the CSI Controller service.
+  - **API**: Actively calls the Linode API to provision, attach and manage volumes.
+
+- **nodeserver**
+  - **Prerequisite**: `LINODE_TOKEN` **not required**.
+  - **Behavior**: Launches only the NodeServer endpoint.
+  - **API**: Operates entirely offline—no Linode API interactions.
