@@ -556,10 +556,7 @@ func getVolumeResponse(volume *linodego.Volume) (csiVolume *csi.Volume, publishe
 		}
 	}
 
-	abnormal := false
-	if volume.Status != linodego.VolumeActive {
-		abnormal = true
-	}
+	abnormal := volume.Status != linodego.VolumeActive
 
 	volumeCondition = &csi.VolumeCondition{
 		Abnormal: abnormal,

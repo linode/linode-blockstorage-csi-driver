@@ -59,6 +59,7 @@ linters:
     - varnamelen
     - whitespace
     - zerologlint
+    - unused
   disable:
     - spancheck
   settings:
