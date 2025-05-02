@@ -111,6 +111,8 @@ spec:
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
             - name: LINODE_URL
               value: https://api.linode.com
+            - name: DRIVER_ROLE
+              value: controller
             - name: LINODE_VOLUME_LABEL_PREFIX
               value: {{ .Values.volumeLabelPrefix | default "" | quote }}
             - name: NODE_NAME

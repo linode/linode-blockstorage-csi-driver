@@ -46,6 +46,8 @@ type configuration struct {
 	// API.
 	linodeToken string
 
+	// driverRole role that the driver is executing, can be controller or nodeserver
+	driverRole string
 	// Linode API URL.
 	linodeURL string
 
@@ -77,6 +79,7 @@ func loadConfig() configuration {
 	var cfg configuration
 	envflag.StringVar(&cfg.csiEndpoint, "CSI_ENDPOINT", "unix:/tmp/csi.sock", "Path to the CSI endpoint socket")
 	envflag.StringVar(&cfg.linodeToken, "LINODE_TOKEN", "", "Linode API token")
+	envflag.StringVar(&cfg.driverRole, "DRIVER_ROLE", "controller", "Driver Role, controller or nodeserver")
 	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", linodego.APIHost, "Linode API URL")
 	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
 	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
@@ -127,10 +130,11 @@ func handle(ctx context.Context) error {
 	log.V(4).Info("Driver vendor version", "version", vendorVersion)
 
 	cfg := loadConfig()
-	if cfg.linodeToken == "" {
-		return errors.New("linode token required")
+	if cfg.driverRole == "controller" {
+		if cfg.linodeToken == "" {
+			return errors.New("linode token required")
+		}
 	}
-
 	linodeDriver := driver.GetLinodeDriver(ctx)
 
 	// Initialize Linode Driver (Move setup to main?)
