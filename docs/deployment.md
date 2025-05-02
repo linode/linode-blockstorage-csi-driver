@@ -164,5 +164,19 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
     - The CSI driver supports offline volume resizing. This means that the volume must be unmounted from all nodes before resizing.
     - To resize a volume, update the `spec.resources.requests.storage` field in the PersistentVolumeClaim (PVC) manifest and apply the changes.
     - The CSI driver will automatically resize the underlying Linode Block Storage Volume to match the new size specified in the PVC.
-    - The volume must be unmounted from all nodes before resizing.  
+    - The volume must be unmounted from all nodes before resizing.
       It could be unmounted by deleting the pod using the volume or by using the `kubectl delete pod <pod-name>` command.
+
+5. Driver Role Configuration
+
+Set the `DRIVER_ROLE` environment variable to control which CSI components load:
+
+- **controller**
+  - **Prerequisite**: `LINODE_TOKEN` **must** be defined.
+  - **Behavior**: Boots the CSI Controller service.
+  - **API**: Actively calls the Linode API to provision, attach and manage volumes.
+
+- **nodeserver**
+  - **Prerequisite**: `LINODE_TOKEN` **not required**.
+  - **Behavior**: Launches only the NodeServer endpoint.
+  - **API**: Operates entirely offline—no Linode API interactions.

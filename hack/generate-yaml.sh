@@ -19,6 +19,6 @@ fi
 
 cd $(dirname "$0")/../
 file=./deploy/kubernetes/overlays/release/kustomization.yaml
-CSI_VERSION=$TAG CSI_IMAGE_NAME=$IMAGE_NAME envsubst < "$file.template" > $file
+CSI_VERSION=$TAG CSI_IMAGE_NAME=$IMAGE_NAME envsubst <"$file.template"  >$file
 
 kustomize build "$(dirname $file)"

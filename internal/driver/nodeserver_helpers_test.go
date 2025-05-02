@@ -262,7 +262,6 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 				driver:      nil,
 				mounter:     nil,
 				deviceutils: mockDeviceUtils,
-				client:      nil,
 				metadata:    Metadata{},
 			}
 
