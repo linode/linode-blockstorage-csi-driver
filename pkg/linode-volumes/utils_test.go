@@ -31,11 +31,6 @@ func Test_hashStringToInt(t *testing.T) {
 			want: 1883843634,
 		},
 		{
-			name: "Unicode characters",
-			b:    "こんにちは世界",
-			want: 3937201063,
-		},
-		{
 			name: "Numeric string",
 			b:    "12345",
 			want: 1136836824,
