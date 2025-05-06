@@ -45,7 +45,7 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           verify: false
