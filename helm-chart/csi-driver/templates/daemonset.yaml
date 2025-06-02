@@ -45,7 +45,7 @@ spec:
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
-        - mountPath: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins_registry
+        - mountPath: /registration
           name: registration-dir
         {{- with .Values.csiNodeDriverRegistrar.volumeMounts }}
         {{- toYaml . | nindent 8 }}
