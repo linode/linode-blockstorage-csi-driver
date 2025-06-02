@@ -27,11 +27,14 @@ spec:
         - name: ADDRESS
           value: /csi/csi.sock
         - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/linodebs.csi.linode.com/csi.sock
+          value: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins/linodebs.csi.linode.com/csi.sock
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        {{- with .Values.csiNodeDriverRegistrar.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         image: {{ .Values.csiNodeDriverRegistrar.image}}:{{ .Values.csiNodeDriverRegistrar.tag}}
         name: csi-node-driver-registrar
         securityContext:
@@ -44,6 +47,9 @@ spec:
           name: plugin-dir
         - mountPath: /registration
           name: registration-dir
+        {{- with .Values.csiNodeDriverRegistrar.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       - args:
         - --v=2
         env:
@@ -100,15 +106,15 @@ spec:
         operator: Exists
       volumes:
       - hostPath:
-          path: /var/lib/kubelet/plugins_registry/
+          path: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins_registry/
           type: DirectoryOrCreate
         name: registration-dir
       - hostPath:
-          path: /var/lib/kubelet
+          path: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}
           type: Directory
         name: kubelet-dir
       - hostPath:
-          path: /var/lib/kubelet/plugins/linodebs.csi.linode.com
+          path: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins/linodebs.csi.linode.com
           type: DirectoryOrCreate
         name: plugin-dir
       - hostPath:
