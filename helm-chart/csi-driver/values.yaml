@@ -23,6 +23,9 @@ volumeLabelPrefix: ""
 # Default namespace is "kube-system" but it can be set to another namespace
 namespace: kube-system
 
+# Add a kubelet path variable to be used across containers for alternate k8s distros (e.g K0s, K3s)
+kubeletPath: "/var/lib/kubelet"
+
 # Set these values if your APIToken and region are already present in a k8s secret.
 # secretRef:
 #   name: "linode"
@@ -91,6 +94,10 @@ kubectl:
 csiNodeDriverRegistrar:
   image: registry.k8s.io/sig-storage/csi-node-driver-registrar
   tag: v2.12.0
+  # Additional environment variables for the node driver registrar container
+  env: []
+  # Additional volume mounts for the node driver registrar container
+  volumeMounts: []
 
 controller:
   nodeSelector: {}
