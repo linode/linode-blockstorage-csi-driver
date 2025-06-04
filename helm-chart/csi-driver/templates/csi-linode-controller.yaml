@@ -16,6 +16,13 @@ spec:
       labels:
         app: csi-linode-controller
         role: csi-linode
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       securityContext:
         seccompProfile:
