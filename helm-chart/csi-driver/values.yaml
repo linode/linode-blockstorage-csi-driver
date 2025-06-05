@@ -103,3 +103,9 @@ controller:
   nodeSelector: {}
   affinity: {}
   tolerations: []
+
+# Add custom annotations to all pods
+podAnnotations: {}
+
+# Add custom labels to all pods
+podLabels: {}
