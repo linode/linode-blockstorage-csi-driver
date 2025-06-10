@@ -10,7 +10,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
-	github.com/jaypipes/ghw v0.16.0
+	github.com/jaypipes/ghw v0.17.0
 	github.com/linode/go-metadata v0.2.2
 	github.com/linode/linodego v1.52.1
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
