@@ -44,7 +44,7 @@ defaultStorageClass: linode-block-storage-retain
 # Images - Default
 csiProvisioner:
   image: registry.k8s.io/sig-storage/csi-provisioner
-  tag: v5.1.0
+  tag: v5.3.0
   pullPolicy: IfNotPresent
   metrics:
     address: "0.0.0.0:10248"
@@ -52,7 +52,7 @@ csiProvisioner:
 
 csiAttacher:
   image: registry.k8s.io/sig-storage/csi-attacher
-  tag: v4.8.1
+  tag: v4.9.0
   pullPolicy: IfNotPresent
   metrics:
     address: "0.0.0.0:10249"
@@ -60,7 +60,7 @@ csiAttacher:
 
 csiResizer:
   image: registry.k8s.io/sig-storage/csi-resizer
-  tag: v1.12.0
+  tag: v1.14.0
   pullPolicy: IfNotPresent
   metrics:
     address: "0.0.0.0:10250"
@@ -93,7 +93,7 @@ kubectl:
 
 csiNodeDriverRegistrar:
   image: registry.k8s.io/sig-storage/csi-node-driver-registrar
-  tag: v2.12.0
+  tag: v2.14.0
   # Additional environment variables for the node driver registrar container
   env: []
   # Additional volume mounts for the node driver registrar container

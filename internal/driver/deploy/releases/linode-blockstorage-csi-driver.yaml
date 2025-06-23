@@ -293,7 +293,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+        image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
         imagePullPolicy: IfNotPresent
         name: csi-provisioner
         securityContext:
@@ -310,7 +310,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-attacher:v4.8.1
+        image: registry.k8s.io/sig-storage/csi-attacher:v4.9.0
         imagePullPolicy: IfNotPresent
         name: csi-attacher
         securityContext:
@@ -328,7 +328,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
+        image: registry.k8s.io/sig-storage/csi-resizer:v1.14.0
         imagePullPolicy: IfNotPresent
         name: csi-resizer
         securityContext:
@@ -413,7 +413,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.12.0
+        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.14.0
         name: csi-node-driver-registrar
         securityContext:
           allowPrivilegeEscalation: false
