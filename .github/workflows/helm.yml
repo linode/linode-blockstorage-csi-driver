@@ -80,3 +80,4 @@ jobs:
         with:
           charts_dir: helm-chart
           skip_existing: true
+          mark_as_latest: false

@@ -87,10 +87,6 @@ csiLinodePlugin:
   # This section adds the ability to pass resources to the container
   resources:
 
-kubectl:
-  image: alpine/k8s  # This needs to be alpine based and have both kubectl and curl installed.
-  tag: 1.25.14
-
 csiNodeDriverRegistrar:
   image: registry.k8s.io/sig-storage/csi-node-driver-registrar
   tag: v2.14.0
