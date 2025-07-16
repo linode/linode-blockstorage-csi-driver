@@ -462,7 +462,7 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 
 	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - diskCount
-	log.V(2).Info("functionStatusfully completed", "maxVolumes", maxVolumes, "diskCount", diskCount)
+	log.V(2).Info("Calculated maxVolumes", "maxVolumes", maxVolumes, "diskCount", diskCount)
 	return &csi.NodeGetInfoResponse{
 		NodeId:            strconv.Itoa(ns.metadata.ID),
 		MaxVolumesPerNode: int64(maxVolumes),

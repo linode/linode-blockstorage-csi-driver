@@ -53,7 +53,52 @@ func TestMaxVolumeAttachments(t *testing.T) {
 	}
 }
 
-func TestAttachedVolumeCount(t *testing.T) {
+func TestIsKubePVCMountPoint(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		mountPoint string
+		want       bool
+	}{
+		{
+			name:       "Valid Kube Path",
+			mountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/pvc-some-pvc-uuid/mount",
+			want:       true,
+		},
+		{
+			name:       "Missing CSI part",
+			mountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/some-other-plugin/pvc-some-pvc-uuid/mount",
+			want:       false,
+		},
+		{
+			name:       "Missing PVC part",
+			mountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/some-other-volume/mount",
+			want:       false,
+		},
+		{
+			name:       "Empty string",
+			mountPoint: "",
+			want:       false,
+		},
+		{
+			name:       "Just a slash",
+			mountPoint: "/",
+			want:       false,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := isKubePVCMountPoint(tt.mountPoint)
+			if got != tt.want {
+				t.Errorf("isKubePVCMountPoint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDiskCount(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -63,31 +108,37 @@ func TestAttachedVolumeCount(t *testing.T) {
 		blkInfo             *ghw.BlockInfo
 	}{
 		{
-			name:                "AllLoopDevices",
+			name:                "Skips loop and unknown devices",
 			expectedVolumeCount: 0,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
 					{
 						DriveType:         DRIVE_TYPE_VIRTUAL,
 						StorageController: block.StorageControllerUnknown,
-						IsRemovable:       false,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "vd1p1",
-								MountPoint: "/mnt/virtual1",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
 					},
 					{
 						DriveType:         DRIVE_TYPE_VIRTUAL,
 						StorageController: block.StorageControllerLoop,
-						IsRemovable:       false,
+					},
+				},
+			},
+		},
+		{
+			name:                "Counts one SCSI disk",
+			expectedVolumeCount: 1,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{
+						StorageController: block.StorageControllerUnknown,
+					},
+					{
+						StorageController: block.StorageControllerLoop,
+					},
+					{
+						StorageController: block.StorageControllerSCSI,
 						Partitions: []*ghw.Partition{
 							{
-								Name:       "loop1",
-								MountPoint: "/mnt/virtual1",
-								SizeBytes:  1024 * 1024 * 1024,
+								MountPoint: "/foo",
 							},
 						},
 					},
@@ -95,43 +146,42 @@ func TestAttachedVolumeCount(t *testing.T) {
 			},
 		},
 		{
-			name:                "OneDisk",
+			name:                "Counts one virtio disk",
 			expectedVolumeCount: 1,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
 					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						IsRemovable:       false,
-						StorageController: block.StorageControllerUnknown,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "vd1p1",
-								MountPoint: "/mnt/virtual1",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
+						StorageController: block.StorageControllerSCSI,
 					},
+				},
+			},
+		},
+		{
+			name:                "Skips SCSI disk with PVC",
+			expectedVolumeCount: 0,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
 					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						IsRemovable:       false,
-						StorageController: block.StorageControllerLoop,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "loop1",
-								MountPoint: "/foo",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
-					},
-					{
-						DriveType:         DRIVE_TYPE_SSD,
-						IsRemovable:       false,
 						StorageController: block.StorageControllerSCSI,
 						Partitions: []*ghw.Partition{
 							{
-								Name:       "nvme0n1",
-								MountPoint: "/foo",
-								SizeBytes:  1024 * 1024 * 1024,
+								MountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/pvc-some-pvc-uuid/mount",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                "Skips virtio disk with PVC",
+			expectedVolumeCount: 0,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{
+						StorageController: block.StorageControllerSCSI,
+						Partitions: []*ghw.Partition{
+							{
+								MountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/pvc-some-pvc-uuid/mount",
 							},
 						},
 					},
@@ -150,7 +200,7 @@ func TestAttachedVolumeCount(t *testing.T) {
 			mockHW := mocks.NewMockHardwareInfo(ctrl)
 			mockHW.EXPECT().Block().Return(tt.blkInfo, nil)
 
-			count, err := attachedVolumeCount(mockHW)
+			count, err := diskCount(mockHW)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

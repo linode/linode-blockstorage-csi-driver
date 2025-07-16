@@ -39,7 +39,7 @@ func isKubePVCMountPoint(mountPoint string) bool {
 	return hasCsiPath && hasPvcPrefix
 }
 
-// attachedVolumeCount calculates the number of attached block devices that are not
+// diskCount calculates the number of attached block devices that are not
 // being used as Kubernetes PersistentVolumeClaims (PVCs).
 func diskCount(hw hwinfo.HardwareInfo) (int, error) {
 	bdev, err := hw.Block()
