@@ -28,26 +28,6 @@ const (
 	maxAttachments = 64
 )
 
-// isKubePVCMountPoint checks if a given mount point string matches the pattern
-// for a Kubernetes CSI-based PersistentVolumeClaim. This is the most reliable way
-// to identify PVCs in a Kubernetes environment.
-func isKubePVCMountPoint(ctx context.Context, mountPoint string) bool {
-	log, _ := logger.GetLogger(ctx)
-	log, done := logger.WithMethod(log, "isKubePVCMountPoint")
-	defer done()
-
-	if mountPoint == "" {
-		return false
-	}
-
-	log.V(2).Info("Checking if mount point is a PVC", "mountPoint", mountPoint)
-	// A PVC mount point managed by a CSI driver will contain both of these substrings.
-	hasCsiPath := strings.Contains(mountPoint, "/volumes/kubernetes.io~csi/")
-	hasPvcPrefix := strings.Contains(mountPoint, "pvc-")
-	log.V(2).Info("Checking if mount point is a PVC", "hasCsiPath", hasCsiPath, "hasPvcPrefix", hasPvcPrefix)
-	return hasCsiPath && hasPvcPrefix
-}
-
 // diskCount calculates the number of attached block devices that are not
 // being used as Kubernetes PersistentVolumeClaims (PVCs).
 func diskCount(ctx context.Context, hw hwinfo.HardwareInfo) (int, error) {
@@ -70,21 +50,9 @@ func diskCount(ctx context.Context, hw hwinfo.HardwareInfo) (int, error) {
 			continue
 		}
 
-		log.V(2).Info("Checking if disk is a PVC", "disk", disk)
-		isKubernetesPVC := false
-		for _, partition := range disk.Partitions {
-			log.V(2).Info("Checking if partition is a PVC", "partition", partition)
-			if isKubePVCMountPoint(ctx, partition.MountPoint) {
-				isKubernetesPVC = true
-				// If we find one partition is a PVC, the whole disk is considered a PVC volume.
-				// No need to check other partitions on this disk.
-				break
-			}
-		}
-
-		// If the disk is identified as a PVC, skip it and move to the next one.
-		if isKubernetesPVC {
-			log.V(2).Info("Skipping disk because it is a PVC", "disk", disk)
+		// The boot disk seems to be from vendor QEMU.
+		// All other attached disks are from vendor Linode.
+		if strings.ToLower(disk.Vendor) != "qemu" {
 			continue
 		}
 

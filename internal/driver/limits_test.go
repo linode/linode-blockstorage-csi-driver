@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -53,138 +54,96 @@ func TestMaxVolumeAttachments(t *testing.T) {
 	}
 }
 
-func TestIsKubePVCMountPoint(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name       string
-		mountPoint string
-		want       bool
-	}{
-		{
-			name:       "Valid Kube Path",
-			mountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/pvc-some-pvc-uuid/mount",
-			want:       true,
-		},
-		{
-			name:       "Missing CSI part",
-			mountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/some-other-plugin/pvc-some-pvc-uuid/mount",
-			want:       false,
-		},
-		{
-			name:       "Missing PVC part",
-			mountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/some-other-volume/mount",
-			want:       false,
-		},
-		{
-			name:       "Empty string",
-			mountPoint: "",
-			want:       false,
-		},
-		{
-			name:       "Just a slash",
-			mountPoint: "/",
-			want:       false,
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := isKubePVCMountPoint(tt.mountPoint)
-			if got != tt.want {
-				t.Errorf("isKubePVCMountPoint() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDiskCount(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name                string
 		expectedVolumeCount int
-		expectedError       error
 		blkInfo             *ghw.BlockInfo
 	}{
 		{
-			name:                "Skips loop and unknown devices",
+			name:                "no disks",
+			expectedVolumeCount: 0,
+			blkInfo:             &ghw.BlockInfo{Disks: []*ghw.Disk{}},
+		},
+		{
+			name:                "skips non-scsi/virtio controllers",
 			expectedVolumeCount: 0,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						StorageController: block.StorageControllerUnknown,
-					},
-					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						StorageController: block.StorageControllerLoop,
-					},
+					{StorageController: block.StorageControllerUnknown, Vendor: "QEMU"},
+					{StorageController: block.StorageControllerLoop, Vendor: "QEMU"},
+					{StorageController: block.StorageControllerIDE, Vendor: "QEMU"},
 				},
 			},
 		},
 		{
-			name:                "Counts one SCSI disk",
+			name:                "counts scsi disk with qemu vendor (uppercase)",
 			expectedVolumeCount: 1,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						StorageController: block.StorageControllerUnknown,
-					},
-					{
-						StorageController: block.StorageControllerLoop,
-					},
-					{
-						StorageController: block.StorageControllerSCSI,
-						Partitions: []*ghw.Partition{
-							{
-								MountPoint: "/foo",
-							},
-						},
-					},
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},
 				},
 			},
 		},
 		{
-			name:                "Counts one virtio disk",
+			name:                "counts scsi disk with qemu vendor (lowercase)",
 			expectedVolumeCount: 1,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						StorageController: block.StorageControllerSCSI,
-					},
+					{StorageController: block.StorageControllerSCSI, Vendor: "qemu"},
 				},
 			},
 		},
 		{
-			name:                "Skips SCSI disk with PVC",
-			expectedVolumeCount: 0,
+			name:                "counts virtio disk with qemu vendor",
+			expectedVolumeCount: 1,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						StorageController: block.StorageControllerSCSI,
-						Partitions: []*ghw.Partition{
-							{
-								MountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/pvc-some-pvc-uuid/mount",
-							},
-						},
-					},
+					{StorageController: block.StorageControllerVirtIO, Vendor: "QEMU"},
 				},
 			},
 		},
 		{
-			name:                "Skips virtio disk with PVC",
+			name:                "skips scsi disk with non-qemu vendor",
 			expectedVolumeCount: 0,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						StorageController: block.StorageControllerSCSI,
-						Partitions: []*ghw.Partition{
-							{
-								MountPoint: "/var/lib/kubelet/pods/some-pod-uuid/volumes/kubernetes.io~csi/pvc-some-pvc-uuid/mount",
-							},
-						},
-					},
+					{StorageController: block.StorageControllerSCSI, Vendor: "Linode"},
+				},
+			},
+		},
+		{
+			name:                "skips virtio disk with non-qemu vendor",
+			expectedVolumeCount: 0,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerVirtIO, Vendor: "OtherVendor"},
+				},
+			},
+		},
+		{
+			name:                "counts multiple qemu disks",
+			expectedVolumeCount: 3,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},
+					{StorageController: block.StorageControllerVirtIO, Vendor: "qemu"},
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},
+				},
+			},
+		},
+		{
+			name:                "mixed vendors and controllers",
+			expectedVolumeCount: 2,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},     // count
+					{StorageController: block.StorageControllerVirtIO, Vendor: "Linode"}, // skip (vendor)
+					{StorageController: block.StorageControllerLoop, Vendor: "QEMU"},     // skip (controller)
+					{StorageController: block.StorageControllerSCSI, Vendor: "Other"},    // skip (vendor)
+					{StorageController: block.StorageControllerVirtIO, Vendor: "qemu"},   // count
 				},
 			},
 		},
@@ -200,7 +159,7 @@ func TestDiskCount(t *testing.T) {
 			mockHW := mocks.NewMockHardwareInfo(ctrl)
 			mockHW.EXPECT().Block().Return(tt.blkInfo, nil)
 
-			count, err := diskCount(mockHW)
+			count, err := diskCount(context.Background(), mockHW)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
