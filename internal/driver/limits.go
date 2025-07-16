@@ -52,7 +52,7 @@ func diskCount(ctx context.Context, hw hwinfo.HardwareInfo) (int, error) {
 
 		// The boot disk seems to be from vendor QEMU.
 		// All other attached disks are from vendor Linode.
-		if strings.ToLower(disk.Vendor) != "qemu" {
+		if !strings.EqualFold(disk.Vendor, "qemu") {
 			continue
 		}
 
