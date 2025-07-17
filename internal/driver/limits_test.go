@@ -53,88 +53,96 @@ func TestMaxVolumeAttachments(t *testing.T) {
 	}
 }
 
-func TestAttachedVolumeCount(t *testing.T) {
+func TestDiskCount(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name                string
 		expectedVolumeCount int
-		expectedError       error
 		blkInfo             *ghw.BlockInfo
 	}{
 		{
-			name:                "AllLoopDevices",
+			name:                "no disks",
+			expectedVolumeCount: 0,
+			blkInfo:             &ghw.BlockInfo{Disks: []*ghw.Disk{}},
+		},
+		{
+			name:                "skips non-scsi/virtio controllers",
 			expectedVolumeCount: 0,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						StorageController: block.StorageControllerUnknown,
-						IsRemovable:       false,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "vd1p1",
-								MountPoint: "/mnt/virtual1",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
-					},
-					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						StorageController: block.StorageControllerLoop,
-						IsRemovable:       false,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "loop1",
-								MountPoint: "/mnt/virtual1",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
-					},
+					{StorageController: block.StorageControllerUnknown, Vendor: "QEMU"},
+					{StorageController: block.StorageControllerLoop, Vendor: "QEMU"},
+					{StorageController: block.StorageControllerIDE, Vendor: "QEMU"},
 				},
 			},
 		},
 		{
-			name:                "OneDisk",
+			name:                "counts scsi disk with qemu vendor (uppercase)",
 			expectedVolumeCount: 1,
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
-					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						IsRemovable:       false,
-						StorageController: block.StorageControllerUnknown,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "vd1p1",
-								MountPoint: "/mnt/virtual1",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
-					},
-					{
-						DriveType:         DRIVE_TYPE_VIRTUAL,
-						IsRemovable:       false,
-						StorageController: block.StorageControllerLoop,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "loop1",
-								MountPoint: "/foo",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
-					},
-					{
-						DriveType:         DRIVE_TYPE_SSD,
-						IsRemovable:       false,
-						StorageController: block.StorageControllerSCSI,
-						Partitions: []*ghw.Partition{
-							{
-								Name:       "nvme0n1",
-								MountPoint: "/foo",
-								SizeBytes:  1024 * 1024 * 1024,
-							},
-						},
-					},
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},
+				},
+			},
+		},
+		{
+			name:                "counts scsi disk with qemu vendor (lowercase)",
+			expectedVolumeCount: 1,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerSCSI, Vendor: "qemu"},
+				},
+			},
+		},
+		{
+			name:                "counts virtio disk with qemu vendor",
+			expectedVolumeCount: 1,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerVirtIO, Vendor: "QEMU"},
+				},
+			},
+		},
+		{
+			name:                "skips scsi disk with non-qemu vendor",
+			expectedVolumeCount: 0,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerSCSI, Vendor: "Linode"},
+				},
+			},
+		},
+		{
+			name:                "skips virtio disk with non-qemu vendor",
+			expectedVolumeCount: 0,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerVirtIO, Vendor: "OtherVendor"},
+				},
+			},
+		},
+		{
+			name:                "counts multiple qemu disks",
+			expectedVolumeCount: 3,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},
+					{StorageController: block.StorageControllerVirtIO, Vendor: "qemu"},
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},
+				},
+			},
+		},
+		{
+			name:                "mixed vendors and controllers",
+			expectedVolumeCount: 2,
+			blkInfo: &ghw.BlockInfo{
+				Disks: []*ghw.Disk{
+					{StorageController: block.StorageControllerSCSI, Vendor: "QEMU"},     // count
+					{StorageController: block.StorageControllerVirtIO, Vendor: "Linode"}, // skip (vendor)
+					{StorageController: block.StorageControllerLoop, Vendor: "QEMU"},     // skip (controller)
+					{StorageController: block.StorageControllerSCSI, Vendor: "Other"},    // skip (vendor)
+					{StorageController: block.StorageControllerVirtIO, Vendor: "qemu"},   // count
 				},
 			},
 		},
@@ -150,7 +158,7 @@ func TestAttachedVolumeCount(t *testing.T) {
 			mockHW := mocks.NewMockHardwareInfo(ctrl)
 			mockHW.EXPECT().Block().Return(tt.blkInfo, nil)
 
-			count, err := attachedVolumeCount(mockHW)
+			count, err := diskCount(mockHW)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
