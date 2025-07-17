@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -159,7 +158,7 @@ func TestDiskCount(t *testing.T) {
 			mockHW := mocks.NewMockHardwareInfo(ctrl)
 			mockHW.EXPECT().Block().Return(tt.blkInfo, nil)
 
-			count, err := diskCount(context.Background(), mockHW)
+			count, err := diskCount(mockHW)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

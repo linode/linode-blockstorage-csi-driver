@@ -456,7 +456,7 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// devices that can be attached.
 	log.V(4).Info("Listing disks", "nodeID", ns.metadata.ID)
 
-	diskCount, err := diskCount(ctx, ns.hardwareInfo)
+	diskCount, err := diskCount(ns.hardwareInfo)
 	if err != nil {
 		return &csi.NodeGetInfoResponse{}, errInternal("list instance disks: %v", err)
 	}

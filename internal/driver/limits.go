@@ -1,11 +1,9 @@
 package driver
 
 import (
-	"context"
 	"strings"
 
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/hwinfo"
-	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
 // maxVolumeAttachments returns the maximum number of block storage volumes
@@ -30,17 +28,11 @@ const (
 
 // diskCount calculates the number of attached block devices that are not
 // being used as Kubernetes PersistentVolumeClaims (PVCs).
-func diskCount(ctx context.Context, hw hwinfo.HardwareInfo) (int, error) {
-	log, _ := logger.GetLogger(ctx)
-	log, done := logger.WithMethod(log, "diskCount")
-	defer done()
-
+func diskCount(hw hwinfo.HardwareInfo) (int, error) {
 	bdev, err := hw.Block()
 	if err != nil {
 		return 0, err
 	}
-
-	log.V(2).Info("Listing disks", "disks", bdev.Disks)
 
 	count := 0
 	for _, disk := range bdev.Disks {
@@ -50,14 +42,14 @@ func diskCount(ctx context.Context, hw hwinfo.HardwareInfo) (int, error) {
 			continue
 		}
 
-		// The boot disk seems to be from vendor QEMU.
-		// All other attached disks are from vendor Linode.
+		// The boot disk & swap disk are from vendor QEMU.
+		// All other attached volumes are from vendor Linode.
 		if !strings.EqualFold(disk.Vendor, "qemu") {
 			continue
 		}
 
-		// If the disk passed both the controller and PVC checks, increment the count.
-		log.V(2).Info("Incrementing disk count", "disk", disk)
+		// If the disk passed both the controller and vendor checks, increment
+		// the count.
 		count++
 	}
 	return count, nil
