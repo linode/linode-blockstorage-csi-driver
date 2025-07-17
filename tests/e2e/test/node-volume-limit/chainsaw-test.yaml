@@ -79,13 +79,7 @@ spec:
     - delete:
         ref:
           apiVersion: v1
-          kind: Pod
-          name: e2e-pod-extra
-    - delete:
-        ref:
-          apiVersion: v1
           kind: PersistentVolumeClaim
-          name: pvc-extra
     - script:
         content: |
           ../check-volume-deleted.sh $FILTER
