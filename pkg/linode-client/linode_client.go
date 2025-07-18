@@ -34,10 +34,21 @@ type LinodeClient interface {
 func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
 	// Use linodego built-in http client which supports setting root CA cert
 	linodeClient := linodego.NewClient(nil)
-	client, err := linodeClient.UseURL(apiURL)
-	if err != nil {
-		return nil, err
+	
+	var client *linodego.Client
+	var err error
+	
+	// Only use custom URL if apiURL is provided and not empty
+	if apiURL != "" {
+		client, err = linodeClient.UseURL(apiURL)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Use default when apiURL is empty
+		client = &linodeClient
 	}
+	
 	client.SetUserAgent(ua)
 	client.SetToken(token)
 
