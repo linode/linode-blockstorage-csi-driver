@@ -454,15 +454,15 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	// This is what the spec wants us to report: the actual number of volumes
 	// that can be attached, and not the theoretical maximum number of
 	// devices that can be attached.
-	log.V(4).Info("Listing attached block devices", "nodeID", ns.metadata.ID)
+	log.V(4).Info("Listing disks", "nodeID", ns.metadata.ID)
 
-	attachedVolumeCount, err := attachedVolumeCount(ns.hardwareInfo)
+	diskCount, err := diskCount(ns.hardwareInfo)
 	if err != nil {
 		return &csi.NodeGetInfoResponse{}, errInternal("list instance disks: %v", err)
 	}
 
-	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - attachedVolumeCount
-	log.V(2).Info("functionStatusfully completed")
+	maxVolumes := maxVolumeAttachments(ns.metadata.Memory) - diskCount
+	log.V(2).Info("Calculated maxVolumes", "maxVolumes", maxVolumes, "diskCount", diskCount)
 	return &csi.NodeGetInfoResponse{
 		NodeId:            strconv.Itoa(ns.metadata.ID),
 		MaxVolumesPerNode: int64(maxVolumes),

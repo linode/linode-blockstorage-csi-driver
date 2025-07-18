@@ -9,19 +9,9 @@ import (
 // maxVolumeAttachments returns the maximum number of block storage volumes
 // that can be attached to a Linode instance, given the amount of memory the
 // instance has.
-//
-// TODO: This code should be cleaned up to use the built-in max and min
-// functions once the project is updated to Go 1.21. See
-// https://go.dev/ref/spec#Min_and_max.
 func maxVolumeAttachments(memoryBytes uint) int {
-	attachments := memoryBytes >> 30
-	if attachments > maxAttachments {
-		return maxAttachments
-	}
-	if attachments < maxPersistentAttachments {
-		return maxPersistentAttachments
-	}
-	return int(attachments)
+	attachments := int(memoryBytes >> 30)
+	return min(max(attachments, maxPersistentAttachments), maxAttachments)
 }
 
 const (
@@ -36,18 +26,30 @@ const (
 	maxAttachments = 64
 )
 
-func attachedVolumeCount(hw hwinfo.HardwareInfo) (int, error) {
+// diskCount calculates the number of attached block devices that are not
+// being used as Kubernetes PersistentVolumeClaims (PVCs).
+func diskCount(hw hwinfo.HardwareInfo) (int, error) {
 	bdev, err := hw.Block()
 	if err != nil {
 		return 0, err
 	}
+
 	count := 0
 	for _, disk := range bdev.Disks {
-		driveType := strings.ToLower(disk.DriveType.String())
 		controllerType := strings.ToLower(disk.StorageController.String())
-		if driveType == "virtual" || driveType == "cdrom" || controllerType == "loop" || controllerType == "unknown" {
+		// Only count disks that are SCSI or virtio
+		if controllerType != "scsi" && controllerType != "virtio" {
 			continue
 		}
+
+		// The boot disk & swap disk are from vendor QEMU.
+		// All other attached volumes are from vendor Linode.
+		if !strings.EqualFold(disk.Vendor, "qemu") {
+			continue
+		}
+
+		// If the disk passed both the controller and vendor checks, increment
+		// the count.
 		count++
 	}
 	return count, nil

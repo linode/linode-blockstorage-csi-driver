@@ -734,6 +734,7 @@ func TestNodeGetInfo(t *testing.T) {
 			blkInfo: &ghw.BlockInfo{
 				Disks: []*ghw.Disk{
 					{
+						Vendor:            "QEMU",
 						DriveType:         ghw.DRIVE_TYPE_SSD,
 						IsRemovable:       false,
 						StorageController: block.StorageControllerSCSI,

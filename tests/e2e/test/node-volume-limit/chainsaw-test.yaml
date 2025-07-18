@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: node-volume-limit
+  labels:
+    all:
+    basic:
+spec:
+  bindings:
+    - name: nodes
+      # number of nodes in cluster
+      value: (length(x_k8s_list($client, 'v1', 'Node', '').items))
+    - name: linode_url
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.apiurl || base64_encode('https://api.linode.com')))
+    - name: linode_token
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.token))
+    - name: node_name
+      value: (x_k8s_list($client, 'v1', 'Node', '').items[0].metadata.name)
+  steps:
+  - name: Check if CSI Driver is deployed
+    try:
+    - assert:
+        file: assert-csi-driver-resources.yaml
+  - name: Verify initial node capacity
+    try:
+    - script:
+        env:
+        - name: NODE_NAME
+          value: ($node_name)
+        content: |
+          kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}'
+        check:
+          ($error): ~
+          (contains($stdout, '6')): true
+  - name: Create StatefulSet to saturate node
+    try:
+    - apply:
+        file: create-statefulset.yaml
+  - name: Assert StatefulSet is ready
+    try:
+    - assert:
+        file: assert-statefulset-ready.yaml
+  - name: Restart csi-linode-node daemonset
+    try:
+    - script:
+        content: |
+          kubectl rollout restart daemonset -n kube-system csi-linode-node
+        check:
+          ($error): ~
+    - script:
+        content: |
+          kubectl rollout status daemonset/csi-linode-node -n kube-system --timeout=300s
+        check:
+          ($error): ~
+  - name: Wait for CSINode resource to get updated by the restart and verify node capacity
+    try:
+    - script:
+        content: |
+          sleep 30s
+        check:
+          ($error): ~
+    - script:
+        env:
+        - name: NODE_NAME
+          value: ($node_name)
+        content: |
+          kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}'
+        check:
+          ($error): ~
+          (contains($stdout, '6')): true
+  - name: Cleanup
+    try:
+    - delete:
+        ref:
+          apiVersion: apps/v1
+          kind: StatefulSet
+          name: test-statefulset
+    - delete:
+        ref:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+    - script:
+        content: |
+          ../check-volume-deleted.sh $FILTER
+        env:
+        - name: FILTER
+          value: (to_string({"tags":($namespace)}))
+        - name: TARGET_API
+          value: ($linode_url)
+        - name: TARGET_API_VERSION
+          value: v4
+        - name: URI
+          value: volumes
+        - name: LINODE_TOKEN
+          value: ($linode_token)
+        check:
+          ($error): ~
+          (contains($stdout, 'Volume deleted in Linode')): true 
