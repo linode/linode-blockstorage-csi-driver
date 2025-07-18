@@ -3,10 +3,12 @@ REGISTRY_NAME           ?= index.docker.io
 DOCKER_USER             ?= linode
 IMAGE_NAME              ?= linode-blockstorage-csi-driver
 REV                     := $(shell git branch --show-current 2> /dev/null || echo "dev")
+# Sanitize branch name for Docker tag by replacing slashes with dashes
+REV_SANITIZED           := $(shell echo "$(REV)" | sed 's|/|-|g')
 ifdef DEV_TAG_EXTENSION
-IMAGE_VERSION           ?= $(REV)-$(DEV_TAG_EXTENSION)
+IMAGE_VERSION           ?= $(REV_SANITIZED)-$(DEV_TAG_EXTENSION)
 else
-IMAGE_VERSION           ?= $(REV)
+IMAGE_VERSION           ?= $(REV_SANITIZED)
 endif
 IMAGE_TAG               ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
 GOLANGCI_LINT_IMG       := golangci/golangci-lint:v1.59-alpine
