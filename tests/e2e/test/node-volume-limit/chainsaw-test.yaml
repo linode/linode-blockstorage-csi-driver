@@ -29,10 +29,57 @@ spec:
         - name: NODE_NAME
           value: ($node_name)
         content: |
-          kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}'
+          MAX_VOL=$(kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}')
+          
+          # Get the CSI node pod running on the target node
+          CSI_POD=$(kubectl get pods -n kube-system -l app=csi-linode-node --field-selector spec.nodeName=$NODE_NAME -o jsonpath='{.items[0].metadata.name}')
+          if [ -z "$CSI_POD" ]; then
+            echo "Error: Could not find CSI node pod on node $NODE_NAME"
+            exit 1
+          fi
+          echo "Found CSI node pod: $CSI_POD"
+          
+          # Count QEMU disks inside the CSI node pod using /sys/block and /proc/scsi/scsi
+          # This mimics the logic used by the CSI driver itself (see internal/driver/limits.go)
+          DISK_COUNT=$(kubectl exec -n kube-system $CSI_POD -c csi-linode-plugin -- sh -c '
+            count=0
+            # Check each block device in /sys/block
+            for device in /sys/block/*; do
+              if [ -d "$device" ]; then
+                device_name=$(basename "$device")
+                # Skip loop, ram, and other non-disk devices
+                case "$device_name" in
+                  loop*|ram*|sr*|fd*) continue ;;
+                esac
+                
+                # Check if device has vendor info
+                if [ -f "$device/device/vendor" ]; then
+                  vendor=$(cat "$device/device/vendor" 2>/dev/null | tr -d " \t\n\r")
+                  if [ "$vendor" = "QEMU" ] || [ "$vendor" = "qemu" ]; then
+                    count=$((count + 1))
+                  fi
+                fi
+              fi
+            done
+            echo $count
+          ')
+          
+          # Calculate expected max volumes (8 - disk count, similar to CSI driver logic)
+          # The CSI driver uses maxVolumeAttachments(memory) - diskCount
+          # For most instances (also the one used for running tests), this defaults to 8 - diskCount
+          EXPECTED_MAX_VOL=$((8 - DISK_COUNT))
+          
+          echo "CSI allocatable count: $MAX_VOL"
+          echo "QEMU disk count: $DISK_COUNT"
+          echo "Expected max volumes (8 - $DISK_COUNT): $EXPECTED_MAX_VOL"
+          if [ "$MAX_VOL" != "$EXPECTED_MAX_VOL" ]; then
+            echo "Mismatch: CSI count ($MAX_VOL) != Expected count ($EXPECTED_MAX_VOL)"
+            exit 1
+          fi
+          echo "Node capacity verified successfully."
         check:
           ($error): ~
-          (contains($stdout, '6')): true
+          (contains($stdout, 'Node capacity verified successfully')): true
   - name: Create StatefulSet to saturate node
     try:
     - apply:
@@ -65,10 +112,57 @@ spec:
         - name: NODE_NAME
           value: ($node_name)
         content: |
-          kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}'
+          MAX_VOL=$(kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}')
+          
+          # Get the CSI node pod running on the target node
+          CSI_POD=$(kubectl get pods -n kube-system -l app=csi-linode-node --field-selector spec.nodeName=$NODE_NAME -o jsonpath='{.items[0].metadata.name}')
+          if [ -z "$CSI_POD" ]; then
+            echo "Error: Could not find CSI node pod on node $NODE_NAME"
+            exit 1
+          fi
+          echo "Found CSI node pod: $CSI_POD"
+          
+          # Count QEMU disks inside the CSI node pod using /sys/block
+          # This mimics the logic used by the CSI driver itself (see internal/driver/limits.go)
+          DISK_COUNT=$(kubectl exec -n kube-system $CSI_POD -c csi-linode-plugin -- sh -c '
+            count=0
+            # Check each block device in /sys/block
+            for device in /sys/block/*; do
+              if [ -d "$device" ]; then
+                device_name=$(basename "$device")
+                # Skip loop, ram, and other non-disk devices
+                case "$device_name" in
+                  loop*|ram*|sr*|fd*) continue ;;
+                esac
+                
+                # Check if device has vendor info
+                if [ -f "$device/device/vendor" ]; then
+                  vendor=$(cat "$device/device/vendor" 2>/dev/null | tr -d " \t\n\r")
+                  if [ "$vendor" = "QEMU" ] || [ "$vendor" = "qemu" ]; then
+                    count=$((count + 1))
+                  fi
+                fi
+              fi
+            done
+            echo $count
+          ')
+          
+          # Calculate expected max volumes (8 - disk count, similar to CSI driver logic)
+          # The CSI driver uses maxVolumeAttachments(memory) - diskCount
+          # For most instances (also the one used for running tests), this defaults to 8 - diskCount
+          EXPECTED_MAX_VOL=$((8 - DISK_COUNT))
+          
+          echo "CSI allocatable count: $MAX_VOL"
+          echo "QEMU disk count: $DISK_COUNT"
+          echo "Expected max volumes (8 - $DISK_COUNT): $EXPECTED_MAX_VOL"
+          if [ "$MAX_VOL" != "$EXPECTED_MAX_VOL" ]; then
+            echo "Mismatch after restart: CSI count ($MAX_VOL) != Expected count ($EXPECTED_MAX_VOL)"
+            exit 1
+          fi
+          echo "Node capacity verified successfully after restart."
         check:
           ($error): ~
-          (contains($stdout, '6')): true
+          (contains($stdout, 'Node capacity verified successfully after restart')): true
   - name: Cleanup
     try:
     - delete:
