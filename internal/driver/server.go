@@ -146,7 +146,7 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	}
 
 	klog.V(4).Infof("Start listening with scheme %v, addr %v", urlObj.Scheme, addr)
-	
+
 	lc := net.ListenConfig{}
 	listener, err := lc.Listen(context.Background(), urlObj.Scheme, addr)
 	if err != nil {
