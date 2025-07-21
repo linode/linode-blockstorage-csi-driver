@@ -24,6 +24,12 @@ echo "Verifying node capacity for node: $NODE_NAME${CONTEXT_SUFFIX:+ $CONTEXT_SU
 # Get CSI allocatable count
 MAX_VOL=$(kubectl get csinode "$NODE_NAME" -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}')
 
+# Validate MAX_VOL
+if [ -z "$MAX_VOL" ] || ! [[ "$MAX_VOL" =~ ^[0-9]+$ ]]; then
+    echo "Error: Invalid or empty CSI allocatable count for node $NODE_NAME" >&2
+    exit 1
+fi
+
 # Get the CSI node pod running on the target node
 CSI_POD=$(kubectl get pods -n kube-system -l app=csi-linode-node --field-selector spec.nodeName="$NODE_NAME" -o jsonpath='{.items[0].metadata.name}')
 if [ -z "$CSI_POD" ]; then
@@ -44,7 +50,6 @@ DISK_COUNT=$(kubectl exec -n kube-system "$CSI_POD" -c csi-linode-plugin -- sh -
       case "$device_name" in
         loop*|ram*|sr*|fd*) continue ;;
       esac
-      
       # Check if device has vendor info
       if [ -f "$device/device/vendor" ]; then
         vendor=$(cat "$device/device/vendor" 2>/dev/null | tr -d " \t\n\r")
@@ -56,6 +61,12 @@ DISK_COUNT=$(kubectl exec -n kube-system "$CSI_POD" -c csi-linode-plugin -- sh -
   done
   echo $count
 ' 2>/dev/null)
+
+# Validate DISK_COUNT
+if [ -z "$DISK_COUNT" ] || ! [[ "$DISK_COUNT" =~ ^[0-9]+$ ]]; then
+    echo "Error: Invalid or empty QEMU disk count for node $NODE_NAME" >&2
+    exit 1
+fi
 
 # Calculate expected max volumes using the defined constant
 # The CSI driver uses maxVolumeAttachments(memory) - diskCount
