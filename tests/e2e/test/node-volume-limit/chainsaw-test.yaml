@@ -29,10 +29,10 @@ spec:
         - name: NODE_NAME
           value: ($node_name)
         content: |
-          kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}'
+          ./verify-node-capacity.sh $NODE_NAME
         check:
           ($error): ~
-          (contains($stdout, '6')): true
+          (contains($stdout, 'Node capacity verified successfully')): true
   - name: Create StatefulSet to saturate node
     try:
     - apply:
@@ -65,10 +65,10 @@ spec:
         - name: NODE_NAME
           value: ($node_name)
         content: |
-          kubectl get csinode $NODE_NAME -o jsonpath='{.spec.drivers[?(@.name=="linodebs.csi.linode.com")].allocatable.count}'
+          ./verify-node-capacity.sh $NODE_NAME "after restart"
         check:
           ($error): ~
-          (contains($stdout, '6')): true
+          (contains($stdout, 'Node capacity verified successfully after restart')): true
   - name: Cleanup
     try:
     - delete:
