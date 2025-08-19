@@ -32,7 +32,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: redis-test
-          image: bitnami/redis
+          image: mirror.registry.linodelke.net/docker/redis
           env:
             - name: ALLOW_EMPTY_PASSWORD
               value: "true"
