@@ -1,4 +1,4 @@
-FROM golang:1.24.5-alpine AS builder
+FROM golang:1.25.1-alpine AS builder
 # from makefile
 ARG REV
 
