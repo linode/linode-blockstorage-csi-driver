@@ -12,6 +12,7 @@ import (
 	"github.com/linode/linodego"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/utils/ptr"
 
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -783,12 +784,11 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		defer span.End()
 	}
 
-	persist := false
-	_, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
+	// Attempt to attach the volume to the Linode instance.
+	if _, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID:           linodeID,
-		PersistAcrossBoots: &persist,
-	})
-	if err != nil {
+		PersistAcrossBoots: ptr.To(true),
+	}); err != nil {
 		code := codes.Internal // Default error code is Internal.
 		// Check if the error indicates that the volume is already attached.
 		var apiErr *linodego.Error
