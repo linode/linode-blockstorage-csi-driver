@@ -96,10 +96,13 @@ csiNodeDriverRegistrar:
   volumeMounts: []
 
 controller:
+  enabled: true
   nodeSelector: {}
   affinity: {}
   tolerations: []
 
+daemonSet:
+  enabled: true
 # Add custom annotations to all pods
 podAnnotations: {}
 
