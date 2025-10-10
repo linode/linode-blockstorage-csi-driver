@@ -36,6 +36,11 @@ spec:
             - --csi-address=$(ADDRESS)
             - --feature-gates=Topology=true
             - --v=2
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretKey }}
+            - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
+              {{- end }}
+            {{- end }}
             {{- if .Values.enableMetrics}}
             - --metrics-address={{ .Values.csiProvisioner.metrics.address }}
             {{- end }}
@@ -59,10 +64,22 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretName }}
+            - mountPath: {{ .mountDir }}
+              name: controller-kubeconfig
+              readOnly: true
+              {{- end }}
+            {{- end }}
         - args:
             - --v=2
             - --csi-address=$(ADDRESS)
             - --timeout=30s
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretKey }}
+            - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
+              {{- end }}
+            {{- end }}
             {{- if .Values.enableMetrics}}
             - --metrics-address={{ .Values.csiAttacher.metrics.address }}
             {{- end }}
@@ -86,9 +103,21 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretName }}
+            - mountPath: {{ .mountDir }}
+              name: controller-kubeconfig
+              readOnly: true
+              {{- end }}
+            {{- end }}
         - args:
             - --v=2
             - --csi-address=$(ADDRESS)
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretKey }}
+            - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
+              {{- end }}
+            {{- end }}
             {{- if .Values.enableMetrics}}
             - --metrics-address={{ .Values.csiResizer.metrics.address }}
             {{- end }}
@@ -112,6 +141,13 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretName }}
+            - mountPath: {{ .mountDir }}
+              name: controller-kubeconfig
+              readOnly: true
+              {{- end }}
+            {{- end }}
         - args:
             - --v=2
           env:
@@ -162,7 +198,9 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      serviceAccount: csi-controller-sa
+      {{- if .Values.controller.serviceAccount.enabled }}
+      serviceAccount: {{ default "csi-controller-sa" .Values.controller.serviceAccount.name }}
+      {{- end }}
       {{- if .Values.controller.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
@@ -194,6 +232,16 @@ spec:
             path: /dev
             type: Directory
           name: dev
+        {{- with .Values.controller.kubeconfig }}
+          {{- if and .secretName .secretKey }}
+        - name: controller-kubeconfig
+          secret:
+            secretName: {{ .secretName }}
+            items:
+              - key: {{ .secretKey }}
+                path: {{ .secretKey }}
+          {{- end }}
+        {{- end }}
         {{- with .Values.csiLinodePlugin.volumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
