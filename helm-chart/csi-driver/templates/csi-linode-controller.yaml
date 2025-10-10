@@ -199,7 +199,7 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       {{- if .Values.controller.serviceAccount.enabled }}
-      serviceAccount: csi-controller-sa
+      serviceAccount: {{ default "csi-controller-sa" .Values.controller.serviceAccount.name }}
       {{- end }}
       {{- if .Values.controller.nodeSelector }}
       nodeSelector:

@@ -113,12 +113,13 @@ stringData:
 
 ###### Controller ServiceAccount and RBAC toggles
 
-By default, the chart creates the controller ServiceAccount and its RBAC ClusterRoleBindings. You can disable these if you want to manage them externally. The controller ServiceAccount name is fixed to `csi-controller-sa`.
+By default, the chart creates the controller ServiceAccount and its RBAC ClusterRoleBindings. You can disable these if you want to manage them externally. The controller ServiceAccount name defaults to `csi-controller-sa`.
 
 ```yaml
 controller:
   serviceAccount:
     enabled: true   # set to false to skip creating the SA (still referenced by the StatefulSet)
+    name: ""        # optionally override the ServiceAccount name (defaults to "csi-controller-sa")
   rbac:
     enabled: true   # set to false to skip creating controller ClusterRoleBindings
 ```
@@ -127,12 +128,13 @@ When `controller.serviceAccount.enabled=false`, ensure a ServiceAccount named `c
 
 ###### DaemonSet ServiceAccount and RBAC toggles
 
-By default, the chart also creates the node DaemonSet ServiceAccount and its RBAC ClusterRoleBinding. You can disable these if you manage them externally. The node ServiceAccount name is fixed to `csi-node-sa`.
+By default, the chart also creates the node DaemonSet ServiceAccount and its RBAC ClusterRoleBinding. You can disable these if you manage them externally. The node ServiceAccount name defaults to `csi-node-sa`.
 
 ```yaml
 daemonSet:
   serviceAccount:
     enabled: true   # set to false to skip creating the node SA (DaemonSet will omit serviceAccount when false)
+    name: ""        # optionally override the ServiceAccount name (defaults to "csi-node-sa")
   rbac:
     enabled: true   # set to false to skip creating the node ClusterRoleBinding
 ```

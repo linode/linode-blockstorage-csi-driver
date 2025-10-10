@@ -103,6 +103,7 @@ controller:
     secretKey: ""
   serviceAccount:
     enabled: true
+    name: "csi-controller-sa"
   rbac:
     enabled: true
   nodeSelector: {}
@@ -113,6 +114,7 @@ daemonSet:
   enabled: true
   serviceAccount:
     enabled: true
+    name: "csi-node-sa"
   rbac:
     enabled: true
 # Add custom annotations to all pods

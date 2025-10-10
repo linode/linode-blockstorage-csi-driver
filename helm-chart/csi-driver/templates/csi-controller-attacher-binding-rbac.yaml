@@ -9,7 +9,7 @@ roleRef:
   name: external-attacher-role
 subjects:
 - kind: ServiceAccount
-  name: csi-controller-sa
+  name: {{ default "csi-controller-sa" .Values.controller.serviceAccount.name }}
   namespace: {{ required ".Values.namespace required" .Values.namespace }}
 {{- end }}
 
