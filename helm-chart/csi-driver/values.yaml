@@ -102,9 +102,9 @@ controller:
     secretName: ""
     secretKey: ""
   serviceAccount:
-    create: true
+    enabled: true
   rbac:
-    create: true
+    enabled: true
   nodeSelector: {}
   affinity: {}
   tolerations: []
@@ -112,9 +112,9 @@ controller:
 daemonSet:
   enabled: true
   serviceAccount:
-    create: true
+    enabled: true
   rbac:
-    create: true
+    enabled: true
 # Add custom annotations to all pods
 podAnnotations: {}
 

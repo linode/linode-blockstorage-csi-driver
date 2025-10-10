@@ -113,31 +113,31 @@ stringData:
 
 ###### Controller ServiceAccount and RBAC toggles
 
-By default, the chart creates the controller ServiceAccount and its RBAC ClusterRoleBindings. You can disable creation if you want to manage these externally. The controller ServiceAccount name is fixed to `csi-controller-sa`.
+By default, the chart creates the controller ServiceAccount and its RBAC ClusterRoleBindings. You can disable these if you want to manage them externally. The controller ServiceAccount name is fixed to `csi-controller-sa`.
 
 ```yaml
 controller:
   serviceAccount:
-    create: true   # set to false to skip creating the SA (still referenced by the StatefulSet)
+    enabled: true   # set to false to skip creating the SA (still referenced by the StatefulSet)
   rbac:
-    create: true   # set to false to skip creating controller ClusterRoleBindings
+    enabled: true   # set to false to skip creating controller ClusterRoleBindings
 ```
 
-When `controller.serviceAccount.create=false`, ensure a ServiceAccount named `csi-controller-sa` exists in the target namespace.
+When `controller.serviceAccount.enabled=false`, ensure a ServiceAccount named `csi-controller-sa` exists in the target namespace.
 
 ###### DaemonSet ServiceAccount and RBAC toggles
 
-By default, the chart also creates the node DaemonSet ServiceAccount and its RBAC ClusterRoleBinding. You can disable creation if you manage these externally. The node ServiceAccount name is fixed to `csi-node-sa`.
+By default, the chart also creates the node DaemonSet ServiceAccount and its RBAC ClusterRoleBinding. You can disable these if you manage them externally. The node ServiceAccount name is fixed to `csi-node-sa`.
 
 ```yaml
 daemonSet:
   serviceAccount:
-    create: true   # set to false to skip creating the node SA (DaemonSet will omit serviceAccount when false)
+    enabled: true   # set to false to skip creating the node SA (DaemonSet will omit serviceAccount when false)
   rbac:
-    create: true   # set to false to skip creating the node ClusterRoleBinding
+    enabled: true   # set to false to skip creating the node ClusterRoleBinding
 ```
 
-When `daemonSet.serviceAccount.create=false`, ensure a ServiceAccount named `csi-node-sa` exists in the target namespace if you intend to set it explicitly on the DaemonSet yourself.
+When `daemonSet.serviceAccount.enabled=false`, ensure a ServiceAccount named `csi-node-sa` exists in the target namespace if you intend to set it explicitly on the DaemonSet yourself.
 
 ##### 👉 Recommendation
 

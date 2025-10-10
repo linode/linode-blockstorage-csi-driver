@@ -104,7 +104,7 @@ spec:
         {{- end }}
       hostNetwork: true
       priorityClassName: system-node-critical
-      {{- if .Values.daemonSet.serviceAccount.create }}
+      {{- if .Values.daemonSet.serviceAccount }}
       serviceAccount: csi-node-sa
       {{- end }}
       tolerations:
