@@ -104,7 +104,9 @@ spec:
         {{- end }}
       hostNetwork: true
       priorityClassName: system-node-critical
+      {{- if .Values.daemonSet.serviceAccount.create }}
       serviceAccount: csi-node-sa
+      {{- end }}
       tolerations:
       - effect: NoSchedule
         operator: Exists
