@@ -74,6 +74,73 @@ _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documen
 - Modify variables using the `--set var=value` flag or by providing a custom `values.yaml` with `-f custom-values.yaml`.
 - For a comprehensive list of configurable variables, refer to [`helm-chart/csi-driver/values.yaml`](https://github.com/linode/linode-blockstorage-csi-driver/blob/main/helm-chart/csi-driver/values.yaml).
 
+###### Controller kubeconfig (optional)
+
+If your environment requires the controller to use a kubeconfig file explicitly, enable the controller kubeconfig by providing the following values. The Secret will be mounted as a directory and the sidecars will read the file `<mountDir>/<secretKey>`.
+
+```yaml
+controller:
+  kubeconfig:
+    mountDir: /etc/kubeconfig
+    secretName: csi-kubeconfig
+    secretKey: external-kubeconfig
+```
+
+Helm example:
+
+```sh
+helm install linode-csi-driver \
+  --set apiToken="$LINODE_API_TOKEN" \
+  --set region="$REGION" \
+  --set controller.kubeconfig.mountDir=/etc/kubeconfig \
+  --set controller.kubeconfig.secretName=csi-kubeconfig \
+  --set controller.kubeconfig.secretKey=external-kubeconfig \
+  linode-csi/linode-blockstorage-csi-driver
+```
+
+The Secret should contain a key named `external-kubeconfig` (or your chosen `secretKey`). For example:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: csi-kubeconfig
+  namespace: kube-system
+stringData:
+  external-kubeconfig: |
+    # contents of your kubeconfig file
+```
+
+###### Controller ServiceAccount and RBAC toggles
+
+By default, the chart creates the controller ServiceAccount and its RBAC ClusterRoleBindings. You can disable these if you want to manage them externally. The controller ServiceAccount name defaults to `csi-controller-sa`.
+
+```yaml
+controller:
+  serviceAccount:
+    enabled: true   # set to false to skip creating the SA (still referenced by the StatefulSet)
+    name: ""        # optionally override the ServiceAccount name (defaults to "csi-controller-sa")
+  rbac:
+    enabled: true   # set to false to skip creating controller ClusterRoleBindings
+```
+
+When `controller.serviceAccount.enabled=false`, ensure a ServiceAccount named `csi-controller-sa` exists in the target namespace.
+
+###### DaemonSet ServiceAccount and RBAC toggles
+
+By default, the chart also creates the node DaemonSet ServiceAccount and its RBAC ClusterRoleBinding. You can disable these if you manage them externally. The node ServiceAccount name defaults to `csi-node-sa`.
+
+```yaml
+daemonSet:
+  serviceAccount:
+    enabled: true   # set to false to skip creating the node SA (DaemonSet will omit serviceAccount when false)
+    name: ""        # optionally override the ServiceAccount name (defaults to "csi-node-sa")
+  rbac:
+    enabled: true   # set to false to skip creating the node ClusterRoleBinding
+```
+
+When `daemonSet.serviceAccount.enabled=false`, ensure a ServiceAccount named `csi-node-sa` exists in the target namespace if you intend to set it explicitly on the DaemonSet yourself.
+
 ##### 👉 Recommendation
 
 Use a custom `values.yaml` file to override variables to avoid template rendering errors.
