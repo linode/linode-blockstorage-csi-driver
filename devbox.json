@@ -13,7 +13,7 @@
     "mockgen@latest",
     "jq@latest",
     "openssl@latest",
-    "go@1.24"
+    "go@1.25"
   ],
   "shell": {
     "init_hook": [
