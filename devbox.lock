@@ -145,51 +145,19 @@
         }
       }
     },
-    "ginkgo@latest": {
-      "last_modified": "2024-07-27T00:41:21Z",
-      "resolved": "github:NixOS/nixpkgs/48bacf585a51d953def8bff32087970f273052e2#ginkgo",
+    "ginkgo@1.16.5": {
+      "last_modified": "2022-01-09T02:18:44Z",
+      "resolved": "github:NixOS/nixpkgs/cf26d7da025a6df4ea053a9f17e4e1d50cf5fa92#ginkgo",
       "source": "devbox-search",
-      "version": "2.19.1",
+      "version": "1.16.5",
       "systems": {
-        "aarch64-darwin": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/83hiwfi19f1gr0r4fhl957jyw65wvaig-ginkgo-2.19.1",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/83hiwfi19f1gr0r4fhl957jyw65wvaig-ginkgo-2.19.1"
-        },
-        "aarch64-linux": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/i2qip2zd28vlqr1wcjpgiq7fd59dlsly-ginkgo-2.19.1",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/i2qip2zd28vlqr1wcjpgiq7fd59dlsly-ginkgo-2.19.1"
-        },
-        "x86_64-darwin": {
-          "outputs": [
-            {
-              "name": "out",
-              "path": "/nix/store/7syipz9ww08qy7yivavpjxxrslhq4aqx-ginkgo-2.19.1",
-              "default": true
-            }
-          ],
-          "store_path": "/nix/store/7syipz9ww08qy7yivavpjxxrslhq4aqx-ginkgo-2.19.1"
-        },
         "x86_64-linux": {
           "outputs": [
             {
-              "name": "out",
-              "path": "/nix/store/pyi1ih2c13rnkn1c04clbx9nxqbrfzwj-ginkgo-2.19.1",
+              "path": "/tmp/containerbase/cache/nix/store/v5js7nmjj012np4l94zp4dgj0n9swvak-ginkgo-1.16.5",
               "default": true
             }
-          ],
-          "store_path": "/nix/store/pyi1ih2c13rnkn1c04clbx9nxqbrfzwj-ginkgo-2.19.1"
+          ]
         }
       }
     },

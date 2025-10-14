@@ -1,6 +1,6 @@
 {
   "packages": [
-    "ginkgo@latest",
+    "ginkgo@1.16.5",
     "ctlptl@0.8.43",
     "clusterctl@latest",
     "kustomize@latest",
