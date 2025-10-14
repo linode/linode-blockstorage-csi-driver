@@ -11,7 +11,7 @@
     "yq-go@latest",
     "envsubst@latest",
     "mockgen@latest",
-    "jq@latest",
+    "jq@1.8.1",
     "openssl@latest",
     "go@1.24"
   ],
