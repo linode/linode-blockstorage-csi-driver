@@ -1,16 +1,16 @@
 {
   "packages": [
-    "ginkgo@latest",
+    "ginkgo@2.26.0",
     "ctlptl@0.8.43",
     "clusterctl@latest",
-    "kustomize@latest",
+    "kustomize@5.7.1",
     "kubectl@latest",
     "kind@latest",
-    "kustomize@latest",
+    "kustomize@5.7.1",
     "kyverno-chainsaw@latest",
-    "yq-go@latest",
+    "yq-go@4.48.1",
     "envsubst@latest",
-    "mockgen@latest",
+    "mockgen@1.6.0",
     "jq@latest",
     "openssl@latest",
     "go@1.25"
