@@ -16,7 +16,7 @@ COPY internal ./internal
 
 RUN CGO_ENABLED=1 go build -a -ldflags "-w -s -X main.vendorVersion=${REV}" -o /bin/linode-blockstorage-csi-driver /linode
 
-FROM alpine:3.20.3
+FROM alpine:3.22.2
 LABEL maintainers="Linode"
 LABEL description="Linode CSI Driver"
 
