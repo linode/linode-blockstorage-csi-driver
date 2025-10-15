@@ -2,18 +2,18 @@
   "packages": [
     "ginkgo@2.26.0",
     "ctlptl@0.8.43",
-    "clusterctl@latest",
+    "clusterctl@1.11.2",
     "kustomize@5.7.1",
-    "kubectl@latest",
-    "kind@latest",
+    "kubectl@1.34.1",
+    "kind@0.30.0",
     "kustomize@5.7.1",
-    "kyverno-chainsaw@latest",
+    "kyverno-chainsaw@0.2.13",
     "yq-go@4.48.1",
-    "envsubst@latest",
+    "envsubst@1.4.3",
     "mockgen@1.6.0",
-    "jq@latest",
-    "openssl@latest",
-    "go@1.25"
+    "jq@1.8.1",
+    "openssl@3.5.2",
+    "go@1.25.1"
   ],
   "shell": {
     "init_hook": [
