@@ -80,7 +80,7 @@ func loadConfig() configuration {
 	envflag.StringVar(&cfg.csiEndpoint, "CSI_ENDPOINT", "unix:/tmp/csi.sock", "Path to the CSI endpoint socket")
 	envflag.StringVar(&cfg.linodeToken, "LINODE_TOKEN", "", "Linode API token")
 	envflag.StringVar(&cfg.driverRole, "DRIVER_ROLE", "controller", "Driver Role, controller or nodeserver")
-	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", linodego.APIHost, "Linode API URL")
+	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", fmt.Sprintf("%s://%s", linodego.APIProto, linodego.APIHost), "Linode API URL")
 	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
 	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
 	envflag.StringVar(&cfg.enableMetrics, "ENABLE_METRICS", "", "This flag conditionally runs the metrics servers")
