@@ -73,17 +73,6 @@
       ]
     },
     {
-      "groupName": "go.uber",
-      "groupSlug": "go-uber",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchPackageNames": [
-        "go.uber.org/**",
-        "github.com/golang/mock"
-      ]
-    },
-    {
       "groupName": "linode sdks",
       "groupSlug": "linode-sdks",
       "matchDatasources": [
