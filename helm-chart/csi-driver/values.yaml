@@ -97,12 +97,26 @@ csiNodeDriverRegistrar:
 
 controller:
   enabled: true
+  kubeconfig:
+    mountDir: ""
+    secretName: ""
+    secretKey: ""
+  serviceAccount:
+    enabled: true
+    name: "csi-controller-sa"
+  rbac:
+    enabled: true
   nodeSelector: {}
   affinity: {}
   tolerations: []
 
 daemonSet:
   enabled: true
+  serviceAccount:
+    enabled: true
+    name: "csi-node-sa"
+  rbac:
+    enabled: true
 # Add custom annotations to all pods
 podAnnotations: {}
 
