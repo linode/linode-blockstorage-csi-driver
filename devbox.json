@@ -2,7 +2,7 @@
   "packages": [
     "ginkgo@latest",
     "ctlptl@0.8.43",
-    "clusterctl@latest",
+    "clusterctl@1.11.2",
     "kustomize@latest",
     "kubectl@latest",
     "kind@latest",
