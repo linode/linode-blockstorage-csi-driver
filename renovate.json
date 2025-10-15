@@ -73,16 +73,6 @@
       ]
     },
     {
-      "groupName": "prometheus",
-      "groupSlug": "prometheus-go",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchPackageNames": [
-        "github.com/prometheus/**"
-      ]
-    },
-    {
       "groupName": "go.uber",
       "groupSlug": "go-uber",
       "matchDatasources": [
@@ -101,16 +91,6 @@
       ],
       "matchPackageNames": [
         "github.com/linode/**"
-      ]
-    },
-    {
-      "groupName": "jaypipes hwinfo",
-      "groupSlug": "jaypipes",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchPackageNames": [
-        "github.com/jaypipes/**"
       ]
     }
   ]
