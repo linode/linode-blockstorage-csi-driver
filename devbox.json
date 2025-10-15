@@ -7,7 +7,7 @@
     "kubectl@latest",
     "kind@latest",
     "kustomize@latest",
-    "kyverno-chainsaw@latest",
+    "kyverno-chainsaw@0.2.13",
     "yq-go@latest",
     "envsubst@latest",
     "mockgen@latest",
