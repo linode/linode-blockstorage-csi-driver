@@ -5,7 +5,7 @@
     "clusterctl@latest",
     "kustomize@latest",
     "kubectl@latest",
-    "kind@latest",
+    "kind@0.30.0",
     "kustomize@latest",
     "kyverno-chainsaw@latest",
     "yq-go@latest",
