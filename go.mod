@@ -12,7 +12,7 @@ require (
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
 	github.com/jaypipes/ghw v0.19.1
 	github.com/linode/go-metadata v0.2.2
-	github.com/linode/linodego v1.60.0
+	github.com/linode/linodego v1.61.0
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/oauth2 v0.31.0 // indirect
+	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/term v0.36.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
