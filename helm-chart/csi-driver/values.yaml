@@ -97,6 +97,7 @@ csiNodeDriverRegistrar:
 
 controller:
   enabled: true
+  hostNetwork: false
   kubeconfig:
     mountDir: ""
     secretName: ""
