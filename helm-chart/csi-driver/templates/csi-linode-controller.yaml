@@ -25,6 +25,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      hostNetwork: {{ .Values.controller.hostNetwork }}
       securityContext:
         seccompProfile:
           type: RuntimeDefault
