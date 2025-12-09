@@ -210,7 +210,7 @@ spec:
       affinity:
         {{- toYaml .Values.controller.affinity | nindent 8 }}
       {{- end }}
-      {{- if .Values.controller.tolerations }}
+      {{- with .Values.controller.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- else }}
