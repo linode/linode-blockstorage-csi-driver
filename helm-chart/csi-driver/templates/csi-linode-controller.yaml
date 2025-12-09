@@ -215,8 +215,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- else }}
       tolerations:
-        - effect: NoSchedule
-          operator: Exists
         - key: CriticalAddonsOnly
           operator: Exists
         - effect: NoExecute
