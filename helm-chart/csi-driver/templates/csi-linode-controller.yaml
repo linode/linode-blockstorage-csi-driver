@@ -210,17 +210,9 @@ spec:
       affinity:
         {{- toYaml .Values.controller.affinity | nindent 8 }}
       {{- end }}
-      {{- if .Values.controller.tolerations }}
+      {{- with .Values.controller.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
-      {{- else }}
-      tolerations:
-        - effect: NoSchedule
-          operator: Exists
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - effect: NoExecute
-          operator: Exists
       {{- end }}
       volumes:
         - emptyDir: {}
