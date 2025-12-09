@@ -213,12 +213,6 @@ spec:
       {{- with .Values.controller.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
-      {{- else }}
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - effect: NoExecute
-          operator: Exists
       {{- end }}
       volumes:
         - emptyDir: {}

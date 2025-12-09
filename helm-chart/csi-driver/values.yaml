@@ -109,7 +109,11 @@ controller:
     enabled: true
   nodeSelector: {}
   affinity: {}
-  tolerations: []
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+    - effect: NoExecute
+      operator: Exists
 
 daemonSet:
   enabled: true
