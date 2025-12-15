@@ -21,8 +21,9 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
