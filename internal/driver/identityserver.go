@@ -15,9 +15,8 @@ limitations under the License.
 package driver
 
 import (
-	"fmt"
-
 	"context"
+	"fmt"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
