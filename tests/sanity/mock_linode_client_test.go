@@ -17,6 +17,8 @@ import (
 )
 
 // setupLinodeClientExpectations configures MockLinodeClient with stateful behavior
+//
+//nolint:gocognit // just for test setup
 func setupLinodeClientExpectations(mock *mocks.MockLinodeClient, store *volumeStore) {
 	// CreateVolume
 	mock.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).DoAndReturn(
