@@ -11,8 +11,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133
 	github.com/jaypipes/ghw v0.21.1
-	github.com/linode/go-metadata v0.2.2
-	github.com/linode/linodego v1.61.0
+	github.com/linode/go-metadata v0.2.3
+	github.com/linode/linodego v1.62.0
 	github.com/martinjungblut/go-cryptsetup v0.0.0-20220520180014-fd0874fd07a6
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
@@ -23,8 +23,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/net v0.46.1-0.20251013234738-63d1a5100f82
-	golang.org/x/sys v0.37.0
+	golang.org/x/net v0.48.0
+	golang.org/x/sys v0.39.0
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.11
 	k8s.io/api v0.34.3
@@ -47,7 +47,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/go-resty/resty/v2 v2.16.5 // indirect
+	github.com/go-resty/resty/v2 v2.17.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -73,10 +73,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/term v0.36.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
-	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/term v0.38.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
