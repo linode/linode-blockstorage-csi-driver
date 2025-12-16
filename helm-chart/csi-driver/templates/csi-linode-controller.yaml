@@ -26,6 +26,7 @@ spec:
       {{- end }}
     spec:
       hostNetwork: {{ .Values.controller.hostNetwork }}
+      dnsPolicy: {{ .Values.controller.dnsPolicy }}
       securityContext:
         seccompProfile:
           type: RuntimeDefault
