@@ -10,6 +10,7 @@ import (
 	"k8s.io/mount-utils"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/hwinfo"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
@@ -61,7 +62,8 @@ func TestDriverSuite(t *testing.T) {
 	metricsPort := "10251"
 	enableTracing := "true"
 	tracingPort := "4318"
-	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, resizeFs, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort, enableTracing, tracingPort); err != nil {
+	hw := hwinfo.NewHardwareInfo()
+	if err := linodeDriver.SetupLinodeDriver(context.Background(), fakeCloudProvider, mounter, deviceUtils, resizeFs, md, driver, vendorVersion, bsPrefix, encrypt, enableMetrics, metricsPort, enableTracing, tracingPort, nil, hw); err != nil {
 		t.Fatalf("Failed to setup Linode Driver: %v", err)
 	}
 

@@ -178,7 +178,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 	// Parse the volume ID from the content source
 	volKey, err = linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
 	if err != nil {
-		return nil, errInternal("parse volume info from content source: %v", err)
+		return nil, errNotFound("parse volume info from content source: %v", err)
 	}
 	if volKey == nil {
 		return nil, errInternal("processed *LinodeVolumeKey is nil") // Throw an internal error if the processed LinodeVolumeKey is nil
@@ -187,7 +187,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 	// Retrieve the volume data using the parsed volume ID
 	volumeData, err := cs.client.GetVolume(ctx, volKey.VolumeID)
 	if err != nil {
-		return nil, errInternal("get volume %d: %v", volKey.VolumeID, err)
+		return nil, errNotFound("get volume %d: %v", volKey.VolumeID, err)
 	}
 	if volumeData == nil {
 		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
@@ -733,6 +733,9 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 	} else if err != nil {
 		// If any other error occurs, return an internal error.
 		return nil, errInternal("get linode instance %d: %v", linodeID, err)
+	}
+	if instance == nil {
+		return nil, errInstanceNotFound(linodeID)
 	}
 
 	log.V(4).Info("Instance retrieved", "instance", instance)

@@ -29,6 +29,7 @@ import (
 
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	filesystemstats "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem-stats"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/hwinfo"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -44,6 +45,7 @@ type NodeServer struct {
 	metadata     Metadata
 	encrypt      Encryption
 	resizeFs     mountmanager.ResizeFSer
+	fsStatter    FilesystemStatter
 	// TODO: Only lock mutually exclusive calls and make locking more fine grained
 	mux sync.Mutex
 
@@ -52,7 +54,7 @@ type NodeServer struct {
 
 var _ csi.NodeServer = &NodeServer{}
 
-func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mountmanager.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, metadata Metadata, encrypt Encryption, resize mountmanager.ResizeFSer, hw hwinfo.HardwareInfo) (*NodeServer, error) {
+func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mountmanager.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, metadata Metadata, encrypt Encryption, resize mountmanager.ResizeFSer, hw hwinfo.HardwareInfo, fsStatter FilesystemStatter) (*NodeServer, error) {
 	log, _ := logger.GetLogger(ctx)
 
 	log.V(4).Info("Creating new NodeServer")
@@ -69,6 +71,9 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 		log.Error(nil, "DeviceUtils is nil")
 		return nil, fmt.Errorf("deviceUtils is nil")
 	}
+	if fsStatter == nil {
+		fsStatter = filesystemstats.NewFilesystemStatter()
+	}
 
 	ns := &NodeServer{
 		driver:       linodeDriver,
@@ -78,6 +83,7 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 		encrypt:      encrypt,
 		resizeFs:     resize,
 		hardwareInfo: hw,
+		fsStatter:    fsStatter,
 	}
 
 	log.V(4).Info("NodeServer created successfully")
@@ -481,5 +487,5 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	log.V(2).Info("Processing request", "req", req)
 
-	return nodeGetVolumeStats(ctx, req)
+	return nodeGetVolumeStats(ctx, req, ns.fsStatter)
 }

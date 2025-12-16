@@ -21,6 +21,7 @@ import (
 type MockLinodeClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockLinodeClientMockRecorder
+	isgomock struct{}
 }
 
 // MockLinodeClientMockRecorder is the mock recorder for MockLinodeClient.

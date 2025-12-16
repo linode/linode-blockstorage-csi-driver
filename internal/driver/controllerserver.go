@@ -3,8 +3,10 @@ package driver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -18,12 +20,59 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
+// publishedVolumeInfo tracks the capability and readonly flag for a published volume
+type publishedVolumeInfo struct {
+	capability *csi.VolumeCapability
+	readonly   bool
+}
+
 type ControllerServer struct {
 	driver   *LinodeDriver
 	client   linodeclient.LinodeClient
 	metadata Metadata
 
+	// Track published volume capabilities and readonly flags for validation (key: "volumeID:nodeID")
+	publishedCaps map[string]*publishedVolumeInfo
+	capMu         sync.RWMutex
+
 	csi.UnimplementedControllerServer
+}
+
+// checkPublishCompatibility verifies if a re-publish request is compatible with existing publish.
+// Returns nil if compatible, or an AlreadyExists error if incompatible.
+func (cs *ControllerServer) checkPublishCompatibility(volumeID, linodeID int, req *csi.ControllerPublishVolumeRequest) error {
+	reqCap := req.GetVolumeCapability()
+	reqReadonly := req.GetReadonly()
+
+	capKey := fmt.Sprintf("%d:%d", volumeID, linodeID)
+	cs.capMu.RLock()
+	existing := cs.publishedCaps[capKey]
+	cs.capMu.RUnlock()
+
+	if existing == nil {
+		return nil
+	}
+
+	// Check readonly flag
+	if existing.readonly != reqReadonly {
+		return status.Errorf(codes.AlreadyExists, "volume %d already published to node %d with incompatible readonly flag", volumeID, linodeID)
+	}
+
+	// Check capability compatibility (block vs mount, access mode)
+	if !capabilitiesMatch(existing.capability, reqCap) {
+		return status.Errorf(codes.AlreadyExists, "volume %d already published to node %d with incompatible capability", volumeID, linodeID)
+	}
+
+	return nil
+}
+
+// capabilitiesMatch checks if two volume capabilities match (same type and access mode).
+func capabilitiesMatch(a, b *csi.VolumeCapability) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return (a.GetBlock() != nil) == (b.GetBlock() != nil) &&
+		a.GetAccessMode().GetMode() == b.GetAccessMode().GetMode()
 }
 
 // NewControllerServer instantiates a new RPC service that implements the
@@ -47,9 +96,10 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 	}
 
 	cs := &ControllerServer{
-		driver:   driver,
-		client:   client,
-		metadata: metadata,
+		driver:        driver,
+		client:        client,
+		metadata:      metadata,
+		publishedCaps: make(map[string]*publishedVolumeInfo),
 	}
 
 	log.V(4).Info("ControllerServer created successfully")
@@ -195,32 +245,50 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
-	// If devicePath is not empty, the volume is already attached
+	// If devicePath is not empty, the volume is already attached - handle idempotency
 	if devicePath != "" {
-		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
+		if err := cs.checkPublishCompatibility(volumeID, linodeID, req); err != nil {
+			observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
+			return resp, err
+		}
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Completed, functionStartTime)
+		log.V(2).Info("Volume already attached (idempotent)", "volume_id", volumeID, "device_path", devicePath)
 		return &csi.ControllerPublishVolumeResponse{
-			PublishContext: map[string]string{
-				devicePathKey: devicePath,
-			},
+			PublishContext: map[string]string{devicePathKey: devicePath},
 		}, nil
 	}
 
 	// Check if the instance can accommodate the volume attachment
 	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
+		log.V(2).Info("Cannot attach volume: capacity limit reached", "volume_id", volumeID, "node_id", linodeID, "error", capErr)
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, capErr
 	}
 
+	log.V(4).Info("Attaching volume to instance", "volume_id", volumeID, "node_id", linodeID)
 	// Attach the volume to the specified instance
 	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, attachErr
 	}
 
+	// Store publish info for idempotency checks
+	capKey := fmt.Sprintf("%d:%d", volumeID, linodeID)
+	cs.capMu.Lock()
+	cs.publishedCaps[capKey] = &publishedVolumeInfo{
+		capability: req.GetVolumeCapability(),
+		readonly:   req.GetReadonly(),
+	}
+	cs.capMu.Unlock()
+
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
 	// Wait for the volume to be successfully attached to the instance
 	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
+		// Clean up stored capability on failure
+		cs.capMu.Lock()
+		delete(cs.publishedCaps, capKey)
+		cs.capMu.Unlock()
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
@@ -302,6 +370,16 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
+	}
+
+	// Clean up stored publish info if nodeID was provided
+	if req.GetNodeId() != "" {
+		if linodeID, err := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req); err == nil {
+			capKey := fmt.Sprintf("%d:%d", volumeID, linodeID)
+			cs.capMu.Lock()
+			delete(cs.publishedCaps, capKey)
+			cs.capMu.Unlock()
+		}
 	}
 
 	// Record function completion

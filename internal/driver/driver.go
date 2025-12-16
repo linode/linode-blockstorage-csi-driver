@@ -94,6 +94,8 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	metricsPort string,
 	enableTracing string,
 	tracingPort string,
+	fsStatter FilesystemStatter,
+	hw hwinfo.HardwareInfo,
 ) error {
 	log, ctx := logger.GetLogger(ctx)
 	log, done := logger.WithMethod(log, "SetupLinodeDriver")
@@ -123,8 +125,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 
 	log.V(2).Info("Setting up RPC Servers")
 
-	hw := hwinfo.NewHardwareInfo()
-	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, metadata, encrypt, resizeFs, hw)
+	linodeDriver.ns, err = NewNodeServer(ctx, linodeDriver, mounter, deviceUtils, metadata, encrypt, resizeFs, hw, fsStatter)
 	if err != nil {
 		return fmt.Errorf("new node server: %w", err)
 	}

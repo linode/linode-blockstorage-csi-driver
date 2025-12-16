@@ -31,6 +31,7 @@ import (
 	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/hwinfo"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
@@ -156,6 +157,8 @@ func handle(ctx context.Context) error {
 		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
 
+	hw := hwinfo.NewHardwareInfo()
+
 	if err := linodeDriver.SetupLinodeDriver(
 		ctx,
 		cloudProvider,
@@ -171,6 +174,8 @@ func handle(ctx context.Context) error {
 		cfg.metricsPort,
 		cfg.enableTracing,
 		cfg.tracingPort,
+		nil,
+		hw,
 	); err != nil {
 		return fmt.Errorf("setup driver: %w", err)
 	}
