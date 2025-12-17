@@ -419,7 +419,6 @@ func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
 		req     *csi.NodeUnpublishVolumeRequest
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{
 			name: "Valid request",
 			req: &csi.NodeUnpublishVolumeRequest{
@@ -427,6 +426,11 @@ func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
 				TargetPath: "/mnt/staging",
 			},
 			wantErr: false,
+		},
+		{
+			name:    "Missing volume ID and target path",
+			req:     &csi.NodeUnpublishVolumeRequest{},
+			wantErr: true,
 		},
 		{
 			name: "Missing volume ID",
@@ -437,7 +441,7 @@ func Test_validateNodeUnpublishVolumeRequest(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Missing staging target path",
+			name: "Missing target path",
 			req: &csi.NodeUnpublishVolumeRequest{
 				VolumeId:   "vol-123",
 				TargetPath: "",

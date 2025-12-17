@@ -1078,3 +1078,171 @@ func TestControllerGetVolume(t *testing.T) {
 		})
 	}
 }
+
+func TestControllerServer_checkPublishCompatibility(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		driver   *LinodeDriver
+		client   linodeclient.LinodeClient
+		metadata Metadata
+		// Named input parameters for target function.
+		volumeID int
+		linodeID int
+		req      *csi.ControllerPublishVolumeRequest
+		wantErr  bool
+	}{
+		{
+			name:     "no existing entry - should succeed",
+			volumeID: 100,
+			linodeID: 200,
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				Readonly: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "existing entry with matching capability and readonly - should succeed",
+			volumeID: 101,
+			linodeID: 201,
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				Readonly: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "existing entry with different readonly flag - should fail",
+			volumeID: 102,
+			linodeID: 202,
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				Readonly: true, // existing is false
+			},
+			wantErr: true,
+		},
+		{
+			name:     "existing entry with different access type (block vs mount) - should fail",
+			volumeID: 103,
+			linodeID: 203,
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Block{
+						Block: &csi.VolumeCapability_BlockVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				Readonly: false,
+			},
+			wantErr: true,
+		},
+		{
+			name:     "existing entry with different access mode - should fail",
+			volumeID: 104,
+			linodeID: 204,
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY, // existing is SINGLE_NODE_WRITER
+					},
+				},
+				Readonly: false,
+			},
+			wantErr: true,
+		},
+	}
+
+	// Pre-populate existing entries for tests that need them
+	existingCaps := map[string]*publishedVolumeInfo{
+		"101:201": {
+			capability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+			readonly: false,
+		},
+		"102:202": {
+			capability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+			readonly: false, // request will have readonly=true
+		},
+		"103:203": {
+			capability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+			readonly: false, // request will have block instead of mount
+		},
+		"104:204": {
+			capability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+			readonly: false, // request will have different access mode
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := &ControllerServer{
+				driver:        &LinodeDriver{},
+				publishedCaps: existingCaps,
+			}
+			gotErr := cs.checkPublishCompatibility(tt.volumeID, tt.linodeID, tt.req)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("checkPublishCompatibility() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("checkPublishCompatibility() succeeded unexpectedly")
+			}
+		})
+	}
+}
