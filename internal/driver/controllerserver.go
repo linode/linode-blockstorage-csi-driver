@@ -248,12 +248,25 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 		return resp, err
 	}
 
-	// If publishing as readonly, add the readonly tag to the volume
+	// Ensure the readonly tag state is correct:
+	// - If publishing as readonly: add the tag
+	// - If publishing as read-write: remove any stale readonly tag (from a previous failed unpublish)
 	if readonly {
-		newTags := addReadOnlyTag(volume.Tags, linodeID)
-		if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
-			log.V(2).Info("Failed to add readonly tag to volume", "volume_id", volumeID, "error", err)
-			// Don't fail the publish operation for tag update failure
+		newTags, updated := addReadOnlyTag(volume.Tags, linodeID)
+		if updated {
+			if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
+				log.V(2).Info("Failed to add readonly tag to volume", "volume_id", volumeID, "error", err)
+				// Don't fail the publish operation for tag update failure
+			}
+		}
+	} else if volumeHasReadOnlyTag(volume, linodeID) {
+		// Clean up stale readonly tag from a previous publish
+		newTags, updated := removeReadOnlyTag(volume.Tags, linodeID)
+		if updated {
+			if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
+				log.V(2).Info("Failed to remove stale readonly tag from volume", "volume_id", volumeID, "error", err)
+				// Don't fail the publish operation for tag update failure
+			}
 		}
 	}
 
@@ -341,10 +354,12 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	if req.GetNodeId() != "" {
 		if linodeID, err := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req); err == nil {
 			if volumeHasReadOnlyTag(volume, linodeID) {
-				newTags := removeReadOnlyTag(volume.Tags, linodeID)
-				if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
-					log.V(2).Info("Failed to remove readonly tag from volume", "volume_id", volumeID, "error", err)
-					// Don't fail the unpublish operation for tag update failure
+				newTags, updated := removeReadOnlyTag(volume.Tags, linodeID)
+				if updated {
+					if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
+						log.V(2).Info("Failed to remove readonly tag from volume", "volume_id", volumeID, "error", err)
+						// Don't fail the unpublish operation for tag update failure
+					}
 				}
 			}
 		}

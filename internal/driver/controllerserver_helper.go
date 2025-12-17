@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -727,38 +728,31 @@ func makeReadOnlyTag(nodeID int) string {
 // volumeHasReadOnlyTag checks if the volume has a read-only tag for the given node.
 func volumeHasReadOnlyTag(volume *linodego.Volume, nodeID int) bool {
 	tag := makeReadOnlyTag(nodeID)
-	for _, t := range volume.Tags {
-		if t == tag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(volume.Tags, tag)
 }
 
 // addReadOnlyTag adds a read-only tag for the given node to the volume's tags.
 // Returns the updated tags slice.
-func addReadOnlyTag(existingTags []string, nodeID int) []string {
+func addReadOnlyTag(existingTags []string, nodeID int) (tags []string, updated bool) {
 	tag := makeReadOnlyTag(nodeID)
 	// Check if tag already exists
-	for _, t := range existingTags {
-		if t == tag {
-			return existingTags
-		}
+	if slices.Contains(existingTags, tag) {
+		return existingTags, false
 	}
-	return append(existingTags, tag)
+	return append(existingTags, tag), true
 }
 
 // removeReadOnlyTag removes the read-only tag for the given node from the volume's tags.
 // Returns the updated tags slice.
-func removeReadOnlyTag(existingTags []string, nodeID int) []string {
+func removeReadOnlyTag(existingTags []string, nodeID int) (tags []string, updated bool) {
 	tag := makeReadOnlyTag(nodeID)
-	result := make([]string, 0, len(existingTags))
-	for _, t := range existingTags {
-		if t != tag {
-			result = append(result, t)
-		}
+
+	i := slices.Index(existingTags, tag)
+	if i == -1 {
+		return existingTags, false // Tag not found; return existing tags
 	}
-	return result
+
+	return slices.Delete(existingTags, i, i+1), true
 }
 
 // getInstance retrieves the Linode instance by its ID. If the

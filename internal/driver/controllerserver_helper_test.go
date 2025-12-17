@@ -1573,7 +1573,7 @@ func TestAddReadOnlyTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := addReadOnlyTag(tt.existingTags, tt.nodeID)
+			got, _ := addReadOnlyTag(tt.existingTags, tt.nodeID)
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("addReadOnlyTag() = %v, want %v", got, tt.expected)
 			}
@@ -1622,7 +1622,7 @@ func TestRemoveReadOnlyTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := removeReadOnlyTag(tt.existingTags, tt.nodeID)
+			got, _ := removeReadOnlyTag(tt.existingTags, tt.nodeID)
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("removeReadOnlyTag() = %v, want %v", got, tt.expected)
 			}
