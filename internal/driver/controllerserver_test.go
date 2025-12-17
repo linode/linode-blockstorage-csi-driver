@@ -358,6 +358,44 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectedError: errAlreadyExists("volume 1006 already published to node 2006 with incompatible capability"),
 		},
+		{
+			name: "publish fails due to max attachments reached",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1007-testvol",
+				NodeId:   "2007",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2007).Return(&linodego.Instance{
+					ID:    2007,
+					Specs: &linodego.InstanceSpec{Memory: 1024}, // Low memory = fewer allowed attachments
+				}, nil)
+				// Volume not attached
+				m.EXPECT().GetVolume(gomock.Any(), 1007).Return(&linodego.Volume{
+					ID:       1007,
+					LinodeID: nil,
+					Size:     10,
+					Status:   linodego.VolumeActive,
+				}, nil)
+				// checkAttachmentCapacity: already at max attachments
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 2007, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 2007, gomock.Any()).Return([]linodego.Volume{
+					{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6},
+				}, nil)
+			},
+			expectedError: errMaxVolumeAttachments(6),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

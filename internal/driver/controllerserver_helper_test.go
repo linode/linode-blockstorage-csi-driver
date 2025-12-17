@@ -962,18 +962,10 @@ func TestGetAndValidateVolume(t *testing.T) {
 }
 
 func TestCheckAttachmentCapacity(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-	cs := &ControllerServer{
-		client: mockClient,
-	}
-
 	testCases := []struct {
 		name          string
 		instance      *linodego.Instance
-		setupMocks    func()
+		setupMocks    func(m *mocks.MockLinodeClient)
 		expectedError error
 	}{
 		{
@@ -984,9 +976,9 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 					Memory: 4096,
 				},
 			},
-			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 123, gomock.Any()).Return([]linodego.Volume{}, nil)
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 123, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 123, gomock.Any()).Return([]linodego.Volume{}, nil)
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 123, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
 			},
 			expectedError: nil,
 		},
@@ -998,22 +990,71 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 					Memory: 1024,
 				},
 			},
-			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil)
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil)
 			},
 			expectedError: errMaxVolumeAttachments(6),
+		},
+		{
+			name: "ListInstanceVolumes error",
+			instance: &linodego.Instance{
+				ID: 789,
+				Specs: &linodego.InstanceSpec{
+					Memory: 4096,
+				},
+			},
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 789, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 789, gomock.Any()).Return(nil, errors.New("API error"))
+			},
+			expectedError: errInternal("list instance volumes: API error"),
+		},
+		{
+			name: "ListInstanceDisks error in canAttach",
+			instance: &linodego.Instance{
+				ID: 101,
+				Specs: &linodego.InstanceSpec{
+					Memory: 4096,
+				},
+			},
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 101, gomock.Any()).Return(nil, errors.New("disk API error"))
+			},
+			expectedError: errInternal("list instance disks: disk API error"),
+		},
+		{
+			name: "Nil instance specs",
+			instance: &linodego.Instance{
+				ID:    102,
+				Specs: nil,
+			},
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				// No mocks needed - should fail before API calls due to nil specs
+			},
+			expectedError: errNilInstance,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.setupMocks()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			cs := &ControllerServer{
+				client: mockClient,
+			}
+
+			tc.setupMocks(mockClient)
 
 			err := cs.checkAttachmentCapacity(context.Background(), tc.instance)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
+			}
+			if err == nil && tc.expectedError != nil {
+				t.Errorf("expected error %v, got nil", tc.expectedError)
 			}
 		})
 	}
