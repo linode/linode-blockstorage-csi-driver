@@ -864,7 +864,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 		volumeID       int
 		linode         *linodego.Instance
 		setupMocks     func()
-		expectedResult string
+		expectedVolume *linodego.Volume
 		expectedError  error
 	}{
 		{
@@ -880,8 +880,12 @@ func TestGetAndValidateVolume(t *testing.T) {
 					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
 				}, nil)
 			},
-			expectedResult: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
-			expectedError:  nil,
+			expectedVolume: &linodego.Volume{
+				ID:             123,
+				LinodeID:       &[]int{456}[0],
+				FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
+			},
+			expectedError: nil,
 		},
 		{
 			name:     "Volume found but not attached",
@@ -897,8 +901,12 @@ func TestGetAndValidateVolume(t *testing.T) {
 					Region:   "us-east",
 				}, nil)
 			},
-			expectedResult: "",
-			expectedError:  nil,
+			expectedVolume: &linodego.Volume{
+				ID:       123,
+				LinodeID: nil,
+				Region:   "us-east",
+			},
+			expectedError: nil,
 		},
 		{
 			name:     "Volume found but attached to different instance",
@@ -912,7 +920,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 					LinodeID: &[]int{789}[0],
 				}, nil)
 			},
-			expectedResult: "",
+			expectedVolume: nil,
 			expectedError:  errVolumeAttached(123, 789),
 		},
 		{
@@ -927,7 +935,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 					Message: "Not Found",
 				})
 			},
-			expectedResult: "",
+			expectedVolume: nil,
 			expectedError:  errVolumeNotFound(123),
 		},
 		{
@@ -939,7 +947,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, errors.New("API error"))
 			},
-			expectedResult: "",
+			expectedVolume: nil,
 			expectedError:  errInternal("get volume 123: API error"),
 		},
 	}
@@ -954,8 +962,14 @@ func TestGetAndValidateVolume(t *testing.T) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 
-			if tc.expectedResult != result {
-				t.Errorf("expected result %s, got %s", tc.expectedResult, result)
+			if tc.expectedVolume == nil && result != nil {
+				t.Errorf("expected nil volume, got %v", result)
+			} else if tc.expectedVolume != nil {
+				if result == nil {
+					t.Errorf("expected volume %v, got nil", tc.expectedVolume)
+				} else if result.ID != tc.expectedVolume.ID {
+					t.Errorf("expected volume ID %d, got %d", tc.expectedVolume.ID, result.ID)
+				}
 			}
 		})
 	}
@@ -1427,6 +1441,190 @@ func Test_getRegionFromTopology(t *testing.T) {
 			got := getRegionFromTopology(tt.requirements)
 			if got != tt.want {
 				t.Errorf("getRegionFromTopology() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMakeReadOnlyTag(t *testing.T) {
+	tests := []struct {
+		name     string
+		nodeID   int
+		expected string
+	}{
+		{
+			name:     "simple node ID",
+			nodeID:   12345,
+			expected: "csi-readonly-12345",
+		},
+		{
+			name:     "large node ID",
+			nodeID:   1234567890,
+			expected: "csi-readonly-1234567890",
+		},
+		{
+			name:     "zero node ID",
+			nodeID:   0,
+			expected: "csi-readonly-0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := makeReadOnlyTag(tt.nodeID)
+			if got != tt.expected {
+				t.Errorf("makeReadOnlyTag(%d) = %s, want %s", tt.nodeID, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestVolumeHasReadOnlyTag(t *testing.T) {
+	tests := []struct {
+		name     string
+		volume   *linodego.Volume
+		nodeID   int
+		expected bool
+	}{
+		{
+			name: "has matching tag",
+			volume: &linodego.Volume{
+				Tags: []string{"other-tag", "csi-readonly-123"},
+			},
+			nodeID:   123,
+			expected: true,
+		},
+		{
+			name: "no matching tag",
+			volume: &linodego.Volume{
+				Tags: []string{"other-tag", "csi-readonly-456"},
+			},
+			nodeID:   123,
+			expected: false,
+		},
+		{
+			name: "empty tags",
+			volume: &linodego.Volume{
+				Tags: []string{},
+			},
+			nodeID:   123,
+			expected: false,
+		},
+		{
+			name: "nil tags",
+			volume: &linodego.Volume{
+				Tags: nil,
+			},
+			nodeID:   123,
+			expected: false,
+		},
+		{
+			name: "partial match should not match",
+			volume: &linodego.Volume{
+				Tags: []string{"csi-readonly-1234"},
+			},
+			nodeID:   123,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := volumeHasReadOnlyTag(tt.volume, tt.nodeID)
+			if got != tt.expected {
+				t.Errorf("volumeHasReadOnlyTag() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAddReadOnlyTag(t *testing.T) {
+	tests := []struct {
+		name         string
+		existingTags []string
+		nodeID       int
+		expected     []string
+	}{
+		{
+			name:         "add to empty tags",
+			existingTags: []string{},
+			nodeID:       123,
+			expected:     []string{"csi-readonly-123"},
+		},
+		{
+			name:         "add to existing tags",
+			existingTags: []string{"other-tag"},
+			nodeID:       123,
+			expected:     []string{"other-tag", "csi-readonly-123"},
+		},
+		{
+			name:         "tag already exists - no duplicate",
+			existingTags: []string{"other-tag", "csi-readonly-123"},
+			nodeID:       123,
+			expected:     []string{"other-tag", "csi-readonly-123"},
+		},
+		{
+			name:         "add nil tags",
+			existingTags: nil,
+			nodeID:       123,
+			expected:     []string{"csi-readonly-123"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := addReadOnlyTag(tt.existingTags, tt.nodeID)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("addReadOnlyTag() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRemoveReadOnlyTag(t *testing.T) {
+	tests := []struct {
+		name         string
+		existingTags []string
+		nodeID       int
+		expected     []string
+	}{
+		{
+			name:         "remove existing tag",
+			existingTags: []string{"other-tag", "csi-readonly-123"},
+			nodeID:       123,
+			expected:     []string{"other-tag"},
+		},
+		{
+			name:         "tag not present - no change",
+			existingTags: []string{"other-tag", "csi-readonly-456"},
+			nodeID:       123,
+			expected:     []string{"other-tag", "csi-readonly-456"},
+		},
+		{
+			name:         "remove from single tag list",
+			existingTags: []string{"csi-readonly-123"},
+			nodeID:       123,
+			expected:     []string{},
+		},
+		{
+			name:         "empty tags",
+			existingTags: []string{},
+			nodeID:       123,
+			expected:     []string{},
+		},
+		{
+			name:         "nil tags",
+			existingTags: nil,
+			nodeID:       123,
+			expected:     []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := removeReadOnlyTag(tt.existingTags, tt.nodeID)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("removeReadOnlyTag() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

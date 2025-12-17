@@ -188,7 +188,6 @@ func TestControllerPublishVolume(t *testing.T) {
 		req                     *csi.ControllerPublishVolumeRequest
 		resp                    *csi.ControllerPublishVolumeResponse
 		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
-		publishedCaps           map[string]*publishedVolumeInfo
 		expectedError           error
 	}{
 		{
@@ -213,16 +212,17 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1003, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
-				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil).AnyTimes()
-				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
-				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				// Volume NOT attached initially (LinodeID = nil)
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 630706045, LinodeID: nil, Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1003, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
 				m.EXPECT().ListInstanceDisks(gomock.Any(), 1003, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 630706045, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 630706045, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive, FilesystemPath: "/dev/sda"}, nil)
 			},
 			expectedError: nil,
 		},
 		{
-			name: "idempotent publish with compatible capability",
+			name: "idempotent publish with compatible readonly (both RW)",
 			req: &csi.ControllerPublishVolumeRequest{
 				VolumeId: "1004-testvol",
 				NodeId:   "2004",
@@ -246,32 +246,20 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), 2004).Return(&linodego.Instance{ID: 2004, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
-				// Volume already attached to the same instance
+				// Volume already attached to the same instance, no readonly tag = RW
 				m.EXPECT().GetVolume(gomock.Any(), 1004).Return(&linodego.Volume{
 					ID:             1004,
 					LinodeID:       createLinodeID(2004),
 					Size:           10,
 					Status:         linodego.VolumeActive,
 					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+					Tags:           []string{},
 				}, nil)
-			},
-			publishedCaps: map[string]*publishedVolumeInfo{
-				"1004:2004": {
-					capability: &csi.VolumeCapability{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-						AccessMode: &csi.VolumeCapability_AccessMode{
-							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-						},
-					},
-					readonly: false,
-				},
 			},
 			expectedError: nil,
 		},
 		{
-			name: "idempotent publish with incompatible readonly flag",
+			name: "idempotent publish with incompatible readonly flag (was RW, requesting RO)",
 			req: &csi.ControllerPublishVolumeRequest{
 				VolumeId: "1005-testvol",
 				NodeId:   "2005",
@@ -286,42 +274,30 @@ func TestControllerPublishVolume(t *testing.T) {
 				VolumeContext: map[string]string{
 					VolumeTopologyRegion: "us-east",
 				},
-				Readonly: true, // Different from existing (false)
+				Readonly: true, // Requesting readonly but volume was published as RW (no tag)
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), 2005).Return(&linodego.Instance{ID: 2005, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
-				// Volume already attached to the same instance
+				// Volume already attached to the same instance, no readonly tag = was RW
 				m.EXPECT().GetVolume(gomock.Any(), 1005).Return(&linodego.Volume{
 					ID:             1005,
 					LinodeID:       createLinodeID(2005),
 					Size:           10,
 					Status:         linodego.VolumeActive,
 					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+					Tags:           []string{}, // No readonly tag = was RW
 				}, nil)
 			},
-			publishedCaps: map[string]*publishedVolumeInfo{
-				"1005:2005": {
-					capability: &csi.VolumeCapability{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-						AccessMode: &csi.VolumeCapability_AccessMode{
-							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-						},
-					},
-					readonly: false,
-				},
-			},
-			expectedError: errAlreadyExists("volume 1005 already published to node 2005 with incompatible readonly flag"),
+			expectedError: errAlreadyExists("volume 1005 already published to node 2005 with readonly=false, cannot re-publish with readonly=true"),
 		},
 		{
-			name: "idempotent publish with incompatible capability type",
+			name: "idempotent publish with incompatible readonly flag (was RO, requesting RW)",
 			req: &csi.ControllerPublishVolumeRequest{
 				VolumeId: "1006-testvol",
 				NodeId:   "2006",
 				VolumeCapability: &csi.VolumeCapability{
-					AccessType: &csi.VolumeCapability_Block{
-						Block: &csi.VolumeCapability_BlockVolume{},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
 					},
 					AccessMode: &csi.VolumeCapability_AccessMode{
 						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
@@ -330,33 +306,21 @@ func TestControllerPublishVolume(t *testing.T) {
 				VolumeContext: map[string]string{
 					VolumeTopologyRegion: "us-east",
 				},
-				Readonly: false,
+				Readonly: false, // Requesting RW but volume was published as readonly (has tag)
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), 2006).Return(&linodego.Instance{ID: 2006, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
-				// Volume already attached to the same instance
+				// Volume already attached, has readonly tag = was published as readonly
 				m.EXPECT().GetVolume(gomock.Any(), 1006).Return(&linodego.Volume{
 					ID:             1006,
 					LinodeID:       createLinodeID(2006),
 					Size:           10,
 					Status:         linodego.VolumeActive,
 					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+					Tags:           []string{"csi-readonly-2006"}, // Has readonly tag = was RO
 				}, nil)
 			},
-			publishedCaps: map[string]*publishedVolumeInfo{
-				"1006:2006": {
-					capability: &csi.VolumeCapability{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-						AccessMode: &csi.VolumeCapability_AccessMode{
-							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-						},
-					},
-					readonly: false,
-				},
-			},
-			expectedError: errAlreadyExists("volume 1006 already published to node 2006 with incompatible capability"),
+			expectedError: errAlreadyExists("volume 1006 already published to node 2006 with readonly=true, cannot re-publish with readonly=false"),
 		},
 		{
 			name: "publish fails due to max attachments reached",
@@ -453,9 +417,8 @@ func TestControllerPublishVolume(t *testing.T) {
 				driver: &LinodeDriver{},
 			}
 			s := &ControllerServer{
-				client:        mockClient,
-				driver:        ns.driver,
-				publishedCaps: tt.publishedCaps,
+				client: mockClient,
+				driver: ns.driver,
 			}
 			_, err := s.ControllerPublishVolume(context.Background(), tt.req)
 			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
@@ -929,6 +892,11 @@ func (flc *fakeLinodeClient) DeleteVolume(context.Context, int) error { return n
 func (flc *fakeLinodeClient) ResizeVolume(context.Context, int, int) error { return nil }
 
 //nolint:nilnil // TODO: re-work tests
+func (flc *fakeLinodeClient) UpdateVolume(context.Context, int, linodego.VolumeUpdateOptions) (*linodego.Volume, error) {
+	return nil, nil
+}
+
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error) {
 	return nil, nil
 }
@@ -1299,161 +1267,79 @@ func TestControllerGetVolume(t *testing.T) {
 	}
 }
 
-func TestControllerServer_checkPublishCompatibility(t *testing.T) {
+func TestCheckPublishCompatibility(t *testing.T) {
 	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for receiver constructor.
-		driver   *LinodeDriver
-		client   linodeclient.LinodeClient
-		metadata Metadata
-		// Named input parameters for target function.
-		volumeID int
+		name     string
+		volume   *linodego.Volume
 		linodeID int
-		req      *csi.ControllerPublishVolumeRequest
+		readonly bool
 		wantErr  bool
 	}{
 		{
-			name:     "no existing entry - should succeed",
-			volumeID: 100,
+			name: "no readonly tag, requesting read-write - should succeed",
+			volume: &linodego.Volume{
+				ID:   100,
+				Tags: []string{"other-tag"},
+			},
 			linodeID: 200,
-			req: &csi.ControllerPublishVolumeRequest{
-				VolumeCapability: &csi.VolumeCapability{
-					AccessType: &csi.VolumeCapability_Mount{
-						Mount: &csi.VolumeCapability_MountVolume{},
-					},
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-					},
-				},
-				Readonly: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "existing entry with matching capability and readonly - should succeed",
-			volumeID: 101,
-			linodeID: 201,
-			req: &csi.ControllerPublishVolumeRequest{
-				VolumeCapability: &csi.VolumeCapability{
-					AccessType: &csi.VolumeCapability_Mount{
-						Mount: &csi.VolumeCapability_MountVolume{},
-					},
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-					},
-				},
-				Readonly: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "existing entry with different readonly flag - should fail",
-			volumeID: 102,
-			linodeID: 202,
-			req: &csi.ControllerPublishVolumeRequest{
-				VolumeCapability: &csi.VolumeCapability{
-					AccessType: &csi.VolumeCapability_Mount{
-						Mount: &csi.VolumeCapability_MountVolume{},
-					},
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-					},
-				},
-				Readonly: true, // existing is false
-			},
-			wantErr: true,
-		},
-		{
-			name:     "existing entry with different access type (block vs mount) - should fail",
-			volumeID: 103,
-			linodeID: 203,
-			req: &csi.ControllerPublishVolumeRequest{
-				VolumeCapability: &csi.VolumeCapability{
-					AccessType: &csi.VolumeCapability_Block{
-						Block: &csi.VolumeCapability_BlockVolume{},
-					},
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-					},
-				},
-				Readonly: false,
-			},
-			wantErr: true,
-		},
-		{
-			name:     "existing entry with different access mode - should fail",
-			volumeID: 104,
-			linodeID: 204,
-			req: &csi.ControllerPublishVolumeRequest{
-				VolumeCapability: &csi.VolumeCapability{
-					AccessType: &csi.VolumeCapability_Mount{
-						Mount: &csi.VolumeCapability_MountVolume{},
-					},
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY, // existing is SINGLE_NODE_WRITER
-					},
-				},
-				Readonly: false,
-			},
-			wantErr: true,
-		},
-	}
-
-	// Pre-populate existing entries for tests that need them
-	existingCaps := map[string]*publishedVolumeInfo{
-		"101:201": {
-			capability: &csi.VolumeCapability{
-				AccessType: &csi.VolumeCapability_Mount{
-					Mount: &csi.VolumeCapability_MountVolume{},
-				},
-				AccessMode: &csi.VolumeCapability_AccessMode{
-					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-				},
-			},
 			readonly: false,
+			wantErr:  false,
 		},
-		"102:202": {
-			capability: &csi.VolumeCapability{
-				AccessType: &csi.VolumeCapability_Mount{
-					Mount: &csi.VolumeCapability_MountVolume{},
-				},
-				AccessMode: &csi.VolumeCapability_AccessMode{
-					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-				},
+		{
+			name: "no readonly tag, requesting readonly - should fail",
+			volume: &linodego.Volume{
+				ID:   101,
+				Tags: []string{"other-tag"},
 			},
-			readonly: false, // request will have readonly=true
+			linodeID: 201,
+			readonly: true,
+			wantErr:  true,
 		},
-		"103:203": {
-			capability: &csi.VolumeCapability{
-				AccessType: &csi.VolumeCapability_Mount{
-					Mount: &csi.VolumeCapability_MountVolume{},
-				},
-				AccessMode: &csi.VolumeCapability_AccessMode{
-					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-				},
+		{
+			name: "has readonly tag, requesting readonly - should succeed",
+			volume: &linodego.Volume{
+				ID:   102,
+				Tags: []string{"csi-readonly-202", "other-tag"},
 			},
-			readonly: false, // request will have block instead of mount
+			linodeID: 202,
+			readonly: true,
+			wantErr:  false,
 		},
-		"104:204": {
-			capability: &csi.VolumeCapability{
-				AccessType: &csi.VolumeCapability_Mount{
-					Mount: &csi.VolumeCapability_MountVolume{},
-				},
-				AccessMode: &csi.VolumeCapability_AccessMode{
-					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-				},
+		{
+			name: "has readonly tag, requesting read-write - should fail",
+			volume: &linodego.Volume{
+				ID:   103,
+				Tags: []string{"csi-readonly-203"},
 			},
-			readonly: false, // request will have different access mode
+			linodeID: 203,
+			readonly: false,
+			wantErr:  true,
+		},
+		{
+			name: "has readonly tag for different node - should succeed (no tag for this node)",
+			volume: &linodego.Volume{
+				ID:   104,
+				Tags: []string{"csi-readonly-999"},
+			},
+			linodeID: 204,
+			readonly: false,
+			wantErr:  false,
+		},
+		{
+			name: "empty tags, requesting read-write - should succeed",
+			volume: &linodego.Volume{
+				ID:   105,
+				Tags: []string{},
+			},
+			linodeID: 205,
+			readonly: false,
+			wantErr:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := &ControllerServer{
-				driver:        &LinodeDriver{},
-				publishedCaps: existingCaps,
-			}
-			gotErr := cs.checkPublishCompatibility(tt.volumeID, tt.linodeID, tt.req)
+			gotErr := checkPublishCompatibility(tt.volume, tt.linodeID, tt.readonly)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("checkPublishCompatibility() failed: %v", gotErr)

@@ -65,6 +65,11 @@ func cloneTimeout() int {
 }
 
 const (
+	// VolumeReadOnlyTagPrefix is the prefix used for tagging volumes published as read-only.
+	// Format: "csi-readonly-<nodeID>" (e.g., "csi-readonly-12345678")
+	// Tag length: 13 + up to 10 digits = max 23 chars (within 3-50 limit)
+	VolumeReadOnlyTagPrefix = "csi-readonly-"
+
 	// VolumeTags is the parameter key used for passing a comma-separated list
 	// of tags to the Linode API.
 	VolumeTags = Name + "/volumeTags"
@@ -680,15 +685,13 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 // getAndValidateVolume retrieves the volume by its ID and run checks.
 //
 // It performs the following checks:
-//  1. If the volume is found and already attached to the specified Linode instance,
-//     it returns the device path of the volume.
-//  2. If the volume is not found, it returns an error indicating that the volume does not exist.
-//  3. If the volume is attached to a different instance, it returns an error indicating
+//  1. If the volume is not found, it returns an error indicating that the volume does not exist.
+//  2. If the volume is attached to a different instance, it returns an error indicating
 //     that the volume is already attached elsewhere.
 //
-// Additionally, it checks if the volume and instance are in the same region based on
-// the provided volume context. If they are not in the same region, it returns an internal error.
-func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (string, error) {
+// Returns the volume object. Caller should check volume.LinodeID to determine if already attached
+// to the target instance, and use volume.FilesystemPath for the device path.
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (*linodego.Volume, error) {
 	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
@@ -699,21 +702,63 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
-		return "", errVolumeNotFound(volumeID)
+		return nil, errVolumeNotFound(volumeID)
 	} else if err != nil {
-		return "", errInternal("get volume %d: %v", volumeID, err)
+		return nil, errInternal("get volume %d: %v", volumeID, err)
 	}
 
 	if volume.LinodeID != nil {
 		if *volume.LinodeID == instance.ID {
 			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
-			return volume.FilesystemPath, nil
+			return volume, nil
 		}
-		return "", errVolumeAttached(volumeID, *volume.LinodeID)
+		return nil, errVolumeAttached(volumeID, *volume.LinodeID)
 	}
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
-	return "", nil
+	return volume, nil
+}
+
+// makeReadOnlyTag creates a tag for marking a volume as published read-only to a specific node.
+func makeReadOnlyTag(nodeID int) string {
+	return fmt.Sprintf("%s%d", VolumeReadOnlyTagPrefix, nodeID)
+}
+
+// volumeHasReadOnlyTag checks if the volume has a read-only tag for the given node.
+func volumeHasReadOnlyTag(volume *linodego.Volume, nodeID int) bool {
+	tag := makeReadOnlyTag(nodeID)
+	for _, t := range volume.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// addReadOnlyTag adds a read-only tag for the given node to the volume's tags.
+// Returns the updated tags slice.
+func addReadOnlyTag(existingTags []string, nodeID int) []string {
+	tag := makeReadOnlyTag(nodeID)
+	// Check if tag already exists
+	for _, t := range existingTags {
+		if t == tag {
+			return existingTags
+		}
+	}
+	return append(existingTags, tag)
+}
+
+// removeReadOnlyTag removes the read-only tag for the given node from the volume's tags.
+// Returns the updated tags slice.
+func removeReadOnlyTag(existingTags []string, nodeID int) []string {
+	tag := makeReadOnlyTag(nodeID)
+	result := make([]string, 0, len(existingTags))
+	for _, t := range existingTags {
+		if t != tag {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // getInstance retrieves the Linode instance by its ID. If the

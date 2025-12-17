@@ -248,6 +248,21 @@ func (mr *MockLinodeClientMockRecorder) ResizeVolume(arg0, arg1, arg2 any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeVolume", reflect.TypeOf((*MockLinodeClient)(nil).ResizeVolume), arg0, arg1, arg2)
 }
 
+// UpdateVolume mocks base method.
+func (m *MockLinodeClient) UpdateVolume(arg0 context.Context, arg1 int, arg2 linodego.VolumeUpdateOptions) (*linodego.Volume, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateVolume", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*linodego.Volume)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateVolume indicates an expected call of UpdateVolume.
+func (mr *MockLinodeClientMockRecorder) UpdateVolume(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateVolume", reflect.TypeOf((*MockLinodeClient)(nil).UpdateVolume), arg0, arg1, arg2)
+}
+
 // WaitForVolumeLinodeID mocks base method.
 func (m *MockLinodeClient) WaitForVolumeLinodeID(arg0 context.Context, arg1 int, arg2 *int, arg3 int) (*linodego.Volume, error) {
 	m.ctrl.T.Helper()
