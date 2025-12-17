@@ -396,6 +396,49 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectedError: errMaxVolumeAttachments(6),
 		},
+		{
+			name: "publish fails when WaitForVolumeLinodeID times out",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1008-testvol",
+				NodeId:   "2008",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2008).Return(&linodego.Instance{
+					ID:    2008,
+					Specs: &linodego.InstanceSpec{Memory: 16 << 10},
+				}, nil)
+				// Volume not attached
+				m.EXPECT().GetVolume(gomock.Any(), 1008).Return(&linodego.Volume{
+					ID:       1008,
+					LinodeID: nil,
+					Size:     10,
+					Status:   linodego.VolumeActive,
+				}, nil)
+				// checkAttachmentCapacity: can attach
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 2008, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 2008, gomock.Any()).Return([]linodego.Volume{}, nil)
+				// AttachVolume succeeds
+				m.EXPECT().AttachVolume(gomock.Any(), 1008, gomock.Any()).Return(&linodego.Volume{
+					ID:       1008,
+					LinodeID: createLinodeID(2008),
+				}, nil)
+				// WaitForVolumeLinodeID fails (timeout)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 1008, gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("timed out waiting for volume attachment"))
+			},
+			expectedError: fmt.Errorf("timed out waiting for volume attachment"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
