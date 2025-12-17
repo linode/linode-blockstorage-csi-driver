@@ -275,6 +275,9 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Store publish info for idempotency checks
 	capKey := fmt.Sprintf("%d:%d", volumeID, linodeID)
 	cs.capMu.Lock()
+	if cs.publishedCaps == nil {
+		cs.publishedCaps = make(map[string]*publishedVolumeInfo)
+	}
 	cs.publishedCaps[capKey] = &publishedVolumeInfo{
 		capability: req.GetVolumeCapability(),
 		readonly:   req.GetReadonly(),

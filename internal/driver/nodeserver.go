@@ -29,7 +29,6 @@ import (
 
 	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
 	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
-	filesystemstats "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem-stats"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/hwinfo"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
@@ -71,10 +70,6 @@ func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mou
 		log.Error(nil, "DeviceUtils is nil")
 		return nil, fmt.Errorf("deviceUtils is nil")
 	}
-	if fsStatter == nil {
-		fsStatter = filesystemstats.NewFilesystemStatter()
-	}
-
 	ns := &NodeServer{
 		driver:       linodeDriver,
 		mounter:      mounter,
