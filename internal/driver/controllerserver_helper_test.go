@@ -1084,7 +1084,7 @@ func TestGetContentSourceVolume(t *testing.T) {
 			},
 			setupMocks:     func() {},
 			expectedResult: nil,
-			expectedError:  errInternal("parse volume info from content source: invalid linode volume id: \"test\""),
+			expectedError:  errNotFound("parse volume info from content source: invalid linode volume id: \"test\""),
 		},
 		{
 			name: "Valid content source, matching region",

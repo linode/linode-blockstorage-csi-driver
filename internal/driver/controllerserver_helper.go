@@ -186,8 +186,10 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 
 	// Retrieve the volume data using the parsed volume ID
 	volumeData, err := cs.client.GetVolume(ctx, volKey.VolumeID)
-	if err != nil {
-		return nil, errNotFound("get volume %d: %v", volKey.VolumeID, err)
+	if linodego.IsNotFound(err) {
+		return nil, errVolumeNotFound(volKey.VolumeID)
+	} else if err != nil {
+		return nil, errInternal("get volume %d: %v", volKey.VolumeID, err)
 	}
 	if volumeData == nil {
 		return nil, errInternal("source volume *linodego.Volume is nil") // Throw an internal error if the processed linodego.Volume is nil
