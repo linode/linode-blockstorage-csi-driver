@@ -12,12 +12,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	sanity "github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/mount-utils"
-
-	sanity "github.com/kubernetes-csi/csi-test/v5/pkg/sanity"
 
 	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
