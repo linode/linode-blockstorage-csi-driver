@@ -188,6 +188,7 @@ func TestControllerPublishVolume(t *testing.T) {
 		req                     *csi.ControllerPublishVolumeRequest
 		resp                    *csi.ControllerPublishVolumeResponse
 		expectLinodeClientCalls func(m *mocks.MockLinodeClient)
+		publishedCaps           map[string]*publishedVolumeInfo
 		expectedError           error
 	}{
 		{
@@ -220,6 +221,143 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "idempotent publish with compatible capability",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1004-testvol",
+				NodeId:   "2004",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			resp: &csi.ControllerPublishVolumeResponse{
+				PublishContext: map[string]string{
+					"devicePath": "/dev/disk/by-id/scsi-0Linode_Volume_test",
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2004).Return(&linodego.Instance{ID: 2004, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				// Volume already attached to the same instance
+				m.EXPECT().GetVolume(gomock.Any(), 1004).Return(&linodego.Volume{
+					ID:             1004,
+					LinodeID:       createLinodeID(2004),
+					Size:           10,
+					Status:         linodego.VolumeActive,
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+				}, nil)
+			},
+			publishedCaps: map[string]*publishedVolumeInfo{
+				"1004:2004": {
+					capability: &csi.VolumeCapability{
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+					readonly: false,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "idempotent publish with incompatible readonly flag",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1005-testvol",
+				NodeId:   "2005",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: true, // Different from existing (false)
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2005).Return(&linodego.Instance{ID: 2005, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				// Volume already attached to the same instance
+				m.EXPECT().GetVolume(gomock.Any(), 1005).Return(&linodego.Volume{
+					ID:             1005,
+					LinodeID:       createLinodeID(2005),
+					Size:           10,
+					Status:         linodego.VolumeActive,
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+				}, nil)
+			},
+			publishedCaps: map[string]*publishedVolumeInfo{
+				"1005:2005": {
+					capability: &csi.VolumeCapability{
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+					readonly: false,
+				},
+			},
+			expectedError: errAlreadyExists("volume 1005 already published to node 2005 with incompatible readonly flag"),
+		},
+		{
+			name: "idempotent publish with incompatible capability type",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1006-testvol",
+				NodeId:   "2006",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Block{
+						Block: &csi.VolumeCapability_BlockVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2006).Return(&linodego.Instance{ID: 2006, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				// Volume already attached to the same instance
+				m.EXPECT().GetVolume(gomock.Any(), 1006).Return(&linodego.Volume{
+					ID:             1006,
+					LinodeID:       createLinodeID(2006),
+					Size:           10,
+					Status:         linodego.VolumeActive,
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+				}, nil)
+			},
+			publishedCaps: map[string]*publishedVolumeInfo{
+				"1006:2006": {
+					capability: &csi.VolumeCapability{
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+					readonly: false,
+				},
+			},
+			expectedError: errAlreadyExists("volume 1006 already published to node 2006 with incompatible capability"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,8 +372,9 @@ func TestControllerPublishVolume(t *testing.T) {
 				driver: &LinodeDriver{},
 			}
 			s := &ControllerServer{
-				client: mockClient,
-				driver: ns.driver,
+				client:        mockClient,
+				driver:        ns.driver,
+				publishedCaps: tt.publishedCaps,
 			}
 			_, err := s.ControllerPublishVolume(context.Background(), tt.req)
 			if err != nil && !reflect.DeepEqual(tt.expectedError, err) {
