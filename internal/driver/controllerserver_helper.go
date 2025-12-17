@@ -720,39 +720,27 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 	return volume, nil
 }
 
-// makeReadOnlyTag creates a tag for marking a volume as published read-only to a specific node.
-func makeReadOnlyTag(nodeID int) string {
-	return fmt.Sprintf("%s%d", VolumeReadOnlyTagPrefix, nodeID)
+// setReadOnlyTag updates the volume tags to reflect the readonly state for the given node.
+// Returns the updated tags and whether an update is needed.
+func setReadOnlyTag(existingTags []string, nodeID int, readonly bool) ([]string, bool) {
+	tag := fmt.Sprintf("%s%d", VolumeReadOnlyTagPrefix, nodeID)
+	idx := slices.Index(existingTags, tag)
+	hasTag := idx != -1
+
+	if readonly == hasTag {
+		return existingTags, false // already in desired state
+	}
+
+	if readonly {
+		return append(existingTags, tag), true
+	}
+	return slices.Delete(existingTags, idx, idx+1), true
 }
 
 // volumeHasReadOnlyTag checks if the volume has a read-only tag for the given node.
 func volumeHasReadOnlyTag(volume *linodego.Volume, nodeID int) bool {
-	tag := makeReadOnlyTag(nodeID)
+	tag := fmt.Sprintf("%s%d", VolumeReadOnlyTagPrefix, nodeID)
 	return slices.Contains(volume.Tags, tag)
-}
-
-// addReadOnlyTag adds a read-only tag for the given node to the volume's tags.
-// Returns the updated tags slice.
-func addReadOnlyTag(existingTags []string, nodeID int) (tags []string, updated bool) {
-	tag := makeReadOnlyTag(nodeID)
-	// Check if tag already exists
-	if slices.Contains(existingTags, tag) {
-		return existingTags, false
-	}
-	return append(existingTags, tag), true
-}
-
-// removeReadOnlyTag removes the read-only tag for the given node from the volume's tags.
-// Returns the updated tags slice.
-func removeReadOnlyTag(existingTags []string, nodeID int) (tags []string, updated bool) {
-	tag := makeReadOnlyTag(nodeID)
-
-	i := slices.Index(existingTags, tag)
-	if i == -1 {
-		return existingTags, false // Tag not found; return existing tags
-	}
-
-	return slices.Delete(existingTags, i, i+1), true
 }
 
 // getInstance retrieves the Linode instance by its ID. If the

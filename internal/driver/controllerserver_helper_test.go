@@ -1446,34 +1446,97 @@ func Test_getRegionFromTopology(t *testing.T) {
 	}
 }
 
-func TestMakeReadOnlyTag(t *testing.T) {
+func TestSetReadOnlyTag(t *testing.T) {
 	tests := []struct {
-		name     string
-		nodeID   int
-		expected string
+		name            string
+		existingTags    []string
+		nodeID          int
+		readonly        bool
+		expectedTags    []string
+		expectedUpdated bool
 	}{
 		{
-			name:     "simple node ID",
-			nodeID:   12345,
-			expected: "csi-readonly-12345",
+			name:            "add to empty tags",
+			existingTags:    []string{},
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"csi-readonly-123"},
+			expectedUpdated: true,
 		},
 		{
-			name:     "large node ID",
-			nodeID:   1234567890,
-			expected: "csi-readonly-1234567890",
+			name:            "add to existing tags",
+			existingTags:    []string{"other-tag"},
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"other-tag", "csi-readonly-123"},
+			expectedUpdated: true,
 		},
 		{
-			name:     "zero node ID",
-			nodeID:   0,
-			expected: "csi-readonly-0",
+			name:            "add when tag already exists - no update",
+			existingTags:    []string{"other-tag", "csi-readonly-123"},
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"other-tag", "csi-readonly-123"},
+			expectedUpdated: false,
+		},
+		{
+			name:            "add to nil tags",
+			existingTags:    nil,
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"csi-readonly-123"},
+			expectedUpdated: true,
+		},
+		{
+			name:            "remove existing tag",
+			existingTags:    []string{"other-tag", "csi-readonly-123"},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{"other-tag"},
+			expectedUpdated: true,
+		},
+		{
+			name:            "remove when tag not present - no update",
+			existingTags:    []string{"other-tag", "csi-readonly-456"},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{"other-tag", "csi-readonly-456"},
+			expectedUpdated: false,
+		},
+		{
+			name:            "remove from single tag list",
+			existingTags:    []string{"csi-readonly-123"},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{},
+			expectedUpdated: true,
+		},
+		{
+			name:            "remove from empty tags - no update",
+			existingTags:    []string{},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{},
+			expectedUpdated: false,
+		},
+		{
+			name:            "large node ID",
+			existingTags:    []string{},
+			nodeID:          1234567890,
+			readonly:        true,
+			expectedTags:    []string{"csi-readonly-1234567890"},
+			expectedUpdated: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := makeReadOnlyTag(tt.nodeID)
-			if got != tt.expected {
-				t.Errorf("makeReadOnlyTag(%d) = %s, want %s", tt.nodeID, got, tt.expected)
+			got, updated := setReadOnlyTag(tt.existingTags, tt.nodeID, tt.readonly)
+			if !reflect.DeepEqual(got, tt.expectedTags) {
+				t.Errorf("setReadOnlyTag() tags = %v, want %v", got, tt.expectedTags)
+			}
+			if updated != tt.expectedUpdated {
+				t.Errorf("setReadOnlyTag() updated = %v, want %v", updated, tt.expectedUpdated)
 			}
 		})
 	}
@@ -1533,98 +1596,6 @@ func TestVolumeHasReadOnlyTag(t *testing.T) {
 			got := volumeHasReadOnlyTag(tt.volume, tt.nodeID)
 			if got != tt.expected {
 				t.Errorf("volumeHasReadOnlyTag() = %v, want %v", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestAddReadOnlyTag(t *testing.T) {
-	tests := []struct {
-		name         string
-		existingTags []string
-		nodeID       int
-		expected     []string
-	}{
-		{
-			name:         "add to empty tags",
-			existingTags: []string{},
-			nodeID:       123,
-			expected:     []string{"csi-readonly-123"},
-		},
-		{
-			name:         "add to existing tags",
-			existingTags: []string{"other-tag"},
-			nodeID:       123,
-			expected:     []string{"other-tag", "csi-readonly-123"},
-		},
-		{
-			name:         "tag already exists - no duplicate",
-			existingTags: []string{"other-tag", "csi-readonly-123"},
-			nodeID:       123,
-			expected:     []string{"other-tag", "csi-readonly-123"},
-		},
-		{
-			name:         "add nil tags",
-			existingTags: nil,
-			nodeID:       123,
-			expected:     []string{"csi-readonly-123"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, _ := addReadOnlyTag(tt.existingTags, tt.nodeID)
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("addReadOnlyTag() = %v, want %v", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestRemoveReadOnlyTag(t *testing.T) {
-	tests := []struct {
-		name         string
-		existingTags []string
-		nodeID       int
-		expected     []string
-	}{
-		{
-			name:         "remove existing tag",
-			existingTags: []string{"other-tag", "csi-readonly-123"},
-			nodeID:       123,
-			expected:     []string{"other-tag"},
-		},
-		{
-			name:         "tag not present - no change",
-			existingTags: []string{"other-tag", "csi-readonly-456"},
-			nodeID:       123,
-			expected:     []string{"other-tag", "csi-readonly-456"},
-		},
-		{
-			name:         "remove from single tag list",
-			existingTags: []string{"csi-readonly-123"},
-			nodeID:       123,
-			expected:     []string{},
-		},
-		{
-			name:         "empty tags",
-			existingTags: []string{},
-			nodeID:       123,
-			expected:     []string{},
-		},
-		{
-			name:         "nil tags",
-			existingTags: nil,
-			nodeID:       123,
-			expected:     []string{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, _ := removeReadOnlyTag(tt.existingTags, tt.nodeID)
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("removeReadOnlyTag() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

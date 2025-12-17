@@ -251,23 +251,8 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	// Ensure the readonly tag state is correct:
 	// - If publishing as readonly: add the tag
 	// - If publishing as read-write: remove any stale readonly tag (from a previous failed unpublish)
-	if readonly {
-		newTags, updated := addReadOnlyTag(volume.Tags, linodeID)
-		if updated {
-			if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
-				log.V(2).Info("Failed to add readonly tag to volume", "volume_id", volumeID, "error", err)
-				// Don't fail the publish operation for tag update failure
-			}
-		}
-	} else if volumeHasReadOnlyTag(volume, linodeID) {
-		// Clean up stale readonly tag from a previous publish
-		newTags, updated := removeReadOnlyTag(volume.Tags, linodeID)
-		if updated {
-			if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
-				log.V(2).Info("Failed to remove stale readonly tag from volume", "volume_id", volumeID, "error", err)
-				// Don't fail the publish operation for tag update failure
-			}
-		}
+	if err := cs.syncReadOnlyTag(ctx, volumeID, volume, linodeID, readonly); err != nil {
+		log.V(2).Info("Failed to sync readonly tag on volume", "volume_id", volumeID, "error", err)
 	}
 
 	// Record function completion
@@ -318,8 +303,11 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
 
+	// Parse nodeID early so we can use it for tag cleanup later
+	var linodeID int
 	if req.GetNodeId() != "" {
-		linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
+		var statusErr error
+		linodeID, statusErr = linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
 		if statusErr != nil {
 			observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 			return &csi.ControllerUnpublishVolumeResponse{}, statusErr
@@ -351,17 +339,9 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	}
 
 	// Remove readonly tag if nodeID was provided
-	if req.GetNodeId() != "" {
-		if linodeID, err := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req); err == nil {
-			if volumeHasReadOnlyTag(volume, linodeID) {
-				newTags, updated := removeReadOnlyTag(volume.Tags, linodeID)
-				if updated {
-					if _, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags}); err != nil {
-						log.V(2).Info("Failed to remove readonly tag from volume", "volume_id", volumeID, "error", err)
-						// Don't fail the unpublish operation for tag update failure
-					}
-				}
-			}
+	if linodeID != 0 {
+		if err := cs.syncReadOnlyTag(ctx, volumeID, volume, linodeID, false); err != nil {
+			log.V(2).Info("Failed to remove readonly tag from volume", "volume_id", volumeID, "error", err)
 		}
 	}
 
@@ -625,4 +605,16 @@ func getVolumeResponse(volume *linodego.Volume) (csiVolume *csi.Volume, publishe
 	}
 
 	return
+}
+
+// syncReadOnlyTag ensures the readonly tag state is correct for a volume.
+// If readonly is true, adds the tag; otherwise removes it if present.
+// Returns nil if no update was needed or the update succeeded.
+func (cs *ControllerServer) syncReadOnlyTag(ctx context.Context, volumeID int, volume *linodego.Volume, linodeID int, readonly bool) error {
+	newTags, updated := setReadOnlyTag(volume.Tags, linodeID, readonly)
+	if !updated {
+		return nil
+	}
+	_, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags})
+	return err
 }
