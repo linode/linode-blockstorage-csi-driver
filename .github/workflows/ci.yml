@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
-    environment: ${{ github.event.pull_request.head.repo.fork == true && 'prod-external' || 'prod' }}
+    environment: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository) && 'prod-external' || 'prod' }}
     env:
       GITHUB_TOKEN: ${{ secrets.github_token }}
       LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
