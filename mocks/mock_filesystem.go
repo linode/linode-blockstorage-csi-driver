@@ -22,6 +22,7 @@ import (
 type MockFileInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockFileInterfaceMockRecorder
+	isgomock struct{}
 }
 
 // MockFileInterfaceMockRecorder is the mock recorder for MockFileInterface.
@@ -89,6 +90,7 @@ func (mr *MockFileInterfaceMockRecorder) Write(arg0 any) *gomock.Call {
 type MockFileSystem struct {
 	ctrl     *gomock.Controller
 	recorder *MockFileSystemMockRecorder
+	isgomock struct{}
 }
 
 // MockFileSystemMockRecorder is the mock recorder for MockFileSystem.

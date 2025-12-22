@@ -26,6 +26,22 @@ type ControllerServer struct {
 	csi.UnimplementedControllerServer
 }
 
+// checkPublishCompatibility verifies if a re-publish request is compatible with existing publish.
+// Uses volume tags to track readonly state. If a volume was published as readonly, it will have
+// a tag "csi-readonly-<nodeID>". If no such tag exists, the volume is assumed to be read-write.
+// Returns nil if compatible, or an AlreadyExists error if incompatible.
+func checkPublishCompatibility(volume *linodego.Volume, linodeID int, readonly bool) error {
+	wasReadOnly := volumeHasReadOnlyTag(volume, linodeID)
+
+	if wasReadOnly != readonly {
+		return status.Errorf(codes.AlreadyExists,
+			"volume %d already published to node %d with readonly=%v, cannot re-publish with readonly=%v",
+			volume.ID, linodeID, wasReadOnly, readonly)
+	}
+
+	return nil
+}
+
 // NewControllerServer instantiates a new RPC service that implements the
 // CSI [Controller Service RPC] endpoints.
 //
@@ -189,28 +205,35 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 
 	// Check if the volume exists and is valid.
-	// If the volume is already attached to the specified instance, it returns its device path.
-	devicePath, err := cs.getAndValidateVolume(ctx, volumeID, instance)
+	volume, err := cs.getAndValidateVolume(ctx, volumeID, instance)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
 	}
-	// If devicePath is not empty, the volume is already attached
-	if devicePath != "" {
-		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
+
+	readonly := req.GetReadonly()
+
+	// If volume is already attached to this instance, handle idempotency
+	if volume.LinodeID != nil && *volume.LinodeID == instance.ID {
+		if err := checkPublishCompatibility(volume, linodeID, readonly); err != nil {
+			observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
+			return resp, err
+		}
+		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Completed, functionStartTime)
+		log.V(2).Info("Volume already attached (idempotent)", "volume_id", volumeID, "device_path", volume.FilesystemPath)
 		return &csi.ControllerPublishVolumeResponse{
-			PublishContext: map[string]string{
-				devicePathKey: devicePath,
-			},
+			PublishContext: map[string]string{devicePathKey: volume.FilesystemPath},
 		}, nil
 	}
 
 	// Check if the instance can accommodate the volume attachment
 	if capErr := cs.checkAttachmentCapacity(ctx, instance); capErr != nil {
+		log.V(2).Info("Cannot attach volume: capacity limit reached", "volume_id", volumeID, "node_id", linodeID, "error", capErr)
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, capErr
 	}
 
+	log.V(4).Info("Attaching volume to instance", "volume_id", volumeID, "node_id", linodeID)
 	// Attach the volume to the specified instance
 	if attachErr := cs.attachVolume(ctx, volumeID, linodeID); attachErr != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
@@ -219,10 +242,17 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
 	// Wait for the volume to be successfully attached to the instance
-	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
+	volume, err = cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
+	}
+
+	// Ensure the readonly tag state is correct:
+	// - If publishing as readonly: add the tag
+	// - If publishing as read-write: remove any stale readonly tag (from a previous failed unpublish)
+	if err := cs.syncReadOnlyTag(ctx, volumeID, volume, linodeID, readonly); err != nil {
+		log.V(2).Info("Failed to sync readonly tag on volume", "volume_id", volumeID, "error", err)
 	}
 
 	// Record function completion
@@ -273,8 +303,11 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("get volume %d: %v", volumeID, err)
 	}
 
+	// Parse nodeID early so we can use it for tag cleanup later
+	var linodeID int
 	if req.GetNodeId() != "" {
-		linodeID, statusErr := linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
+		var statusErr error
+		linodeID, statusErr = linodevolumes.NodeIdAsInt("ControllerUnpublishVolume", req)
 		if statusErr != nil {
 			observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 			return &csi.ControllerUnpublishVolumeResponse{}, statusErr
@@ -299,9 +332,17 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	}
 
 	log.V(4).Info("Waiting for volume to detach")
-	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
+	volume, err = cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout())
+	if err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
+	}
+
+	// Remove readonly tag if nodeID was provided
+	if linodeID != 0 {
+		if err := cs.syncReadOnlyTag(ctx, volumeID, volume, linodeID, false); err != nil {
+			log.V(2).Info("Failed to remove readonly tag from volume", "volume_id", volumeID, "error", err)
+		}
 	}
 
 	// Record function completion
@@ -564,4 +605,16 @@ func getVolumeResponse(volume *linodego.Volume) (csiVolume *csi.Volume, publishe
 	}
 
 	return
+}
+
+// syncReadOnlyTag ensures the readonly tag state is correct for a volume.
+// If readonly is true, adds the tag; otherwise removes it if present.
+// Returns nil if no update was needed or the update succeeded.
+func (cs *ControllerServer) syncReadOnlyTag(ctx context.Context, volumeID int, volume *linodego.Volume, linodeID int, readonly bool) error {
+	newTags, updated := setReadOnlyTag(volume.Tags, linodeID, readonly)
+	if !updated {
+		return nil
+	}
+	_, err := cs.client.UpdateVolume(ctx, volumeID, linodego.VolumeUpdateOptions{Tags: &newTags})
+	return err
 }

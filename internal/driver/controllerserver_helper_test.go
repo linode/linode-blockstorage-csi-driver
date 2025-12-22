@@ -864,7 +864,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 		volumeID       int
 		linode         *linodego.Instance
 		setupMocks     func()
-		expectedResult string
+		expectedVolume *linodego.Volume
 		expectedError  error
 	}{
 		{
@@ -880,8 +880,12 @@ func TestGetAndValidateVolume(t *testing.T) {
 					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
 				}, nil)
 			},
-			expectedResult: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
-			expectedError:  nil,
+			expectedVolume: &linodego.Volume{
+				ID:             123,
+				LinodeID:       &[]int{456}[0],
+				FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test-volume",
+			},
+			expectedError: nil,
 		},
 		{
 			name:     "Volume found but not attached",
@@ -897,8 +901,12 @@ func TestGetAndValidateVolume(t *testing.T) {
 					Region:   "us-east",
 				}, nil)
 			},
-			expectedResult: "",
-			expectedError:  nil,
+			expectedVolume: &linodego.Volume{
+				ID:       123,
+				LinodeID: nil,
+				Region:   "us-east",
+			},
+			expectedError: nil,
 		},
 		{
 			name:     "Volume found but attached to different instance",
@@ -912,7 +920,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 					LinodeID: &[]int{789}[0],
 				}, nil)
 			},
-			expectedResult: "",
+			expectedVolume: nil,
 			expectedError:  errVolumeAttached(123, 789),
 		},
 		{
@@ -927,7 +935,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 					Message: "Not Found",
 				})
 			},
-			expectedResult: "",
+			expectedVolume: nil,
 			expectedError:  errVolumeNotFound(123),
 		},
 		{
@@ -939,7 +947,7 @@ func TestGetAndValidateVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().GetVolume(gomock.Any(), 123).Return(nil, errors.New("API error"))
 			},
-			expectedResult: "",
+			expectedVolume: nil,
 			expectedError:  errInternal("get volume 123: API error"),
 		},
 	}
@@ -954,26 +962,24 @@ func TestGetAndValidateVolume(t *testing.T) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
 			}
 
-			if tc.expectedResult != result {
-				t.Errorf("expected result %s, got %s", tc.expectedResult, result)
+			if tc.expectedVolume == nil && result != nil {
+				t.Errorf("expected nil volume, got %v", result)
+			} else if tc.expectedVolume != nil {
+				if result == nil {
+					t.Errorf("expected volume %v, got nil", tc.expectedVolume)
+				} else if result.ID != tc.expectedVolume.ID {
+					t.Errorf("expected volume ID %d, got %d", tc.expectedVolume.ID, result.ID)
+				}
 			}
 		})
 	}
 }
 
 func TestCheckAttachmentCapacity(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mocks.NewMockLinodeClient(ctrl)
-	cs := &ControllerServer{
-		client: mockClient,
-	}
-
 	testCases := []struct {
 		name          string
 		instance      *linodego.Instance
-		setupMocks    func()
+		setupMocks    func(m *mocks.MockLinodeClient)
 		expectedError error
 	}{
 		{
@@ -984,9 +990,9 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 					Memory: 4096,
 				},
 			},
-			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 123, gomock.Any()).Return([]linodego.Volume{}, nil)
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 123, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 123, gomock.Any()).Return([]linodego.Volume{}, nil)
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 123, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
 			},
 			expectedError: nil,
 		},
@@ -998,22 +1004,71 @@ func TestCheckAttachmentCapacity(t *testing.T) {
 					Memory: 1024,
 				},
 			},
-			setupMocks: func() {
-				mockClient.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
-				mockClient.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil)
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 456, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 456, gomock.Any()).Return([]linodego.Volume{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil)
 			},
 			expectedError: errMaxVolumeAttachments(6),
+		},
+		{
+			name: "ListInstanceVolumes error",
+			instance: &linodego.Instance{
+				ID: 789,
+				Specs: &linodego.InstanceSpec{
+					Memory: 4096,
+				},
+			},
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 789, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 789, gomock.Any()).Return(nil, errors.New("API error"))
+			},
+			expectedError: errInternal("list instance volumes: API error"),
+		},
+		{
+			name: "ListInstanceDisks error in canAttach",
+			instance: &linodego.Instance{
+				ID: 101,
+				Specs: &linodego.InstanceSpec{
+					Memory: 4096,
+				},
+			},
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 101, gomock.Any()).Return(nil, errors.New("disk API error"))
+			},
+			expectedError: errInternal("list instance disks: disk API error"),
+		},
+		{
+			name: "Nil instance specs",
+			instance: &linodego.Instance{
+				ID:    102,
+				Specs: nil,
+			},
+			setupMocks: func(m *mocks.MockLinodeClient) {
+				// No mocks needed - should fail before API calls due to nil specs
+			},
+			expectedError: errNilInstance,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.setupMocks()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockClient := mocks.NewMockLinodeClient(ctrl)
+			cs := &ControllerServer{
+				client: mockClient,
+			}
+
+			tc.setupMocks(mockClient)
 
 			err := cs.checkAttachmentCapacity(context.Background(), tc.instance)
 
 			if err != nil && !reflect.DeepEqual(tc.expectedError, err) {
 				t.Errorf("expected error %v, got %v", tc.expectedError, err)
+			}
+			if err == nil && tc.expectedError != nil {
+				t.Errorf("expected error %v, got nil", tc.expectedError)
 			}
 		})
 	}
@@ -1084,7 +1139,7 @@ func TestGetContentSourceVolume(t *testing.T) {
 			},
 			setupMocks:     func() {},
 			expectedResult: nil,
-			expectedError:  errInternal("parse volume info from content source: invalid linode volume id: \"test\""),
+			expectedError:  errNotFound("parse volume info from content source: invalid linode volume id: \"test\""),
 		},
 		{
 			name: "Valid content source, matching region",
@@ -1386,6 +1441,161 @@ func Test_getRegionFromTopology(t *testing.T) {
 			got := getRegionFromTopology(tt.requirements)
 			if got != tt.want {
 				t.Errorf("getRegionFromTopology() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSetReadOnlyTag(t *testing.T) {
+	tests := []struct {
+		name            string
+		existingTags    []string
+		nodeID          int
+		readonly        bool
+		expectedTags    []string
+		expectedUpdated bool
+	}{
+		{
+			name:            "add to empty tags",
+			existingTags:    []string{},
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"csi-readonly-123"},
+			expectedUpdated: true,
+		},
+		{
+			name:            "add to existing tags",
+			existingTags:    []string{"other-tag"},
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"other-tag", "csi-readonly-123"},
+			expectedUpdated: true,
+		},
+		{
+			name:            "add when tag already exists - no update",
+			existingTags:    []string{"other-tag", "csi-readonly-123"},
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"other-tag", "csi-readonly-123"},
+			expectedUpdated: false,
+		},
+		{
+			name:            "add to nil tags",
+			existingTags:    nil,
+			nodeID:          123,
+			readonly:        true,
+			expectedTags:    []string{"csi-readonly-123"},
+			expectedUpdated: true,
+		},
+		{
+			name:            "remove existing tag",
+			existingTags:    []string{"other-tag", "csi-readonly-123"},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{"other-tag"},
+			expectedUpdated: true,
+		},
+		{
+			name:            "remove when tag not present - no update",
+			existingTags:    []string{"other-tag", "csi-readonly-456"},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{"other-tag", "csi-readonly-456"},
+			expectedUpdated: false,
+		},
+		{
+			name:            "remove from single tag list",
+			existingTags:    []string{"csi-readonly-123"},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{},
+			expectedUpdated: true,
+		},
+		{
+			name:            "remove from empty tags - no update",
+			existingTags:    []string{},
+			nodeID:          123,
+			readonly:        false,
+			expectedTags:    []string{},
+			expectedUpdated: false,
+		},
+		{
+			name:            "large node ID",
+			existingTags:    []string{},
+			nodeID:          1234567890,
+			readonly:        true,
+			expectedTags:    []string{"csi-readonly-1234567890"},
+			expectedUpdated: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, updated := setReadOnlyTag(tt.existingTags, tt.nodeID, tt.readonly)
+			if !reflect.DeepEqual(got, tt.expectedTags) {
+				t.Errorf("setReadOnlyTag() tags = %v, want %v", got, tt.expectedTags)
+			}
+			if updated != tt.expectedUpdated {
+				t.Errorf("setReadOnlyTag() updated = %v, want %v", updated, tt.expectedUpdated)
+			}
+		})
+	}
+}
+
+func TestVolumeHasReadOnlyTag(t *testing.T) {
+	tests := []struct {
+		name     string
+		volume   *linodego.Volume
+		nodeID   int
+		expected bool
+	}{
+		{
+			name: "has matching tag",
+			volume: &linodego.Volume{
+				Tags: []string{"other-tag", "csi-readonly-123"},
+			},
+			nodeID:   123,
+			expected: true,
+		},
+		{
+			name: "no matching tag",
+			volume: &linodego.Volume{
+				Tags: []string{"other-tag", "csi-readonly-456"},
+			},
+			nodeID:   123,
+			expected: false,
+		},
+		{
+			name: "empty tags",
+			volume: &linodego.Volume{
+				Tags: []string{},
+			},
+			nodeID:   123,
+			expected: false,
+		},
+		{
+			name: "nil tags",
+			volume: &linodego.Volume{
+				Tags: nil,
+			},
+			nodeID:   123,
+			expected: false,
+		},
+		{
+			name: "partial match should not match",
+			volume: &linodego.Volume{
+				Tags: []string{"csi-readonly-1234"},
+			},
+			nodeID:   123,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := volumeHasReadOnlyTag(tt.volume, tt.nodeID)
+			if got != tt.expected {
+				t.Errorf("volumeHasReadOnlyTag() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

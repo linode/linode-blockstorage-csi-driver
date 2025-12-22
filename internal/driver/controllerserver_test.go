@@ -212,13 +212,196 @@ func TestControllerPublishVolume(t *testing.T) {
 			},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1003, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
-				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil).AnyTimes()
-				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
-				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				// Volume NOT attached initially (LinodeID = nil)
+				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 630706045, LinodeID: nil, Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1003, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
 				m.EXPECT().ListInstanceDisks(gomock.Any(), 1003, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 630706045, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 630706045, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive, FilesystemPath: "/dev/sda"}, nil)
 			},
 			expectedError: nil,
+		},
+		{
+			name: "idempotent publish with compatible readonly (both RW)",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1004-testvol",
+				NodeId:   "2004",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			resp: &csi.ControllerPublishVolumeResponse{
+				PublishContext: map[string]string{
+					"devicePath": "/dev/disk/by-id/scsi-0Linode_Volume_test",
+				},
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2004).Return(&linodego.Instance{ID: 2004, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				// Volume already attached to the same instance, no readonly tag = RW
+				m.EXPECT().GetVolume(gomock.Any(), 1004).Return(&linodego.Volume{
+					ID:             1004,
+					LinodeID:       createLinodeID(2004),
+					Size:           10,
+					Status:         linodego.VolumeActive,
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+					Tags:           []string{},
+				}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "idempotent publish with incompatible readonly flag (was RW, requesting RO)",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1005-testvol",
+				NodeId:   "2005",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: true, // Requesting readonly but volume was published as RW (no tag)
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2005).Return(&linodego.Instance{ID: 2005, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				// Volume already attached to the same instance, no readonly tag = was RW
+				m.EXPECT().GetVolume(gomock.Any(), 1005).Return(&linodego.Volume{
+					ID:             1005,
+					LinodeID:       createLinodeID(2005),
+					Size:           10,
+					Status:         linodego.VolumeActive,
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+					Tags:           []string{}, // No readonly tag = was RW
+				}, nil)
+			},
+			expectedError: errAlreadyExists("volume 1005 already published to node 2005 with readonly=false, cannot re-publish with readonly=true"),
+		},
+		{
+			name: "idempotent publish with incompatible readonly flag (was RO, requesting RW)",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1006-testvol",
+				NodeId:   "2006",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false, // Requesting RW but volume was published as readonly (has tag)
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2006).Return(&linodego.Instance{ID: 2006, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
+				// Volume already attached, has readonly tag = was published as readonly
+				m.EXPECT().GetVolume(gomock.Any(), 1006).Return(&linodego.Volume{
+					ID:             1006,
+					LinodeID:       createLinodeID(2006),
+					Size:           10,
+					Status:         linodego.VolumeActive,
+					FilesystemPath: "/dev/disk/by-id/scsi-0Linode_Volume_test",
+					Tags:           []string{"csi-readonly-2006"}, // Has readonly tag = was RO
+				}, nil)
+			},
+			expectedError: errAlreadyExists("volume 1006 already published to node 2006 with readonly=true, cannot re-publish with readonly=false"),
+		},
+		{
+			name: "publish fails due to max attachments reached",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1007-testvol",
+				NodeId:   "2007",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2007).Return(&linodego.Instance{
+					ID:    2007,
+					Specs: &linodego.InstanceSpec{Memory: 1024}, // Low memory = fewer allowed attachments
+				}, nil)
+				// Volume not attached
+				m.EXPECT().GetVolume(gomock.Any(), 1007).Return(&linodego.Volume{
+					ID:       1007,
+					LinodeID: nil,
+					Size:     10,
+					Status:   linodego.VolumeActive,
+				}, nil)
+				// checkAttachmentCapacity: already at max attachments
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 2007, gomock.Any()).Return([]linodego.InstanceDisk{{ID: 1}, {ID: 2}}, nil).AnyTimes()
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 2007, gomock.Any()).Return([]linodego.Volume{
+					{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6},
+				}, nil)
+			},
+			expectedError: errMaxVolumeAttachments(6),
+		},
+		{
+			name: "publish fails when WaitForVolumeLinodeID times out",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "1008-testvol",
+				NodeId:   "2008",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+				VolumeContext: map[string]string{
+					VolumeTopologyRegion: "us-east",
+				},
+				Readonly: false,
+			},
+			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
+				m.EXPECT().GetInstance(gomock.Any(), 2008).Return(&linodego.Instance{
+					ID:    2008,
+					Specs: &linodego.InstanceSpec{Memory: 16 << 10},
+				}, nil)
+				// Volume not attached
+				m.EXPECT().GetVolume(gomock.Any(), 1008).Return(&linodego.Volume{
+					ID:       1008,
+					LinodeID: nil,
+					Size:     10,
+					Status:   linodego.VolumeActive,
+				}, nil)
+				// checkAttachmentCapacity: can attach
+				m.EXPECT().ListInstanceDisks(gomock.Any(), 2008, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
+				m.EXPECT().ListInstanceVolumes(gomock.Any(), 2008, gomock.Any()).Return([]linodego.Volume{}, nil)
+				// AttachVolume succeeds
+				m.EXPECT().AttachVolume(gomock.Any(), 1008, gomock.Any()).Return(&linodego.Volume{
+					ID:       1008,
+					LinodeID: createLinodeID(2008),
+				}, nil)
+				// WaitForVolumeLinodeID fails (timeout)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 1008, gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("timed out waiting for volume attachment"))
+			},
+			expectedError: fmt.Errorf("timed out waiting for volume attachment"),
 		},
 	}
 	for _, tt := range tests {
@@ -709,6 +892,11 @@ func (flc *fakeLinodeClient) DeleteVolume(context.Context, int) error { return n
 func (flc *fakeLinodeClient) ResizeVolume(context.Context, int, int) error { return nil }
 
 //nolint:nilnil // TODO: re-work tests
+func (flc *fakeLinodeClient) UpdateVolume(context.Context, int, linodego.VolumeUpdateOptions) (*linodego.Volume, error) {
+	return nil, nil
+}
+
+//nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error) {
 	return nil, nil
 }
@@ -1074,6 +1262,92 @@ func TestControllerGetVolume(t *testing.T) {
 				t.Errorf("ControllerGetVolume error = %v, wantErr %v", err, tt.expectedError)
 			} else if !reflect.DeepEqual(resp, tt.resp) {
 				t.Errorf("ControllerGetVolume response = %v, want %v", resp, tt.resp)
+			}
+		})
+	}
+}
+
+func TestCheckPublishCompatibility(t *testing.T) {
+	tests := []struct {
+		name     string
+		volume   *linodego.Volume
+		linodeID int
+		readonly bool
+		wantErr  bool
+	}{
+		{
+			name: "no readonly tag, requesting read-write - should succeed",
+			volume: &linodego.Volume{
+				ID:   100,
+				Tags: []string{"other-tag"},
+			},
+			linodeID: 200,
+			readonly: false,
+			wantErr:  false,
+		},
+		{
+			name: "no readonly tag, requesting readonly - should fail",
+			volume: &linodego.Volume{
+				ID:   101,
+				Tags: []string{"other-tag"},
+			},
+			linodeID: 201,
+			readonly: true,
+			wantErr:  true,
+		},
+		{
+			name: "has readonly tag, requesting readonly - should succeed",
+			volume: &linodego.Volume{
+				ID:   102,
+				Tags: []string{"csi-readonly-202", "other-tag"},
+			},
+			linodeID: 202,
+			readonly: true,
+			wantErr:  false,
+		},
+		{
+			name: "has readonly tag, requesting read-write - should fail",
+			volume: &linodego.Volume{
+				ID:   103,
+				Tags: []string{"csi-readonly-203"},
+			},
+			linodeID: 203,
+			readonly: false,
+			wantErr:  true,
+		},
+		{
+			name: "has readonly tag for different node - should succeed (no tag for this node)",
+			volume: &linodego.Volume{
+				ID:   104,
+				Tags: []string{"csi-readonly-999"},
+			},
+			linodeID: 204,
+			readonly: false,
+			wantErr:  false,
+		},
+		{
+			name: "empty tags, requesting read-write - should succeed",
+			volume: &linodego.Volume{
+				ID:   105,
+				Tags: []string{},
+			},
+			linodeID: 205,
+			readonly: false,
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotErr := checkPublishCompatibility(tt.volume, tt.linodeID, tt.readonly)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("checkPublishCompatibility() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("checkPublishCompatibility() succeeded unexpectedly")
 			}
 		})
 	}

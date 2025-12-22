@@ -15,10 +15,7 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 )
 
-// unixStatfs is used to mock the unix.Statfs function.
-var unixStatfs = unix.Statfs
-
-func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest, fsStatter FilesystemStatter) (*csi.NodeGetVolumeStatsResponse, error) {
 	log, _ := logger.GetLogger(ctx)
 
 	if req.GetVolumeId() == "" || req.GetVolumePath() == "" {
@@ -27,7 +24,7 @@ func nodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest)
 
 	var statfs unix.Statfs_t
 	// See http://man7.org/linux/man-pages/man2/statfs.2.html for details.
-	err := unixStatfs(req.GetVolumePath(), &statfs)
+	err := fsStatter.Statfs(req.GetVolumePath(), &statfs)
 	switch {
 	case errors.Is(err, unix.EIO):
 		// EIO is returned when the filesystem is not mounted.

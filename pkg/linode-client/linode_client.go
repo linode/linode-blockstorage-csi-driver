@@ -27,6 +27,7 @@ type LinodeClient interface {
 	DeleteVolume(context.Context, int) error
 
 	ResizeVolume(context.Context, int, int) error
+	UpdateVolume(context.Context, int, linodego.VolumeUpdateOptions) (*linodego.Volume, error)
 
 	NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error)
 }

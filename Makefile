@@ -159,6 +159,7 @@ generate-mock:
 	mockgen -source=pkg/cryptsetup-client/cryptsetup_client.go -destination=mocks/mock_cryptsetupclient.go -package=mocks
 	mockgen -source=internal/driver/metadata.go -destination=mocks/mock_metadata.go -package=mocks
 	mockgen -source=pkg/hwinfo/hwinfo.go -destination=mocks/mock_hwinfo.go -package=mocks
+	mockgen -source=pkg/filesystem-stats/filesystem_stats.go -destination=mocks/mock_filesystemstatter.go -package=mocks
 
 .PHONY: test
 test:
@@ -172,6 +173,10 @@ e2e-test:
 .PHONY: csi-sanity-test
 csi-sanity-test:
 	KUBECONFIG=$(KUBECONFIG) ./tests/csi-sanity/run-tests.sh
+
+.PHONY: sanity-test
+sanity-test:
+	go test ./tests/sanity -v
 
 .PHONY: upstream-e2e-tests
 upstream-e2e-tests:

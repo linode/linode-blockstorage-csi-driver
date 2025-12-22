@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,6 +66,11 @@ func cloneTimeout() int {
 }
 
 const (
+	// VolumeReadOnlyTagPrefix is the prefix used for tagging volumes published as read-only.
+	// Format: "csi-readonly-<nodeID>" (e.g., "csi-readonly-12345678")
+	// Tag length: 13 + up to 10 digits = max 23 chars (within 3-50 limit)
+	VolumeReadOnlyTagPrefix = "csi-readonly-"
+
 	// VolumeTags is the parameter key used for passing a comma-separated list
 	// of tags to the Linode API.
 	VolumeTags = Name + "/volumeTags"
@@ -178,7 +184,7 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 	// Parse the volume ID from the content source
 	volKey, err = linodevolumes.ParseLinodeVolumeKey(sourceVolume.GetVolumeId())
 	if err != nil {
-		return nil, errInternal("parse volume info from content source: %v", err)
+		return nil, errNotFound("parse volume info from content source: %v", err)
 	}
 	if volKey == nil {
 		return nil, errInternal("processed *LinodeVolumeKey is nil") // Throw an internal error if the processed LinodeVolumeKey is nil
@@ -186,7 +192,9 @@ func (cs *ControllerServer) getContentSourceVolume(ctx context.Context, contentS
 
 	// Retrieve the volume data using the parsed volume ID
 	volumeData, err := cs.client.GetVolume(ctx, volKey.VolumeID)
-	if err != nil {
+	if linodego.IsNotFound(err) {
+		return nil, errVolumeNotFound(volKey.VolumeID)
+	} else if err != nil {
 		return nil, errInternal("get volume %d: %v", volKey.VolumeID, err)
 	}
 	if volumeData == nil {
@@ -678,15 +686,13 @@ func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.C
 // getAndValidateVolume retrieves the volume by its ID and run checks.
 //
 // It performs the following checks:
-//  1. If the volume is found and already attached to the specified Linode instance,
-//     it returns the device path of the volume.
-//  2. If the volume is not found, it returns an error indicating that the volume does not exist.
-//  3. If the volume is attached to a different instance, it returns an error indicating
+//  1. If the volume is not found, it returns an error indicating that the volume does not exist.
+//  2. If the volume is attached to a different instance, it returns an error indicating
 //     that the volume is already attached elsewhere.
 //
-// Additionally, it checks if the volume and instance are in the same region based on
-// the provided volume context. If they are not in the same region, it returns an internal error.
-func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (string, error) {
+// Returns the volume object. Caller should check volume.LinodeID to determine if already attached
+// to the target instance, and use volume.FilesystemPath for the device path.
+func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID int, instance *linodego.Instance) (*linodego.Volume, error) {
 	log, ctx := logger.GetLogger(ctx)
 	log.V(4).Info("Entering getAndValidateVolume()", "volumeID", volumeID, "linodeID", instance.ID)
 	defer log.V(4).Info("Exiting getAndValidateVolume()")
@@ -697,21 +703,44 @@ func (cs *ControllerServer) getAndValidateVolume(ctx context.Context, volumeID i
 
 	volume, err := cs.client.GetVolume(ctx, volumeID)
 	if linodego.IsNotFound(err) {
-		return "", errVolumeNotFound(volumeID)
+		return nil, errVolumeNotFound(volumeID)
 	} else if err != nil {
-		return "", errInternal("get volume %d: %v", volumeID, err)
+		return nil, errInternal("get volume %d: %v", volumeID, err)
 	}
 
 	if volume.LinodeID != nil {
 		if *volume.LinodeID == instance.ID {
 			log.V(4).Info("Volume already attached to instance", "volume_id", volume.ID, "node_id", *volume.LinodeID, "device_path", volume.FilesystemPath)
-			return volume.FilesystemPath, nil
+			return volume, nil
 		}
-		return "", errVolumeAttached(volumeID, *volume.LinodeID)
+		return nil, errVolumeAttached(volumeID, *volume.LinodeID)
 	}
 
 	log.V(4).Info("Volume validated and is not attached to instance", "volume_id", volume.ID, "node_id", instance.ID)
-	return "", nil
+	return volume, nil
+}
+
+// setReadOnlyTag updates the volume tags to reflect the readonly state for the given node.
+// Returns the updated tags and whether an update is needed.
+func setReadOnlyTag(existingTags []string, nodeID int, readonly bool) ([]string, bool) {
+	tag := fmt.Sprintf("%s%d", VolumeReadOnlyTagPrefix, nodeID)
+	idx := slices.Index(existingTags, tag)
+	hasTag := idx != -1
+
+	if readonly == hasTag {
+		return existingTags, false // already in desired state
+	}
+
+	if readonly {
+		return append(existingTags, tag), true
+	}
+	return slices.Delete(existingTags, idx, idx+1), true
+}
+
+// volumeHasReadOnlyTag checks if the volume has a read-only tag for the given node.
+func volumeHasReadOnlyTag(volume *linodego.Volume, nodeID int) bool {
+	tag := fmt.Sprintf("%s%d", VolumeReadOnlyTagPrefix, nodeID)
+	return slices.Contains(volume.Tags, tag)
 }
 
 // getInstance retrieves the Linode instance by its ID. If the
@@ -733,6 +762,9 @@ func (cs *ControllerServer) getInstance(ctx context.Context, linodeID int) (*lin
 	} else if err != nil {
 		// If any other error occurs, return an internal error.
 		return nil, errInternal("get linode instance %d: %v", linodeID, err)
+	}
+	if instance == nil {
+		return nil, errInstanceNotFound(linodeID)
 	}
 
 	log.V(4).Info("Instance retrieved", "instance", instance)

@@ -14,11 +14,19 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type testFilesystemStatter struct {
+	statfsFunc func(string, *unix.Statfs_t) error
+}
+
+func (t *testFilesystemStatter) Statfs(path string, stat *unix.Statfs_t) error {
+	return t.statfsFunc(path, stat)
+}
+
 func TestNodeGetVolumeStats(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockStatfs := func(path string, stat *unix.Statfs_t) error {
+	mockFsStatter := func(path string, stat *unix.Statfs_t) error {
 		switch path {
 		case "/valid/path":
 			stat.Blocks = 1000
@@ -37,7 +45,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		}
 	}
 
-	unixStatfs = mockStatfs
+	// Create a simple implementation for testing
+	testStatter := &testFilesystemStatter{statfsFunc: mockFsStatter}
 
 	testCases := []struct {
 		name        string
@@ -115,7 +124,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				VolumePath: tc.volumePath,
 			}
 
-			resp, err := nodeGetVolumeStats(ctx, req)
+			resp, err := nodeGetVolumeStats(ctx, req, testStatter)
 
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
