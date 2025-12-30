@@ -58,8 +58,8 @@ github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133 h1:h6FO/Da7rdYq
 github.com/ianschenck/envflag v0.0.0-20140720210342-9111d830d133/go.mod h1:pyYc5lldRtL0l5YitYVv1dLKuC0qhMfAfiR7BLsN2pA=
 github.com/jarcoal/httpmock v1.4.1 h1:0Ju+VCFuARfFlhVXFc2HxlcQkfB+Xq12/EotHko+x2A=
 github.com/jarcoal/httpmock v1.4.1/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
-github.com/jaypipes/ghw v0.21.1 h1:zA7N2G7Bw1VCVacA9Dl4B0OuKl6NRwyRiYvOs/HLrcg=
-github.com/jaypipes/ghw v0.21.1/go.mod h1:GPrvwbtPoxYUenr74+nAnWbardIZq600vJDD5HnPsPE=
+github.com/jaypipes/ghw v0.21.2 h1:woW0lqNMPbYk59sur6thOVM8YFP9Hxxr8PM+JtpUrNU=
+github.com/jaypipes/ghw v0.21.2/go.mod h1:GPrvwbtPoxYUenr74+nAnWbardIZq600vJDD5HnPsPE=
 github.com/jaypipes/pcidb v1.1.1 h1:QmPhpsbmmnCwZmHeYAATxEaoRuiMAJusKYkUncMC0ro=
 github.com/jaypipes/pcidb v1.1.1/go.mod h1:x27LT2krrUgjf875KxQXKB0Ha/YXLdZRVmw6hH0G7g8=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
