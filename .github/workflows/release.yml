@@ -23,7 +23,7 @@ jobs:
             ./release/linode-blockstorage-csi-driver-${{ github.ref_name }}.yaml
       - name: Docker Meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             linode/linode-blockstorage-csi-driver
