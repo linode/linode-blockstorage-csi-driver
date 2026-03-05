@@ -86,6 +86,9 @@ linters:
     gosec:
       excludes:
         - G115
+        - G702 # https://github.com/securego/gosec/issues/1500
+        - G703 # https://github.com/securego/gosec/issues/1500
+        - G705 # https://github.com/securego/gosec/issues/1500
       confidence: medium
     govet:
       enable:
