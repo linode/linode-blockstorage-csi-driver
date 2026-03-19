@@ -65,7 +65,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	defer done()
 
 	functionStartTime := time.Now()
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "name", req.GetName(), "hasContentSource", req.GetVolumeContentSource() != nil)
 
 	// Validate the incoming request to ensure it meets the necessary criteria.
 	// This includes checking for required fields and valid volume capabilities.
@@ -130,7 +130,7 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return &csi.DeleteVolumeResponse{}, statusErr
 	}
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volume_id", volID)
 
 	// Check if the volume exists
 	log.V(4).Info("Checking if volume exists", "volume_id", volID)
@@ -172,7 +172,7 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	defer done()
 
 	functionStartTime := time.Now()
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volume_id", req.GetVolumeId(), "node_id", req.GetNodeId())
 
 	// Validate the request and get Linode ID and Volume ID
 	linodeID, volumeID, err := cs.validateControllerPublishVolumeRequest(ctx, req)
@@ -252,7 +252,7 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	defer done()
 
 	functionStartTime := time.Now()
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volume_id", req.GetVolumeId(), "node_id", req.GetNodeId())
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerUnpublishVolume", req)
 	if statusErr != nil {
@@ -319,7 +319,7 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 	log, done := logger.WithMethod(log, "ValidateVolumeCapabilities")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volume_id", req.GetVolumeId(), "capability_count", len(req.GetVolumeCapabilities()))
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerValidateVolumeCapabilities", req)
 	if statusErr != nil {
@@ -356,7 +356,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	log, done := logger.WithMethod(log, "ListVolumes")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "starting_token", req.GetStartingToken(), "max_entries", req.GetMaxEntries())
 
 	startingToken := req.GetStartingToken()
 	nextToken := ""
@@ -423,7 +423,7 @@ func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *
 	log, done := logger.WithMethod(log, "ControllerGetCapabilities")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request")
 
 	resp := &csi.ControllerGetCapabilitiesResponse{
 		Capabilities: cs.driver.cscap,
@@ -443,7 +443,7 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 	log, done := logger.WithMethod(log, "ControllerExpandVolume")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volume_id", req.GetVolumeId())
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerExpandVolume", req)
 	if statusErr != nil {
@@ -497,7 +497,7 @@ func (cs *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.Co
 	log, done := logger.WithMethod(log, "ControllerGetVolume")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volume_id", req.GetVolumeId())
 
 	volumeID, statusErr := linodevolumes.VolumeIdAsInt("ControllerGetVolume", req)
 	if statusErr != nil {
