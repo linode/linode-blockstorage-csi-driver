@@ -33,6 +33,12 @@
       "automerge": true,
     },
     {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "separateMajorMinor": false
+    },
+    {
       "groupName": "kubernetes",
       "groupSlug": "kubernetes-go",
       "matchDatasources": [
