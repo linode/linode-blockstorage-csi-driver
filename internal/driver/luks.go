@@ -165,7 +165,7 @@ func (e *Encryption) luksFormat(ctx context.Context, luksCtx *LuksContext, sourc
 	log.V(4).Info("Activating luks device using volumekey", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
 	err = newLuksDevice.Device.ActivateByPassphrase(luksCtx.VolumeName, 0, luksCtx.EncryptionKey, 0)
 	if err != nil {
-		return "", fmt.Errorf("activating %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
+		return "", fmt.Errorf("activating %s luks device %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, err)
 	}
 	log.V(4).Info("The LUKS volume is now ready", "volumeName", luksCtx.VolumeName)
 
@@ -188,7 +188,7 @@ func (e *Encryption) luksOpen(ctx context.Context, luksCtx *LuksContext, source 
 	log.V(4).Info("Loading luks device", "device", newLuksDevice.Identifier, "VolumeName", luksCtx.VolumeName)
 	err = newLuksDevice.Device.Load(cryptsetup.LUKS2{SectorSize: 512})
 	if err != nil {
-		return "", fmt.Errorf("loading %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
+		return "", fmt.Errorf("loading %s luks device %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, err)
 	}
 
 	// Activate the device using the encryption key
@@ -198,7 +198,7 @@ func (e *Encryption) luksOpen(ctx context.Context, luksCtx *LuksContext, source 
 		if errors.As(err, &apiErr) && apiErr.Code() == -17 {
 			return "/dev/mapper/" + luksCtx.VolumeName, nil
 		}
-		return "", fmt.Errorf("activating %s luks device %s volumekey %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, luksCtx.EncryptionKey, err)
+		return "", fmt.Errorf("activating %s luks device %s: %w", newLuksDevice.Identifier, luksCtx.VolumeName, err)
 	}
 
 	log.V(4).Info("The LUKS volume is now ready ", "volumeName", luksCtx.VolumeName)

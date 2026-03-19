@@ -39,7 +39,7 @@ const (
 // It validates the volume ID, staging target path, and volume capability.
 func validateNodeStageVolumeRequest(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
 	log, _ := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateNodeStageVolumeRequest", "req", req)
+	log.V(4).Info("Entering validateNodeStageVolumeRequest", "volumeID", req.GetVolumeId(), "stagingTargetPath", req.GetStagingTargetPath())
 
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
@@ -59,7 +59,7 @@ func validateNodeStageVolumeRequest(ctx context.Context, req *csi.NodeStageVolum
 // It validates the volume ID and staging target path.
 func validateNodeUnstageVolumeRequest(ctx context.Context, req *csi.NodeUnstageVolumeRequest) error {
 	log, _ := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateNodeUnstageVolumeRequest", "req", req)
+	log.V(4).Info("Entering validateNodeUnstageVolumeRequest", "volumeID", req.GetVolumeId(), "stagingTargetPath", req.GetStagingTargetPath())
 
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
@@ -76,7 +76,7 @@ func validateNodeUnstageVolumeRequest(ctx context.Context, req *csi.NodeUnstageV
 // It checks the volume ID and volume path in the provided request.
 func validateNodeExpandVolumeRequest(ctx context.Context, req *csi.NodeExpandVolumeRequest) error {
 	log, _ := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateNodeExpandVolumeRequest", "req", req)
+	log.V(4).Info("Entering validateNodeExpandVolumeRequest", "volumeID", req.GetVolumeId(), "volumePath", req.GetVolumePath())
 
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
@@ -93,7 +93,7 @@ func validateNodeExpandVolumeRequest(ctx context.Context, req *csi.NodeExpandVol
 // It checks the volume ID, staging target path, target path, and volume capability in the provided request.
 func validateNodePublishVolumeRequest(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
 	log, _ := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateNodePublishVolumeRequest", "req", req)
+	log.V(4).Info("Entering validateNodePublishVolumeRequest", "volumeID", req.GetVolumeId(), "stagingTargetPath", req.GetStagingTargetPath(), "targetPath", req.GetTargetPath())
 
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
@@ -116,7 +116,7 @@ func validateNodePublishVolumeRequest(ctx context.Context, req *csi.NodePublishV
 // It checks the volume ID and target path in the provided request.
 func validateNodeUnpublishVolumeRequest(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error {
 	log, _ := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateNodeUnpublishVolumeRequest", "req", req)
+	log.V(4).Info("Entering validateNodeUnpublishVolumeRequest", "volumeID", req.GetVolumeId(), "targetPath", req.GetTargetPath())
 
 	if req.GetVolumeId() == "" {
 		return errNoVolumeID
@@ -223,7 +223,7 @@ func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs file
 // It returns a CSI NodePublishVolumeResponse and an error if the operation fails.
 func (ns *NodeServer) nodePublishVolumeBlock(ctx context.Context, req *csi.NodePublishVolumeRequest, mountOptions []string, fs filesystem.FileSystem) (*csi.NodePublishVolumeResponse, error) {
 	log, _ := logger.GetLogger(ctx)
-	log.V(4).Info("Entering nodePublishVolumeBlock", "req", req, "mountOptions", mountOptions)
+	log.V(4).Info("Entering nodePublishVolumeBlock", "volumeID", req.GetVolumeId(), "targetPath", req.GetTargetPath(), "mountOptions", mountOptions)
 
 	targetPath := req.GetTargetPath()
 	targetPathDir := filepath.Dir(targetPath)
@@ -276,7 +276,7 @@ func (ns *NodeServer) nodePublishVolumeBlock(ctx context.Context, req *csi.NodeP
 // the filesystem type and mount options from the volume capability.
 func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *csi.NodeStageVolumeRequest) error {
 	log, ctx := logger.GetLogger(ctx)
-	log.V(4).Info("Entering mountVolume", "devicePath", devicePath, "req", req)
+	log.V(4).Info("Entering mountVolume", "devicePath", devicePath, "volumeID", req.GetVolumeId(), "stagingTargetPath", req.GetStagingTargetPath())
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	volumeCapability := req.GetVolumeCapability()
@@ -321,7 +321,7 @@ func (ns *NodeServer) mountVolume(ctx context.Context, devicePath string, req *c
 // Finally, it prepares the LUKS volume for mounting.
 func (ns *NodeServer) formatLUKSVolume(ctx context.Context, devicePath string, luksContext *LuksContext) (luksSource string, err error) {
 	log, ctx := logger.GetLogger(ctx)
-	log.V(4).Info("Entering formatLUKSVolume", "devicePath", devicePath, "luksContext", luksContext)
+	log.V(4).Info("Entering formatLUKSVolume", "devicePath", devicePath, "encryptionEnabled", luksContext.EncryptionEnabled, "encryptionCipher", luksContext.EncryptionCipher, "encryptionKeySize", luksContext.EncryptionKeySize, "volumeName", luksContext.VolumeName, "volumeLifecycle", luksContext.VolumeLifecycle)
 
 	// LUKS encryption enabled, check if the volume needs to be formatted.
 	formatted, err := ns.encrypt.blkidValid(ctx, devicePath)

@@ -440,7 +440,7 @@ func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 // and that the capabilities are valid. Returns an error if any validation fails.
 func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req *csi.CreateVolumeRequest) error {
 	log, ctx := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateCreateVolumeRequest()", "req", req)
+	log.V(4).Info("Entering validateCreateVolumeRequest()", "name", req.GetName(), "capability_count", len(req.GetVolumeCapabilities()))
 	defer log.V(4).Info("Exiting validateCreateVolumeRequest()")
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -472,7 +472,7 @@ func (cs *ControllerServer) validateCreateVolumeRequest(ctx context.Context, req
 // and generates a normalized volume name. Returns the volume name and size in GB.
 func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.CreateVolumeRequest) (*VolumeParams, error) {
 	log, ctx := logger.GetLogger(ctx)
-	log.V(4).Info("Entering prepareVolumeParams()", "req", req)
+	log.V(4).Info("Entering prepareVolumeParams()", "name", req.GetName())
 	defer log.V(4).Info("Exiting prepareVolumeParams()")
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -535,7 +535,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 // If the volume is encrypted, it adds relevant encryption attributes to the context.
 func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.CreateVolumeRequest, vol *linodego.Volume) map[string]string {
 	log, ctx := logger.GetLogger(ctx)
-	log.V(4).Info("Entering createVolumeContext()", "req", req)
+	log.V(4).Info("Entering createVolumeContext()", "name", req.GetName(), "region", vol.Region)
 	defer log.V(4).Info("Exiting createVolumeContext()")
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)
@@ -553,7 +553,7 @@ func (cs *ControllerServer) createVolumeContext(ctx context.Context, req *csi.Cr
 
 	volumeContext[VolumeTopologyRegion] = vol.Region
 
-	log.V(4).Info("Volume context created", "volumeContext", volumeContext)
+	log.V(4).Info("Volume context created", "region", volumeContext[VolumeTopologyRegion], "luksEncrypted", volumeContext[LuksEncryptedAttribute] == True)
 	return volumeContext
 }
 
@@ -641,7 +641,7 @@ func (cs *ControllerServer) prepareCreateVolumeResponse(ctx context.Context, vol
 // an appropriate error.
 func (cs *ControllerServer) validateControllerPublishVolumeRequest(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (linodeID, volumeID int, err error) {
 	log, ctx := logger.GetLogger(ctx)
-	log.V(4).Info("Entering validateControllerPublishVolumeRequest()", "req", req)
+	log.V(4).Info("Entering validateControllerPublishVolumeRequest()", "volume_id", req.GetVolumeId(), "node_id", req.GetNodeId())
 	defer log.V(4).Info("Exiting validateControllerPublishVolumeRequest()")
 	if !observability.SkipObservability {
 		_, span := observability.StartFunctionSpan(ctx)

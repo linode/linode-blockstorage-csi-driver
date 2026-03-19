@@ -444,7 +444,7 @@ func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	log, done := logger.WithMethod(log, "NodeGetInfo")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request")
 
 	// Get the number of currently attached instance disks, and subtract it
 	// from the limit of block devices that can be attached to the instance,
@@ -479,7 +479,7 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	log, done := logger.WithMethod(log, "NodeGetVolumeStats")
 	defer done()
 
-	log.V(2).Info("Processing request", "req", req)
+	log.V(2).Info("Processing request", "volumeID", req.GetVolumeId(), "volumePath", req.GetVolumePath())
 
 	return nodeGetVolumeStats(ctx, req)
 }
