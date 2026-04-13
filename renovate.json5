@@ -13,6 +13,11 @@
   },
   "osvVulnerabilityAlerts": true,
   "platformAutomerge": true,
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/deploy/kubernetes/.+\\.yaml$/"
+    ]
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -25,6 +30,16 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?)(?: (?:packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*:*\\??=\\s*[\"']?(?<currentValue>.+?)[\"']?\\s"
       ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)values\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "\\s+image:\\s+(?<depName>[^\\s]+)\\n\\s+tag:\\s+(?<currentValue>v[\\d.]+)"
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [
@@ -94,6 +109,16 @@
       ],
       "matchPackageNames": [
         "github.com/linode/**"
+      ]
+    },
+    {
+      "groupName": "CSI sidecar images",
+      "groupSlug": "csi-sidecar-images",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "registry.k8s.io/sig-storage/**"
       ]
     }
   ]
