@@ -34,10 +34,10 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/(^|/)values\\.ya?ml$/"
+        "/helm-chart\\/.*values\\.ya?ml$/"
       ],
       "matchStrings": [
-        "\\s+image:\\s+(?<depName>[^\\s]+)\\n\\s+tag:\\s+(?<currentValue>v[\\d.]+)"
+        "\\s+image:\\s+(?<depName>[^\\s]+)\\r?\\n(?:\\s+[a-zA-Z]+:.*\\r?\\n)*?\\s+tag:\\s+(?<currentValue>v[\\d][\\w.+-]*)"
       ],
       "datasourceTemplate": "docker"
     }
