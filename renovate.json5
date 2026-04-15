@@ -44,6 +44,11 @@
   ],
   "packageRules": [
     {
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "prPriority": 10
+    },
+    {
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
     },
