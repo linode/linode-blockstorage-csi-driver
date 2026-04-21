@@ -78,7 +78,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "cd data && touch testfile"
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "cd /data && touch testfile"
             check:
               ($error): ~
     - name: Delete the redis pod
@@ -109,7 +109,7 @@ spec:
               - name: NAMESPACE
                 value: ($namespace)
             content: |
-              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "ls data"
+              kubectl exec -n $NAMESPACE redis-test-0 -- sh -c "ls /data"
             check:
               ($error): ~
               (contains($stdout, 'testfile')): true
