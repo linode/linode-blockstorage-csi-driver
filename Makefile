@@ -9,10 +9,10 @@ else
 IMAGE_VERSION           ?= $(REV)
 endif
 IMAGE_TAG               ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
-GOLANGCI_LINT_IMG       := golangci/golangci-lint:v1.59-alpine
+GOLANGCI_LINT_IMG       := golangci/golangci-lint:v2.12-alpine
 RELEASE_DIR             ?= release
 DOCKERFILE              ?= Dockerfile
-GOLANGCI_LINT_VERSION   ?= v1.61.0
+GOLANGCI_LINT_VERSION   ?= v2.12.2
 E2E_SELECTOR            ?= all
 LINODE_FIREWALL_ENABLED ?= true
 

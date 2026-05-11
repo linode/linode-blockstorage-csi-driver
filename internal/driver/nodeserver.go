@@ -52,6 +52,8 @@ type NodeServer struct {
 
 var _ csi.NodeServer = &NodeServer{}
 
+const bindMountOption = "bind"
+
 func NewNodeServer(ctx context.Context, linodeDriver *LinodeDriver, mounter *mountmanager.SafeFormatAndMount, deviceUtils devicemanager.DeviceUtils, metadata Metadata, encrypt Encryption, resize mountmanager.ResizeFSer, hw hwinfo.HardwareInfo) (*NodeServer, error) {
 	log, _ := logger.GetLogger(ctx)
 
@@ -104,7 +106,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	// Set mount options
-	options := []string{"bind"}
+	options := []string{bindMountOption}
 	if req.GetReadonly() {
 		options = append(options, "ro")
 		log.V(4).Info("Volume will be mounted as read-only", "volumeID", volumeID)
