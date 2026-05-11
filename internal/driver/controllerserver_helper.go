@@ -78,6 +78,12 @@ const (
 	// the volume exists in.
 	VolumeTopologyRegion string = "topology.linode.com/region"
 
+	// disableEncryption is a constant string used to represent the "disabled" state for volume encryption.
+	disableEncryption = "disabled"
+
+	// enableEncryption is a constant string used to represent the "enabled" state for volume encryption.
+	enableEncryption = "enabled"
+
 	// devicePathKey is the key used in the publish context map when a volume is
 	// published/attached to an instance.
 	devicePathKey = "devicePath"
@@ -480,7 +486,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 	}
 
 	// By default, encryption is disabled
-	encryptionStatus := "disabled"
+	encryptionStatus := disableEncryption
 	// Retrieve the capacity range from the request to determine the size limits for the volume.
 	capRange := req.GetCapacityRange()
 	// Get the requested size in bytes, handling any potential errors.
@@ -512,7 +518,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		if !supported {
 			return nil, errInternal("Volume encryption is not supported in the %s region", region)
 		}
-		encryptionStatus = "enabled"
+		encryptionStatus = enableEncryption
 	}
 
 	log.V(4).Info("Volume parameters prepared", "parameters", &VolumeParams{

@@ -10,6 +10,8 @@ import (
 const (
 	Completed = "true"  // Represents successful operation
 	Failed    = "false" // Represents failed operation
+
+	functionStatusLabel = "functionStatus"
 )
 
 // Metrics definitions for different CSI driver operations
@@ -21,7 +23,7 @@ var (
 		prometheus.CounterOpts{
 			Name: "csi_node_publish_total",
 			Help: "Total number of NodePublishVolume calls"},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodePublishDuration tracks the duration of NodePublishVolume calls.
@@ -32,7 +34,7 @@ var (
 			Help:    "Duration of NodePublishVolume calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeUnpublishTotal counts the total number of NodeUnpublishVolume calls.
@@ -41,7 +43,7 @@ var (
 			Name: "csi_node_unpublish_total",
 			Help: "Total number of NodeUnpublishVolume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeUnpublishDuration tracks the duration of NodeUnpublishVolume calls.
@@ -51,7 +53,7 @@ var (
 			Help:    "Duration of NodeUnpublishVolume calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeStageVolumeTotal counts the total number of NodeStageVolume calls.
@@ -60,7 +62,7 @@ var (
 			Name: "csi_node_stage_volume_total",
 			Help: "Total number of NodeStageVolume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeStageVolumeDuration tracks the duration of NodeStageVolume calls.
@@ -70,7 +72,7 @@ var (
 			Help:    "Duration of NodeStageVolume calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeUnstageVolumeTotal counts the total number of NodeUnstageVolume calls.
@@ -79,7 +81,7 @@ var (
 			Name: "csi_node_unstage_volume_total",
 			Help: "Total number of NodeUnstageVolume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeUnstageVolumeDuration tracks the duration of NodeUnstageVolume calls.
@@ -89,7 +91,7 @@ var (
 			Help:    "Duration of NodeUnstageVolume calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeExpandTotal counts the total number of NodeExpandVolume calls.
@@ -98,7 +100,7 @@ var (
 			Name: "csi_node_expand_total",
 			Help: "Total number of NodeExpandVolume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// NodeExpandDuration tracks the duration of NodeExpandVolume calls.
@@ -108,7 +110,7 @@ var (
 			Help:    "Duration of NodeExpandVolume calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 )
 
@@ -119,7 +121,7 @@ var (
 			Name: "csi_controller_create_volume_total",
 			Help: "Total number of Create Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerCreateVolumeDuration tracks the duration of create volume calls.
@@ -128,7 +130,7 @@ var (
 			Name: "csi_controller_create_volume_duration_seconds",
 			Help: "Duration of Create Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerDeleteVolumeTotal counts the total number of delete volume calls.
@@ -137,7 +139,7 @@ var (
 			Name: "csi_controller_delete_volume_total",
 			Help: "Total number of Delete Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerDeleteVolumeDuration tracks the duration of delete volume calls.
@@ -146,7 +148,7 @@ var (
 			Name: "csi_controller_delete_volume_duration_seconds",
 			Help: "Duration of Delete Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerPublishVolumeTotal counts the total number of publish volume calls.
@@ -155,7 +157,7 @@ var (
 			Name: "csi_controller_publish_volume_total",
 			Help: "Total number of Publish Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerPublishVolumeDuration tracks the duration of publish volume calls.
@@ -164,7 +166,7 @@ var (
 			Name: "csi_controller_publish_volume_duration_seconds",
 			Help: "Duration of Publish Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerUnpublishVolumeTotal counts the total number of unpublish volume calls.
@@ -173,7 +175,7 @@ var (
 			Name: "csi_controller_unpublish_volume_total",
 			Help: "Total number of Unpublish Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 
 	// ControllerUnpublishVolumeDuration tracks the duration of unpublish volume calls.
@@ -182,7 +184,7 @@ var (
 			Name: "csi_controller_unpublish_volume_duration_seconds",
 			Help: "Duration of Unpublish Volume calls",
 		},
-		[]string{"functionStatus"},
+		[]string{functionStatusLabel},
 	)
 )
 
