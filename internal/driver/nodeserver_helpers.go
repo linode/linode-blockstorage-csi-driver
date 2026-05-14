@@ -189,6 +189,27 @@ func (ns *NodeServer) findDevicePath(ctx context.Context, key linodevolumes.Lino
 	return devicePath, nil
 }
 
+// resolveStageDevicePath prefers the controller server provided device path when it is
+// available and locally verified, then falls back to the by-id st lookup.
+func (ns *NodeServer) resolveStageDevicePath(ctx context.Context, req *csi.NodeStageVolumeRequest, key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
+	log, _ := logger.GetLogger(ctx)
+	log.V(4).Info("Entering resolveStageDevicePath", "volumeID", req.GetVolumeId(), "partition", partition)
+
+	if publishContext := req.GetPublishContext(); publishContext != nil {
+		if devicePath := publishContext[devicePathKey]; devicePath != "" {
+			verifiedDevicePath, err := ns.deviceutils.VerifyDevicePath([]string{devicePath})
+			if err == nil && verifiedDevicePath != "" {
+				log.V(4).Info("Using device path from PublishContext", "devicePath", verifiedDevicePath)
+				return verifiedDevicePath, nil
+			}
+
+			log.V(4).Info("PublishContext device path was not found on this node, falling back to local lookup", "devicePath", devicePath)
+		}
+	}
+
+	return ns.findDevicePath(ctx, key, partition)
+}
+
 // ensureMountPoint checks if the staging target path is a mount point or not.
 // If not, it creates a directory at the target path.
 func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs filesystem.FileSystem) (bool, error) {

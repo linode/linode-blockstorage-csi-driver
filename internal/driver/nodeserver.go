@@ -237,8 +237,8 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	log.V(4).Info("Finding device path", "volumeID", volumeID)
-	devicePath, err := ns.findDevicePath(ctx, *LinodeVolumeKey, partition)
+	log.V(4).Info("Resolving device path", "volumeID", volumeID)
+	devicePath, err := ns.resolveStageDevicePath(ctx, req, *LinodeVolumeKey, partition)
 	if err != nil {
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
 		return nil, err

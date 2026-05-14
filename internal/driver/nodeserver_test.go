@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
@@ -145,7 +146,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "1000-stagehappypath",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stagehappypath",
+					"devicePath": "/dev/sdc",
 				},
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
@@ -160,7 +161,7 @@ func TestNodeStageVolume(t *testing.T) {
 			expectedError: nil,
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
-				m.EXPECT().Stat("/dev/disk/by-id/linode-stagehappypath").Return(nil, nil)
+				m.EXPECT().Stat("/dev/sdc").Return(nil, nil)
 			},
 		},
 		{
@@ -169,7 +170,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "1000-stageNoAccessMode",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stageNoAccessMode",
+					"devicePath": "/dev/sdc",
 				},
 				VolumeCapability: &csi.VolumeCapability{},
 			},
@@ -184,7 +185,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "foo",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stageBadVolumeID",
+					"devicePath": "/dev/sdd",
 				},
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
@@ -203,7 +204,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "1000-stageBlock",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stageBadVolumeID",
+					"devicePath": "/dev/sde",
 				},
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
@@ -220,7 +221,7 @@ func TestNodeStageVolume(t *testing.T) {
 			},
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
-				m.EXPECT().Stat("/dev/disk/by-id/linode-stageBlock").Return(nil, nil)
+				m.EXPECT().Stat("/dev/sde").Return(nil, nil)
 			},
 			expectedError: nil,
 			resp:          &csi.NodeStageVolumeResponse{},
@@ -231,7 +232,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "1000-stageOkToFormat",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stageOkToFormat",
+					"devicePath": "/dev/sdf",
 				},
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
@@ -248,13 +249,83 @@ func TestNodeStageVolume(t *testing.T) {
 			},
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
-				m.EXPECT().Stat("/dev/disk/by-id/linode-stageOkToFormat").Return(nil, nil)
+				m.EXPECT().Stat("/dev/sdf").Return(nil, nil)
 			},
 			expectFormatCalls: func(m *mocks.MockFormater) {
-				m.EXPECT().FormatAndMount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				m.EXPECT().FormatAndMount("/dev/sdf", "/mnt/staging", gomock.Any(), gomock.Any()).Return(nil)
 			},
 			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
-				m.EXPECT().NeedResize("/dev/disk/by-id/linode-stageOkToFormat", "/mnt/staging").Return(false, nil)
+				m.EXPECT().NeedResize("/dev/sdf", "/mnt/staging").Return(false, nil)
+			},
+			expectedError: nil,
+			resp:          &csi.NodeStageVolumeResponse{},
+		},
+		{
+			name: "stageUsesPublishContextDevicePath",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "1000-stageUsesPublishContextDevicePath",
+				StagingTargetPath: "/mnt/staging",
+				PublishContext: map[string]string{
+					"devicePath": "/dev/sdg",
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(true, nil).Times(1)
+			},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+				m.EXPECT().Stat("/dev/sdg").Return(nil, nil)
+			},
+			expectFormatCalls: func(m *mocks.MockFormater) {
+				m.EXPECT().FormatAndMount("/dev/sdg", "/mnt/staging", gomock.Any(), gomock.Any()).Return(nil)
+			},
+			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
+				m.EXPECT().NeedResize("/dev/sdg", "/mnt/staging").Return(false, nil)
+			},
+			expectedError: nil,
+			resp:          &csi.NodeStageVolumeResponse{},
+		},
+		{
+			name: "stageFallsBackWhenPublishContextDevicePathMissingOnNode",
+			req: &csi.NodeStageVolumeRequest{
+				VolumeId:          "1000-stageFallsBackWhenPublishContextDevicePathMissingOnNode",
+				StagingTargetPath: "/mnt/staging",
+				PublishContext: map[string]string{
+					"devicePath": "/dev/sdz",
+				},
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(false, nil).Times(1)
+				m.EXPECT().IsLikelyNotMountPoint(gomock.Any()).Return(true, nil).Times(1)
+			},
+			expectFSCalls: func(m *mocks.MockFileSystem) {
+				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
+				m.EXPECT().Stat("/dev/sdz").Return(nil, os.ErrNotExist)
+				m.EXPECT().IsNotExist(os.ErrNotExist).Return(true)
+				m.EXPECT().Stat("/dev/disk/by-id/linode-stageFallsBackWhenPublishContext").Return(nil, nil)
+			},
+			expectFormatCalls: func(m *mocks.MockFormater) {
+				m.EXPECT().FormatAndMount("/dev/disk/by-id/linode-stageFallsBackWhenPublishContext", "/mnt/staging", gomock.Any(), gomock.Any()).Return(nil)
+			},
+			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
+				m.EXPECT().NeedResize("/dev/disk/by-id/linode-stageFallsBackWhenPublishContext", "/mnt/staging").Return(false, nil)
 			},
 			expectedError: nil,
 			resp:          &csi.NodeStageVolumeResponse{},
@@ -265,7 +336,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "1000-stageOkToFormatAndResize",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stageOkToFormatAndResize",
+					"devicePath": "/dev/sdh",
 				},
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
@@ -282,14 +353,14 @@ func TestNodeStageVolume(t *testing.T) {
 			},
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
-				m.EXPECT().Stat("/dev/disk/by-id/linode-stageOkToFormatAndResize").Return(nil, nil)
+				m.EXPECT().Stat("/dev/sdh").Return(nil, nil)
 			},
 			expectFormatCalls: func(m *mocks.MockFormater) {
-				m.EXPECT().FormatAndMount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				m.EXPECT().FormatAndMount("/dev/sdh", "/mnt/staging", gomock.Any(), gomock.Any()).Return(nil)
 			},
 			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
-				m.EXPECT().NeedResize("/dev/disk/by-id/linode-stageOkToFormatAndResize", "/mnt/staging").Return(true, nil)
-				m.EXPECT().Resize("/dev/disk/by-id/linode-stageOkToFormatAndResize", "/mnt/staging").Return(true, nil)
+				m.EXPECT().NeedResize("/dev/sdh", "/mnt/staging").Return(true, nil)
+				m.EXPECT().Resize("/dev/sdh", "/mnt/staging").Return(true, nil)
 			},
 			expectedError: nil,
 			resp:          &csi.NodeStageVolumeResponse{},
@@ -313,7 +384,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "1000-stagePartition",
 				StagingTargetPath: "/mnt/staging",
 				PublishContext: map[string]string{
-					"devicePath": "/dev/stagePartition",
+					"devicePath": "/dev/sdi",
 				},
 				VolumeContext: map[string]string{
 					"partition": "1",
@@ -333,13 +404,13 @@ func TestNodeStageVolume(t *testing.T) {
 			},
 			expectFSCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().Glob("/dev/sd*").Return([]string{"/dev/sda", "/dev/sdb"}, nil).AnyTimes()
-				m.EXPECT().Stat("/dev/disk/by-id/linode-stagePartition-part1").Return(nil, nil)
+				m.EXPECT().Stat("/dev/sdi").Return(nil, nil)
 			},
 			expectFormatCalls: func(m *mocks.MockFormater) {
-				m.EXPECT().FormatAndMount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				m.EXPECT().FormatAndMount("/dev/sdi", "/mnt/staging", gomock.Any(), gomock.Any()).Return(nil)
 			},
 			expectResizeFsCall: func(m *mocks.MockResizeFSer) {
-				m.EXPECT().NeedResize("/dev/disk/by-id/linode-stagePartition-part1", "/mnt/staging").Return(false, nil)
+				m.EXPECT().NeedResize("/dev/sdi", "/mnt/staging").Return(false, nil)
 			},
 			expectedError: nil,
 			resp:          &csi.NodeStageVolumeResponse{},
