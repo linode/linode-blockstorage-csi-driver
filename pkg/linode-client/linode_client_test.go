@@ -3,7 +3,7 @@ package linodeclient
 import (
 	"testing"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 )
 
 func TestNewLinodeClient(t *testing.T) {

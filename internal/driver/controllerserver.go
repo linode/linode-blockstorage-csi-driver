@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -219,7 +219,9 @@ func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 
 	log.V(4).Info("Waiting for volume to attach", "volume_id", volumeID)
 	// Wait for the volume to be successfully attached to the instance
-	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID, waitTimeout())
+	ctx, cancel := context.WithTimeout(ctx, WaitTimeout)
+	defer cancel()
+	volume, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, &linodeID)
 	if err != nil {
 		observability.RecordMetrics(observability.ControllerPublishVolumeTotal, observability.ControllerPublishVolumeDuration, observability.Failed, functionStartTime)
 		return resp, err
@@ -299,7 +301,9 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	}
 
 	log.V(4).Info("Waiting for volume to detach")
-	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil, waitTimeout()); err != nil {
+	ctx, cancel := context.WithTimeout(ctx, WaitTimeout)
+	defer cancel()
+	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil); err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
 		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
 	}
@@ -469,13 +473,15 @@ func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi
 
 	// Resize the volume
 	log.V(4).Info("Calling API to resize volume", "volume_id", volumeID)
-	if err = cs.client.ResizeVolume(ctx, volumeID, bytesToGB(size)); err != nil {
+	if err = cs.client.ResizeVolume(ctx, volumeID, linodego.VolumeResizeOptions{Size: bytesToGB(size)}); err != nil {
 		return resp, errInternal("resize volume %d: %v", volumeID, err)
 	}
 
 	// Wait for the volume to become active
 	log.V(4).Info("Waiting for volume to become active", "volume_id", volumeID)
-	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, waitTimeout())
+	ctx, cancel := context.WithTimeout(ctx, WaitTimeout)
+	defer cancel()
+	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive)
 	if err != nil {
 		return resp, errInternal("timed out waiting for volume %d to become active: %v", volumeID, err)
 	}

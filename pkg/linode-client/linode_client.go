@@ -3,7 +3,7 @@ package linodeclient
 import (
 	"context"
 
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 )
 
 type LinodeClient interface {
@@ -17,28 +17,33 @@ type LinodeClient interface {
 	GetVolume(context.Context, int) (*linodego.Volume, error)
 
 	CreateVolume(context.Context, linodego.VolumeCreateOptions) (*linodego.Volume, error)
-	CloneVolume(context.Context, int, string) (*linodego.Volume, error)
+	CloneVolume(context.Context, int, linodego.VolumeCloneOptions) (*linodego.Volume, error)
 
 	AttachVolume(context.Context, int, *linodego.VolumeAttachOptions) (*linodego.Volume, error)
 	DetachVolume(context.Context, int) error
 
-	WaitForVolumeLinodeID(context.Context, int, *int, int) (*linodego.Volume, error)
-	WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus, int) (*linodego.Volume, error)
+	WaitForVolumeLinodeID(context.Context, int, *int) (*linodego.Volume, error)
+	WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus) (*linodego.Volume, error)
 	DeleteVolume(context.Context, int) error
 
-	ResizeVolume(context.Context, int, int) error
+	ResizeVolume(context.Context, int, linodego.VolumeResizeOptions) error
 
 	NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error)
 }
 
+// linodego.Client implements LinodeClient
+var _ LinodeClient = (*linodego.Client)(nil)
+
 func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
 	// Use linodego built-in http client which supports setting root CA cert
-	linodeClient := linodego.NewClient(nil)
+	linodeClient, err := linodego.NewClient(nil)
+	if err != nil {
+		return nil, err
+	}
 	// Only override the base URL if a custom API URL is provided. Recent versions
 	// of linodego return an error when given an empty string to UseURL.
 	var (
 		client *linodego.Client
-		err    error
 	)
 	if apiURL != "" {
 		client, err = linodeClient.UseURL(apiURL)
