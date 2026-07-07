@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -51,18 +51,6 @@ const (
 	// Linode API.
 	CloneTimeout = 15 * time.Minute
 )
-
-// waitTimeout is a convenience function to get the number of seconds in
-// [WaitTimeout].
-func waitTimeout() int {
-	return int(WaitTimeout.Truncate(time.Second).Seconds())
-}
-
-// cloneTimeout is a convenience function to get the number of seconds in
-// [CloneTimeout].
-func cloneTimeout() int {
-	return int(CloneTimeout.Truncate(time.Second).Seconds())
-}
 
 const (
 	// VolumeTags is the parameter key used for passing a comma-separated list
@@ -342,7 +330,7 @@ func (cs *ControllerServer) cloneLinodeVolume(ctx context.Context, label string,
 		defer span.End()
 	}
 
-	result, err := cs.client.CloneVolume(ctx, sourceID, label)
+	result, err := cs.client.CloneVolume(ctx, sourceID, linodego.VolumeCloneOptions{Label: label})
 	if err != nil {
 		return nil, errInternal("clone volume %d: %v", sourceID, err)
 	}
@@ -586,13 +574,15 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 	}
 
 	// Set the timeout for polling the volume status based on whether it's a clone or not.
-	statusPollTimeout := waitTimeout()
+	statusPollTimeout := WaitTimeout
 	if sourceInfo != nil {
-		statusPollTimeout = cloneTimeout()
+		statusPollTimeout = CloneTimeout
 	}
 
 	log.V(4).Info("Waiting for volume to be active", "volumeID", vol.ID)
-	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive, statusPollTimeout)
+	ctx, cancel := context.WithTimeout(ctx, statusPollTimeout)
+	defer cancel()
+	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive)
 	if err != nil {
 		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
 	}

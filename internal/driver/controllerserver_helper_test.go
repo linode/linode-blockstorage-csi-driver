@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -294,7 +294,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 20}, nil)
-				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 20, Status: linodego.VolumeActive}, nil)
+				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 123, Size: 20, Status: linodego.VolumeActive}, nil)
 			},
 			expectedVolume: &linodego.Volume{ID: 123, Size: 20, Status: linodego.VolumeActive},
 			expectedError:  nil,
@@ -341,7 +341,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 				mockClient.EXPECT().CloneVolume(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 789, Size: 40, Status: linodego.VolumeActive}, nil)
-				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 789, Size: 40, Status: linodego.VolumeActive}, nil)
+				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 789, Size: 40, Status: linodego.VolumeActive}, nil)
 			},
 			expectedVolume: &linodego.Volume{ID: 789, Size: 40, Status: linodego.VolumeActive},
 			expectedError:  nil,
@@ -357,7 +357,7 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 101, Size: 50}, nil)
-				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 101, Size: 50}, fmt.Errorf("timed out"))
+				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 101, Size: 50}, fmt.Errorf("timed out"))
 			},
 			expectedVolume: nil,
 			expectedError:  errInternal("Timed out waiting for volume 101 to be active: timed out"),

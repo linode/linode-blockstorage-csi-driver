@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"go.uber.org/mock/gomock"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
@@ -52,7 +52,7 @@ func TestCreateVolume(t *testing.T) {
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 				m.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10}, nil)
-				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1, Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1, Size: 10, Status: linodego.VolumeActive}, nil)
 			},
 			expectedError: nil,
 		},
@@ -213,7 +213,7 @@ func TestControllerPublishVolume(t *testing.T) {
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetInstance(gomock.Any(), gomock.Any()).Return(&linodego.Instance{ID: 1003, Specs: &linodego.InstanceSpec{Memory: 16 << 10}}, nil)
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil).AnyTimes()
-				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().AttachVolume(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ListInstanceVolumes(gomock.Any(), 1003, gomock.Any()).Return([]linodego.Volume{{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}}, nil)
 				m.EXPECT().ListInstanceDisks(gomock.Any(), 1003, gomock.Any()).Return([]linodego.InstanceDisk{}, nil)
@@ -261,7 +261,7 @@ func TestControllerUnPublishVolume(t *testing.T) {
 			},
 			resp: &csi.ControllerUnpublishVolumeResponse{},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
-				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().DetachVolume(gomock.Any(), 630706045).Return(nil)
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 			},
@@ -274,7 +274,7 @@ func TestControllerUnPublishVolume(t *testing.T) {
 			},
 			resp: &csi.ControllerUnpublishVolumeResponse{},
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
-				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeLinodeID(gomock.Any(), 630706045, gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().DetachVolume(gomock.Any(), 630706045).Return(nil)
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 			},
@@ -438,7 +438,7 @@ func TestControllerExpandVolume(t *testing.T) {
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, LinodeID: createLinodeID(1003), Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ResizeVolume(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
 			},
 			expectedError: nil,
 		},
@@ -457,7 +457,7 @@ func TestControllerExpandVolume(t *testing.T) {
 			expectLinodeClientCalls: func(m *mocks.MockLinodeClient) {
 				m.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
 				m.EXPECT().ResizeVolume(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
+				m.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 1001, Size: 10, Status: linodego.VolumeActive}, nil)
 			},
 			expectedError: nil,
 		},
@@ -683,7 +683,7 @@ func (flc *fakeLinodeClient) CreateVolume(context.Context, linodego.VolumeCreate
 }
 
 //nolint:nilnil // TODO: re-work tests
-func (flc *fakeLinodeClient) CloneVolume(context.Context, int, string) (*linodego.Volume, error) {
+func (flc *fakeLinodeClient) CloneVolume(context.Context, int, linodego.VolumeCloneOptions) (*linodego.Volume, error) {
 	return nil, nil
 }
 
@@ -695,18 +695,20 @@ func (flc *fakeLinodeClient) AttachVolume(context.Context, int, *linodego.Volume
 func (flc *fakeLinodeClient) DetachVolume(context.Context, int) error { return nil }
 
 //nolint:nilnil // TODO: re-work tests
-func (flc *fakeLinodeClient) WaitForVolumeLinodeID(context.Context, int, *int, int) (*linodego.Volume, error) {
+func (flc *fakeLinodeClient) WaitForVolumeLinodeID(context.Context, int, *int) (*linodego.Volume, error) {
 	return nil, nil
 }
 
 //nolint:nilnil // TODO: re-work tests
-func (flc *fakeLinodeClient) WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus, int) (*linodego.Volume, error) {
+func (flc *fakeLinodeClient) WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus) (*linodego.Volume, error) {
 	return nil, nil
 }
 
 func (flc *fakeLinodeClient) DeleteVolume(context.Context, int) error { return nil }
 
-func (flc *fakeLinodeClient) ResizeVolume(context.Context, int, int) error { return nil }
+func (flc *fakeLinodeClient) ResizeVolume(context.Context, int, linodego.VolumeResizeOptions) error {
+	return nil
+}
 
 //nolint:nilnil // TODO: re-work tests
 func (flc *fakeLinodeClient) NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error) {

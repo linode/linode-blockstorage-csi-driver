@@ -22,7 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/ianschenck/envflag"
-	"github.com/linode/linodego"
+	"github.com/linode/linodego/v2"
 	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"

@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	linodego "github.com/linode/linodego"
+	linodego "github.com/linode/linodego/v2"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -21,6 +21,7 @@ import (
 type MockLinodeClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockLinodeClientMockRecorder
+	isgomock struct{}
 }
 
 // MockLinodeClientMockRecorder is the mock recorder for MockLinodeClient.
@@ -56,7 +57,7 @@ func (mr *MockLinodeClientMockRecorder) AttachVolume(arg0, arg1, arg2 any) *gomo
 }
 
 // CloneVolume mocks base method.
-func (m *MockLinodeClient) CloneVolume(arg0 context.Context, arg1 int, arg2 string) (*linodego.Volume, error) {
+func (m *MockLinodeClient) CloneVolume(arg0 context.Context, arg1 int, arg2 linodego.VolumeCloneOptions) (*linodego.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CloneVolume", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*linodego.Volume)
@@ -234,7 +235,7 @@ func (mr *MockLinodeClientMockRecorder) NewEventPoller(arg0, arg1, arg2, arg3 an
 }
 
 // ResizeVolume mocks base method.
-func (m *MockLinodeClient) ResizeVolume(arg0 context.Context, arg1, arg2 int) error {
+func (m *MockLinodeClient) ResizeVolume(arg0 context.Context, arg1 int, arg2 linodego.VolumeResizeOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResizeVolume", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -248,31 +249,31 @@ func (mr *MockLinodeClientMockRecorder) ResizeVolume(arg0, arg1, arg2 any) *gomo
 }
 
 // WaitForVolumeLinodeID mocks base method.
-func (m *MockLinodeClient) WaitForVolumeLinodeID(arg0 context.Context, arg1 int, arg2 *int, arg3 int) (*linodego.Volume, error) {
+func (m *MockLinodeClient) WaitForVolumeLinodeID(arg0 context.Context, arg1 int, arg2 *int) (*linodego.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForVolumeLinodeID", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "WaitForVolumeLinodeID", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*linodego.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // WaitForVolumeLinodeID indicates an expected call of WaitForVolumeLinodeID.
-func (mr *MockLinodeClientMockRecorder) WaitForVolumeLinodeID(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockLinodeClientMockRecorder) WaitForVolumeLinodeID(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeLinodeID", reflect.TypeOf((*MockLinodeClient)(nil).WaitForVolumeLinodeID), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeLinodeID", reflect.TypeOf((*MockLinodeClient)(nil).WaitForVolumeLinodeID), arg0, arg1, arg2)
 }
 
 // WaitForVolumeStatus mocks base method.
-func (m *MockLinodeClient) WaitForVolumeStatus(arg0 context.Context, arg1 int, arg2 linodego.VolumeStatus, arg3 int) (*linodego.Volume, error) {
+func (m *MockLinodeClient) WaitForVolumeStatus(arg0 context.Context, arg1 int, arg2 linodego.VolumeStatus) (*linodego.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForVolumeStatus", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "WaitForVolumeStatus", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*linodego.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // WaitForVolumeStatus indicates an expected call of WaitForVolumeStatus.
-func (mr *MockLinodeClientMockRecorder) WaitForVolumeStatus(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockLinodeClientMockRecorder) WaitForVolumeStatus(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeStatus", reflect.TypeOf((*MockLinodeClient)(nil).WaitForVolumeStatus), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForVolumeStatus", reflect.TypeOf((*MockLinodeClient)(nil).WaitForVolumeStatus), arg0, arg1, arg2)
 }
