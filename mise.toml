@@ -17,7 +17,7 @@ kustomize = "5.8.1"
 yq = "4.52.2"
 envsubst = "1.4.3"
 jq = "1.8.2"
-clusterctl = "1.13.3"
+clusterctl = "1.7.4"
 
 [tasks.build]
 description = "Build the binary"
