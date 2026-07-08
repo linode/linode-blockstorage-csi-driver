@@ -59,7 +59,7 @@ clean:
 #####################################################################
 
 CLUSTER_NAME         ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
-K8S_VERSION          ?= "v1.33.4"
+K8S_VERSION          ?= "v1.29.1"
 CAPI_VERSION         ?= "v1.8.5"
 HELM_VERSION         ?= "v0.2.1"
 CAPL_VERSION         ?= "v0.7.1"
