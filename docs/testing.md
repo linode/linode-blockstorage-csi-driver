@@ -7,7 +7,7 @@ In order to run these e2e tests, you'll need the following:
 
 ### 📋 Pre-requisites: Setup Development Environment
 
-Follow the steps outlined in the [development setup](./development-setup.md) to setup your development environment.
+Follow the steps outlined in the [development setup](./development-setup.md) to set up your development environment.
 
 ### 🏗️ Setup a CAPL Management Cluster
 
@@ -23,7 +23,7 @@ export KUBERNETES_VERSION=v1.29.1
 export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
 export LINODE_MACHINE_TYPE=g6-standard-2
 
-devbox run mgmt-cluster
+mise run mgmt-cluster
 ```
 This will download all the necessary binaries to local bin and create a local mgmt cluster.
 
@@ -38,8 +38,8 @@ If you do not have PR open, follow the steps below:
   > You can use any public repository that you have access to. The tags used below are just examples
 
   ```
-  make docker-build IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
-  make docker-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+  mise run image-build IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+  mise run image-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
   ```
 
 ### 🔄 Setup a CAPL Child Test Cluster
@@ -47,7 +47,7 @@ If you do not have PR open, follow the steps below:
 In order create a test cluster, run the following command:
 
 ```sh
-IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_VERSION=test-e2e devbox run capl-cluster
+IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_VERSION=test-e2e mise run capl-cluster
 ```
 > You don't need to pass IMAGE_NAME and IMAGE_VERSION if you have a PR open
 
@@ -58,7 +58,7 @@ The above command will create a test cluster, install CSI driver using the test 
 Run the following command to run all e2e tests:
 
 ```sh
-devbox run e2e-test
+mise run e2e-test
 ```
 This will run the chainsaw e2e tests under the `e2e/test` directory
 
@@ -68,7 +68,7 @@ For example:
 If you would like to only run the test that creates a luks volume and shuffles it between the CP and worker nodes, you could run
 ```sh
 export E2E_SELECTOR=luksmove
-devbox run e2e-test
+mise run e2e-test
 ```
 
 ### 🧹 Cleanup
@@ -76,6 +76,6 @@ devbox run e2e-test
 Run the following command to cleanup the test cluster:
 
 ```sh
-devbox run cleanup-cluster
+mise run cleanup-cluster
 ```
 *Its will destroy the CAPL test cluster and kind mgmt cluster*

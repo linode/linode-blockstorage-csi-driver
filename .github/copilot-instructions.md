@@ -234,10 +234,10 @@ make generate-mock
 
 ## Development Environment
 
-### Devbox Integration
-Uses devbox for reproducible development environments:
+### Mise Integration
+Uses mise for reproducible development environments:
 ```bash
-devbox shell  # Activates dev environment with all dependencies
+mise run build
 ```
 
 ### Container-First Development

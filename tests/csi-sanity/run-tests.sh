@@ -24,9 +24,6 @@ SKIP_TESTS_STRING=$(
                              echo "${SKIP_TESTS[*]}"
 )
 
-# Install the latest version of csi-sanity
-go install github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@latest
-
 # Create socat statefulset
 kubectl apply -f tests/csi-sanity/socat.yaml
 
