@@ -6,7 +6,7 @@
 - **Docker**: Required for building and testing Docker images. Download from [here](https://www.docker.com/get-started).
 - **kubectl**: Kubernetes command-line tool. Install instructions [here](https://kubernetes.io/docs/tasks/tools/).
 - **Helm**: Package manager for Kubernetes. Install instructions [here](https://helm.sh/docs/intro/install/).
-- **Devbox**: For managing development environments. Install instructions [here](https://www.jetify.com/devbox/docs/installing_devbox/).
+- **Mise**: For managing development environments. Install instructions [here](https://mise.jdx.dev/getting-started.html).
 
 ### 🚀 Setting Up the Local Development Environment
 
@@ -17,11 +17,18 @@
     cd linode-blockstorage-csi-driver
     ```
 
-2. **Install Devbox**
+2. **Install the pinned toolchain from the repository root**
 
-    Follow the [Devbox installation guide](https://www.jetify.com/devbox/docs/installing_devbox/) to set up Devbox on your machine.
+```bash
+mise install
+```
 
-3. **Setup Environment Variables**
+3. Run commands through mise so the pinned toolchain is used:
+
+```bash
+mise run test
+```
+4. **Setup Environment Variables**
 
     Create a `.env` file in the root directory or export them directly in your shell:
 
@@ -33,20 +40,12 @@
     export LINODE_MACHINE_TYPE=g6-standard-2
     ```
 
-4. **Start Devbox Environment**
-
-    ```sh
-    devbox shell
-    ```
-
-    This command initializes the development environment with all necessary dependencies.
-
 ### 🛠️ Building the Project
 
 To build the project binaries in a container(builds are run in a docker container to allow consistent builds regardless of underlying unix/linux systems):
 
 ```sh
-make docker-build
+mise run image-build
 ```
 
 ### 🧪 Running Unit Tests
@@ -55,7 +54,7 @@ To run the unit tests, use the Dockerfile.dev that copies the directory into the
 
 ```sh
 export DOCKERFILE=Dockerfile.dev
-make docker-build && make test
+mise run test
 ```
 
 ### 🧪 Create a Development Cluster
@@ -65,7 +64,8 @@ To set up a development cluster for running any e2e testing/workflows, follow th
 1. **Setup a CAPL Management Cluster**
 
     ```sh
-    devbox run mgmt-cluster
+    mise run build
+    mise run mgmt-cluster
     ```
 
 2. **Build and Push Test Image**
@@ -74,10 +74,10 @@ To set up a development cluster for running any e2e testing/workflows, follow th
 
     ```sh
     # Build the Docker image with your changes
-    make docker-build IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test
+    mise run image-build IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test
 
     # Push the image to the container registry
-    make docker-push IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test
+    mise run image-push IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test
     ```
 
     Note: Replace `yourusername` with your actual GitHub username or organization name.
@@ -92,7 +92,7 @@ To set up a development cluster for running any e2e testing/workflows, follow th
 3. **Create a CAPL Child Test Cluster**
 
     ```sh
-    IMAGE_NAME=ghcr.io/yourusername/linode-blockstorage-csi-driver IMAGE_VERSION=test devbox run capl-cluster
+    IMAGE_NAME=ghcr.io/yourusername/linode-blockstorage-csi-driver IMAGE_VERSION=test mise run capl-cluster
     ```
 
 This will create a testing cluster with the necessary components to run end-to-end testing or workflows for the Linode BlockStorage CSI Driver.
@@ -104,7 +104,7 @@ For more detailed instructions on running the actual end-to-end tests, refer to 
 Ensure your code adheres to the project's coding standards by running:
 
 ```sh
-make lint
+mise run lint
 ```
 
 ### 📝 Documentation
