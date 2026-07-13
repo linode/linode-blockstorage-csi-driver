@@ -243,7 +243,8 @@ func (ns *NodeServer) isVolumePublishedElsewhere(req *csi.NodePublishVolumeReque
 		if err != nil {
 			return false, err
 		}
-		for _, mountPoint := range mountPoints {
+		for i := range mountPoints {
+			mountPoint := &mountPoints[i]
 			if filepath.Clean(mountPoint.Device) == devicePath && filepath.Clean(mountPoint.Path) != targetPath {
 				return true, nil
 			}
