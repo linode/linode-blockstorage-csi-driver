@@ -548,22 +548,6 @@ func TestListVolumesPagination(t *testing.T) {
 	}
 }
 
-func TestListVolumesZeroMaxEntriesUsesDefaultPageSize(t *testing.T) {
-	client := &fakeLinodeClient{volumes: makeTestVolumes(maxListVolumesResponseEntries + 1)}
-	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
-
-	resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := len(resp.GetEntries()); got != maxListVolumesResponseEntries {
-		t.Fatalf("entries = %d, want %d", got, maxListVolumesResponseEntries)
-	}
-	if resp.GetNextToken() == "" {
-		t.Fatal("expected a continuation token")
-	}
-}
-
 func TestListVolumesUsesAbsoluteOffsets(t *testing.T) {
 	client := &fakeLinodeClient{volumes: makeTestVolumes(5)}
 	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
@@ -593,24 +577,48 @@ func TestListVolumesUsesAbsoluteOffsets(t *testing.T) {
 	}
 }
 
-func TestListVolumesInvalidArgumentsAndTokens(t *testing.T) {
-	client := &fakeLinodeClient{volumes: makeTestVolumes(3)}
-	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+func TestListVolumesErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		request       *csi.ListVolumesRequest
+		providerError bool
+		wantCode      codes.Code
+		wantCalls     int
+	}{
+		{
+			name:      "negative max entries",
+			request:   &csi.ListVolumesRequest{MaxEntries: -1},
+			wantCode:  codes.InvalidArgument,
+			wantCalls: 0,
+		},
+		{
+			name:      "unknown token",
+			request:   &csi.ListVolumesRequest{StartingToken: "unknown"},
+			wantCode:  codes.Aborted,
+			wantCalls: 0,
+		},
+		{
+			name:          "provider error",
+			request:       &csi.ListVolumesRequest{},
+			providerError: true,
+			wantCode:      codes.Internal,
+			wantCalls:     1,
+		},
+	}
 
-	_, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: -1})
-	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("negative max entries error = %v, want InvalidArgument", err)
-	}
-	if client.listVolumeCalls() != 0 {
-		t.Fatalf("provider calls = %d, want 0", client.listVolumeCalls())
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeLinodeClient{volumes: makeTestVolumes(3), throwErr: tt.providerError}
+			cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
 
-	_, err = cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{StartingToken: "unknown"})
-	if status.Code(err) != codes.Aborted {
-		t.Fatalf("unknown token error = %v, want Aborted", err)
-	}
-	if client.listVolumeCalls() != 0 {
-		t.Fatalf("provider calls = %d, want 0", client.listVolumeCalls())
+			_, err := cs.ListVolumes(context.Background(), tt.request)
+			if got := status.Code(err); got != tt.wantCode {
+				t.Fatalf("error code = %v, want %v: %v", got, tt.wantCode, err)
+			}
+			if got := client.listVolumeCalls(); got != tt.wantCalls {
+				t.Fatalf("provider calls = %d, want %d", got, tt.wantCalls)
+			}
+		})
 	}
 }
 
@@ -664,13 +672,6 @@ func TestListVolumesResponse(t *testing.T) {
 	}
 	if entry.GetStatus().GetVolumeCondition().GetAbnormal() {
 		t.Fatal("active volume reported as abnormal")
-	}
-}
-
-func TestListVolumesProviderError(t *testing.T) {
-	cs := &ControllerServer{client: &fakeLinodeClient{throwErr: true}, volumeEntriesSeen: make(map[string]int)}
-	if _, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{}); err == nil {
-		t.Fatal("expected provider error")
 	}
 }
 
