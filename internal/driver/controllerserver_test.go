@@ -489,6 +489,7 @@ func TestControllerExpandVolume(t *testing.T) {
 	}
 }
 
+//nolint:gocognit // The table-driven pagination assertions are clearer in one test.
 func TestListVolumesPagination(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -732,8 +733,8 @@ func (flc *fakeLinodeClient) ListVolumes(_ context.Context, options *linodego.Li
 	flc.mu.Lock()
 	flc.listCalls++
 	if options != nil {
-		copy := *options
-		flc.listOptions = &copy
+		optionsCopy := *options
+		flc.listOptions = &optionsCopy
 	}
 	flc.mu.Unlock()
 
