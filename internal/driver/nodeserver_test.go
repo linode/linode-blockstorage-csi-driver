@@ -12,6 +12,8 @@ import (
 	"github.com/jaypipes/ghw"
 	"github.com/jaypipes/ghw/pkg/block"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 
@@ -48,6 +50,59 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "single node single writer already published elsewhere",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "/mnt/target",
+				StagingTargetPath: "/mnt/staging",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().GetMountRefs("/mnt/staging").Return([]string{"/mnt/other-target"}, nil)
+			},
+			expectedError: status.Error(codes.FailedPrecondition, "volume vol-123 is already published at a different target path"),
+		},
+		{
+			name: "single node single writer idempotent publish",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "/mnt/target",
+				StagingTargetPath: "/mnt/staging",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+					},
+				},
+			},
+			resp: &csi.NodePublishVolumeResponse{},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().GetMountRefs("/mnt/staging").Return([]string{"/mnt/target"}, nil)
+				m.EXPECT().IsLikelyNotMountPoint("/mnt/target").Return(false, nil)
+			},
+		},
+		{
+			name: "single node multi writer publishes at another target",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "/mnt/target",
+				StagingTargetPath: "/mnt/staging",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+					},
+				},
+			},
+			resp: &csi.NodePublishVolumeResponse{},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().IsLikelyNotMountPoint("/mnt/target").Return(true, nil)
+				m.EXPECT().Mount("/mnt/staging", "/mnt/target", "ext4", []string{"bind"}).Return(nil)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -69,7 +124,7 @@ func TestNodePublishVolume(t *testing.T) {
 				},
 			}
 			returnedResp, err := ns.NodePublishVolume(context.Background(), tt.req)
-			if err != nil && !errors.Is(err, tt.expectedError) {
+			if status.Code(err) != status.Code(tt.expectedError) {
 				t.Errorf("NodePublishVolume error = %v, wantErr %v", err, tt.expectedError)
 			}
 			if !reflect.DeepEqual(returnedResp, tt.resp) {
