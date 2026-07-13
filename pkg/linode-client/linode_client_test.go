@@ -6,6 +6,20 @@ import (
 	"github.com/linode/linodego/v2"
 )
 
+func TestNewListOptions(t *testing.T) {
+	options := NewListOptions(2, `{"label":"example"}`)
+
+	if options.Page != 2 {
+		t.Fatalf("expected page 2, got %d", options.Page)
+	}
+	if options.PageSize != DefaultListPageSize {
+		t.Fatalf("expected page size %d, got %d", DefaultListPageSize, options.PageSize)
+	}
+	if options.Filter != `{"label":"example"}` {
+		t.Fatalf("expected filter to be preserved, got %q", options.Filter)
+	}
+}
+
 func TestNewLinodeClient(t *testing.T) {
 	type args struct {
 		token  string

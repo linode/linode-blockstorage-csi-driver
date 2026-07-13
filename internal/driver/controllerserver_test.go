@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/linode/linodego/v2"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/linode/linode-blockstorage-csi-driver/mocks"
 	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
@@ -486,172 +489,264 @@ func TestControllerExpandVolume(t *testing.T) {
 	}
 }
 
-//nolint:gocognit // As simple as possible.
-func TestListVolumes(t *testing.T) {
-	cases := map[string]struct {
-		volumes  []linodego.Volume
-		throwErr bool
+func TestListVolumesPagination(t *testing.T) {
+	tests := []struct {
+		name            string
+		volumeCount     int
+		maxEntries      int32
+		expectedEntries []int
 	}{
-		"volume attached to node": {
-			volumes: []linodego.Volume{
-				{
-					ID:       1,
-					Label:    "foo",
-					Region:   "danmaaag",
-					Size:     30,
-					LinodeID: createLinodeID(10),
-					Status:   linodego.VolumeActive,
-				},
-			},
-		},
-		"volume not attached": {
-			volumes: []linodego.Volume{
-				{
-					ID:     1,
-					Label:  "bar",
-					Size:   30,
-					Status: linodego.VolumeActive,
-				},
-			},
-		},
-		"multiple volumes - with attachments": {
-			volumes: []linodego.Volume{
-				{
-					ID:       1,
-					Label:    "foo",
-					Size:     30,
-					LinodeID: createLinodeID(5),
-					Status:   linodego.VolumeActive,
-				},
-				{
-					ID:       2,
-					Label:    "foo",
-					Size:     60,
-					LinodeID: createLinodeID(10),
-					Status:   linodego.VolumeActive,
-				},
-			},
-		},
-		"multiple volumes - mixed attachments": {
-			volumes: []linodego.Volume{
-				{
-					ID:       1,
-					Label:    "foo",
-					Size:     30,
-					LinodeID: createLinodeID(5),
-					Status:   linodego.VolumeActive,
-				},
-				{
-					ID:     2,
-					Label:  "foo",
-					Size:   30,
-					Status: linodego.VolumeActive,
-				},
-			},
-		},
-		"Linode API error": {
-			throwErr: true,
-		},
+		{name: "no pagination", volumeCount: 325, maxEntries: 500, expectedEntries: []int{325}},
+		{name: "implicit pagination", volumeCount: 1327, expectedEntries: []int{500, 500, 327}},
+		{name: "explicit pagination", volumeCount: 723, maxEntries: 200, expectedEntries: []int{200, 200, 200, 123}},
+		{name: "exact boundary", volumeCount: 400, maxEntries: 200, expectedEntries: []int{200, 200}},
 	}
 
-	for c, tt := range cases {
-		t.Run(c, func(t *testing.T) {
-			cs := &ControllerServer{
-				client: &fakeLinodeClient{
-					volumes:  tt.volumes,
-					throwErr: tt.throwErr,
-				},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeLinodeClient{volumes: makeTestVolumes(tt.volumeCount)}
+			cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+			token := ""
+			seen := 0
+
+			for page, expected := range tt.expectedEntries {
+				resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{
+					MaxEntries:    tt.maxEntries,
+					StartingToken: token,
+				})
+				if err != nil {
+					t.Fatalf("page %d: %v", page+1, err)
+				}
+				if got := len(resp.GetEntries()); got != expected {
+					t.Fatalf("page %d entries = %d, want %d", page+1, got, expected)
+				}
+				for _, entry := range resp.GetEntries() {
+					key := linodevolumes.CreateLinodeVolumeKey(seen+1, fmt.Sprintf("volume-%d", seen+1))
+					want := key.GetVolumeKey()
+					if got := entry.GetVolume().GetVolumeId(); got != want {
+						t.Fatalf("entry %d volume ID = %q, want %q", seen, got, want)
+					}
+					seen++
+				}
+				token = resp.GetNextToken()
 			}
 
-			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{StartingToken: "10"})
-			switch {
-			case (err != nil && !tt.throwErr):
-				t.Fatal("failed to list volumes:", err)
-			case (err != nil && tt.throwErr):
-				// expected failure
-			case (err == nil && tt.throwErr):
-				t.Fatal("should have failed to list volumes")
+			if token != "" {
+				t.Fatalf("expected pagination to finish, got token %q", token)
 			}
-
-			for _, entry := range resp.GetEntries() {
-				volume := entry.GetVolume()
-				if volume == nil {
-					t.Error("nil volume")
-					continue
-				}
-
-				var linodeVolume *linodego.Volume
-				for _, v := range tt.volumes {
-					key := linodevolumes.CreateLinodeVolumeKey(v.ID, v.Label)
-					if volume.GetVolumeId() == key.GetVolumeKey() {
-						v := v
-						linodeVolume = &v
-						break
-					}
-				}
-				if linodeVolume == nil {
-					t.Fatalf("no matching linode volume for %#v", volume)
-					return
-				}
-
-				if want, got := int64(linodeVolume.Size<<30), volume.GetCapacityBytes(); want != got {
-					t.Errorf("mismatched volume size: want=%d got=%d", want, got)
-				}
-				for _, topology := range volume.GetAccessibleTopology() {
-					region, ok := topology.GetSegments()[VolumeTopologyRegion]
-					if !ok {
-						t.Error("region not set in volume topology")
-					}
-					if region != linodeVolume.Region {
-						t.Errorf("mismatched regions: want=%q got=%q", linodeVolume.Region, region)
-					}
-				}
-
-				status := entry.GetStatus()
-				if status == nil {
-					t.Error("nil status")
-					continue
-				}
-				if status.GetVolumeCondition().GetAbnormal() {
-					t.Error("abnormal volume condition")
-				}
-
-				if n := len(status.GetPublishedNodeIds()); n > 1 {
-					t.Errorf("volume published to too many nodes (%d)", n)
-				}
-
-				switch publishedNodes := status.GetPublishedNodeIds(); {
-				case len(publishedNodes) == 0 && linodeVolume.LinodeID == nil:
-				// This case is fine - having it here prevents a segfault if we try to index into publishedNodes in the last case
-				case len(publishedNodes) == 0 && linodeVolume.LinodeID != nil:
-					t.Errorf("expected volume to be attached, got: %s, want: %d", status.GetPublishedNodeIds(), *linodeVolume.LinodeID)
-				case len(publishedNodes) != 0 && linodeVolume.LinodeID == nil:
-					t.Errorf("expected volume to be unattached, got: %s", publishedNodes)
-				case publishedNodes[0] != fmt.Sprintf("%d", *linodeVolume.LinodeID):
-					t.Fatalf("got: %s, want: %d published node id", status.GetPublishedNodeIds()[0], *linodeVolume.LinodeID)
-				}
+			if seen != tt.volumeCount {
+				t.Fatalf("saw %d volumes, want %d", seen, tt.volumeCount)
+			}
+			if client.listVolumeCalls() != 1 {
+				t.Fatalf("provider calls = %d, want 1", client.listVolumeCalls())
+			}
+			if client.listOptions == nil || client.listOptions.Page != 0 || client.listOptions.PageSize != linodeclient.DefaultListPageSize {
+				t.Fatalf("unexpected provider list options: %#v", client.listOptions)
 			}
 		})
 	}
 }
 
+func TestListVolumesZeroMaxEntriesUsesDefaultPageSize(t *testing.T) {
+	client := &fakeLinodeClient{volumes: makeTestVolumes(maxListVolumesResponseEntries + 1)}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(resp.GetEntries()); got != maxListVolumesResponseEntries {
+		t.Fatalf("entries = %d, want %d", got, maxListVolumesResponseEntries)
+	}
+	if resp.GetNextToken() == "" {
+		t.Fatal("expected a continuation token")
+	}
+}
+
+func TestListVolumesUsesAbsoluteOffsets(t *testing.T) {
+	client := &fakeLinodeClient{volumes: makeTestVolumes(5)}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	first, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{
+		MaxEntries:    3,
+		StartingToken: first.GetNextToken(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(second.GetEntries()); got != 3 {
+		t.Fatalf("second page entries = %d, want 3", got)
+	}
+	if got := second.GetEntries()[0].GetVolume().GetVolumeId(); got != "3-volume-3" {
+		t.Fatalf("second page starts with %q, want %q", got, "3-volume-3")
+	}
+	if second.GetNextToken() != "" {
+		t.Fatalf("expected final page, got token %q", second.GetNextToken())
+	}
+	if client.listVolumeCalls() != 1 {
+		t.Fatalf("provider calls = %d, want 1", client.listVolumeCalls())
+	}
+}
+
+func TestListVolumesInvalidArgumentsAndTokens(t *testing.T) {
+	client := &fakeLinodeClient{volumes: makeTestVolumes(3)}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	_, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: -1})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("negative max entries error = %v, want InvalidArgument", err)
+	}
+	if client.listVolumeCalls() != 0 {
+		t.Fatalf("provider calls = %d, want 0", client.listVolumeCalls())
+	}
+
+	_, err = cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{StartingToken: "unknown"})
+	if status.Code(err) != codes.Aborted {
+		t.Fatalf("unknown token error = %v, want Aborted", err)
+	}
+	if client.listVolumeCalls() != 0 {
+		t.Fatalf("provider calls = %d, want 0", client.listVolumeCalls())
+	}
+}
+
+func TestListVolumesNewTraversalInvalidatesTokens(t *testing.T) {
+	client := &fakeLinodeClient{volumes: makeTestVolumes(3)}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	first, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: 1}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{
+		MaxEntries:    1,
+		StartingToken: first.GetNextToken(),
+	})
+	if status.Code(err) != codes.Aborted {
+		t.Fatalf("stale token error = %v, want Aborted", err)
+	}
+	if client.listVolumeCalls() != 2 {
+		t.Fatalf("provider calls = %d, want 2", client.listVolumeCalls())
+	}
+}
+
+func TestListVolumesResponse(t *testing.T) {
+	client := &fakeLinodeClient{volumes: []linodego.Volume{{
+		ID:       1,
+		Label:    "foo",
+		Region:   "us-east",
+		Size:     30,
+		LinodeID: createLinodeID(10),
+		Status:   linodego.VolumeActive,
+	}}}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := resp.GetEntries()[0]
+	if got := entry.GetVolume().GetCapacityBytes(); got != 30<<30 {
+		t.Fatalf("capacity = %d, want %d", got, int64(30<<30))
+	}
+	if got := entry.GetVolume().GetAccessibleTopology()[0].GetSegments()[VolumeTopologyRegion]; got != "us-east" {
+		t.Fatalf("region = %q, want us-east", got)
+	}
+	if got := entry.GetStatus().GetPublishedNodeIds(); !reflect.DeepEqual(got, []string{"10"}) {
+		t.Fatalf("published nodes = %v, want [10]", got)
+	}
+	if entry.GetStatus().GetVolumeCondition().GetAbnormal() {
+		t.Fatal("active volume reported as abnormal")
+	}
+}
+
+func TestListVolumesProviderError(t *testing.T) {
+	cs := &ControllerServer{client: &fakeLinodeClient{throwErr: true}, volumeEntriesSeen: make(map[string]int)}
+	if _, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{}); err == nil {
+		t.Fatal("expected provider error")
+	}
+}
+
+func TestListVolumesConcurrent(t *testing.T) {
+	client := &fakeLinodeClient{volumes: makeTestVolumes(50)}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	const concurrency = 20
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for range concurrency {
+		go func() {
+			defer wg.Done()
+			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: 10})
+			if err != nil {
+				t.Errorf("first page: %v", err)
+				return
+			}
+			_, err = cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{
+				MaxEntries:    10,
+				StartingToken: resp.GetNextToken(),
+			})
+			if err != nil && status.Code(err) != codes.Aborted {
+				t.Errorf("second page: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func makeTestVolumes(count int) []linodego.Volume {
+	volumes := make([]linodego.Volume, count)
+	for i := range count {
+		volumes[i] = linodego.Volume{
+			ID:     i + 1,
+			Label:  fmt.Sprintf("volume-%d", i+1),
+			Size:   10,
+			Status: linodego.VolumeActive,
+		}
+	}
+	return volumes
+}
+
 var _ linodeclient.LinodeClient = &fakeLinodeClient{}
 
 type fakeLinodeClient struct {
-	volumes  []linodego.Volume
-	disks    []linodego.InstanceDisk
-	throwErr bool
+	mu          sync.Mutex
+	volumes     []linodego.Volume
+	disks       []linodego.InstanceDisk
+	throwErr    bool
+	listCalls   int
+	listOptions *linodego.ListOptions
 }
 
 func (flc *fakeLinodeClient) ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) {
 	return nil, nil
 }
 
-func (flc *fakeLinodeClient) ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error) {
+func (flc *fakeLinodeClient) ListVolumes(_ context.Context, options *linodego.ListOptions) ([]linodego.Volume, error) {
+	flc.mu.Lock()
+	flc.listCalls++
+	if options != nil {
+		copy := *options
+		flc.listOptions = &copy
+	}
+	flc.mu.Unlock()
+
 	if flc.throwErr {
 		return nil, errors.New("sad times mate")
 	}
 	return flc.volumes, nil
+}
+
+func (flc *fakeLinodeClient) listVolumeCalls() int {
+	flc.mu.Lock()
+	defer flc.mu.Unlock()
+	return flc.listCalls
 }
 
 func (c *fakeLinodeClient) ListInstanceVolumes(_ context.Context, _ int, _ *linodego.ListOptions) ([]linodego.Volume, error) {

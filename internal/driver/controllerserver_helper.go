@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
 	linodevolumes "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-volumes"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
@@ -110,7 +111,7 @@ func (cs *ControllerServer) canAttach(ctx context.Context, instance *linodego.In
 	}
 
 	// List the volumes currently attached to the instance
-	volumes, err := cs.client.ListInstanceVolumes(ctx, instance.ID, nil)
+	volumes, err := cs.client.ListInstanceVolumes(ctx, instance.ID, linodeclient.NewListOptions(0, ""))
 	if err != nil {
 		return false, errInternal("list instance volumes: %v", err)
 	}
@@ -135,7 +136,7 @@ func (cs *ControllerServer) maxAllowedVolumeAttachments(ctx context.Context, ins
 	}
 
 	// Retrieve the list of disks currently attached to the instance
-	disks, err := cs.client.ListInstanceDisks(ctx, instance.ID, nil)
+	disks, err := cs.client.ListInstanceDisks(ctx, instance.ID, linodeclient.NewListOptions(0, ""))
 	if err != nil {
 		return 0, errInternal("list instance disks: %v", err)
 	}
@@ -220,7 +221,7 @@ func (cs *ControllerServer) attemptCreateLinodeVolume(ctx context.Context, label
 		return nil, errInternal("marshal json filter: %v", err)
 	}
 
-	volumes, err := cs.client.ListVolumes(ctx, linodego.NewListOptions(0, string(jsonFilter)))
+	volumes, err := cs.client.ListVolumes(ctx, linodeclient.NewListOptions(0, string(jsonFilter)))
 	if err != nil {
 		return nil, errInternal("list volumes: %v", err)
 	}

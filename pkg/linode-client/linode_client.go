@@ -6,6 +6,16 @@ import (
 	"github.com/linode/linodego/v2"
 )
 
+// DefaultListPageSize is the page size used for internal Linode list requests.
+const DefaultListPageSize = 500
+
+// NewListOptions creates list options with the driver's standard page size.
+func NewListOptions(page int, filter string) *linodego.ListOptions {
+	options := linodego.NewListOptions(page, filter)
+	options.PageSize = DefaultListPageSize
+	return options
+}
+
 type LinodeClient interface {
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) // Needed for metadata
 	ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error)

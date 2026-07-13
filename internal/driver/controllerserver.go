@@ -3,11 +3,12 @@ package driver
 import (
 	"context"
 	"errors"
-	"math"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/google/uuid"
 	"github.com/linode/linodego/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,10 +19,18 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
+// maxListVolumesResponseEntries keeps default responses below gRPC message
+// limits while allowing callers to request a different page size explicitly.
+const maxListVolumesResponseEntries = 500
+
 type ControllerServer struct {
 	driver   *LinodeDriver
 	client   linodeclient.LinodeClient
 	metadata Metadata
+
+	volumeEntries     []*csi.ListVolumesResponse_Entry
+	volumeEntriesSeen map[string]int
+	listVolumesLock   sync.Mutex
 
 	csi.UnimplementedControllerServer
 }
@@ -47,9 +56,10 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 	}
 
 	cs := &ControllerServer{
-		driver:   driver,
-		client:   client,
-		metadata: metadata,
+		driver:            driver,
+		client:            client,
+		metadata:          metadata,
+		volumeEntriesSeen: make(map[string]int),
 	}
 
 	log.V(4).Info("ControllerServer created successfully")
@@ -362,51 +372,65 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	log.V(2).Info("Processing request", "starting_token", req.GetStartingToken(), "max_entries", req.GetMaxEntries())
 
-	startingToken := req.GetStartingToken()
+	if req.GetMaxEntries() < 0 {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"ListVolumes got max entries request %d; value must not be negative", req.GetMaxEntries())
+	}
+
+	var volumeEntries []*csi.ListVolumesResponse_Entry
+	if req.GetStartingToken() == "" {
+		listOpts := linodeclient.NewListOptions(0, "")
+		log.V(4).Info("Listing volumes", "list_opts", listOpts)
+		volumes, err := cs.client.ListVolumes(ctx, listOpts)
+		if err != nil {
+			return &csi.ListVolumesResponse{}, errInternal("list volumes: %v", err)
+		}
+
+		volumeEntries = make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
+		for volNum := range volumes {
+			csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(&volumes[volNum])
+			volumeEntries = append(volumeEntries, &csi.ListVolumesResponse_Entry{
+				Volume: csiVol,
+				Status: &csi.ListVolumesResponse_VolumeStatus{
+					PublishedNodeIds: publishedNodeIds,
+					VolumeCondition:  volumeCondition,
+				},
+			})
+		}
+	}
+
+	cs.listVolumesLock.Lock()
+	defer cs.listVolumesLock.Unlock()
+
+	offsetLow := 0
+	if req.GetStartingToken() == "" {
+		cs.volumeEntries = volumeEntries
+		cs.volumeEntriesSeen = make(map[string]int)
+	} else {
+		var ok bool
+		offsetLow, ok = cs.volumeEntriesSeen[req.GetStartingToken()]
+		if !ok {
+			return nil, status.Errorf(codes.Aborted,
+				"ListVolumes error with invalid starting token: %s", req.GetStartingToken())
+		}
+	}
+
+	maxEntries := int(req.GetMaxEntries())
+	if maxEntries == 0 {
+		// Keep responses bounded when accounts have more than 500 volumes. The
+		// sidecar follows next_token to retrieve the remaining cached entries.
+		maxEntries = maxListVolumesResponseEntries
+	}
+
 	nextToken := ""
-
-	listOpts := linodego.NewListOptions(0, "")
-	if req.GetMaxEntries() > 0 {
-		listOpts.PageSize = int(req.GetMaxEntries())
+	offsetHigh := min(offsetLow+maxEntries, len(cs.volumeEntries))
+	if offsetHigh < len(cs.volumeEntries) {
+		nextToken = uuid.NewString()
+		cs.volumeEntriesSeen[nextToken] = offsetHigh
 	}
 
-	if startingToken != "" {
-		startingPage, errParse := strconv.ParseInt(startingToken, 10, 0)
-		if errParse != nil {
-			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
-				"invalid starting token: %q", startingToken)
-		}
-
-		if startingPage < math.MinInt || startingPage > math.MaxInt {
-			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
-				"starting token out of bounds: %q", startingToken)
-		}
-		listOpts.Page = int(startingPage)
-	}
-
-	// List all volumes
-	log.V(4).Info("Listing volumes", "list_opts", listOpts)
-	volumes, err := cs.client.ListVolumes(ctx, listOpts)
-	if err != nil {
-		return &csi.ListVolumesResponse{}, errInternal("list volumes: %v", err)
-	}
-
-	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
-	for volNum := range volumes {
-		csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(&volumes[volNum])
-		entries = append(entries, &csi.ListVolumesResponse_Entry{
-			Volume: csiVol,
-			Status: &csi.ListVolumesResponse_VolumeStatus{
-				PublishedNodeIds: publishedNodeIds,
-				VolumeCondition:  volumeCondition,
-			},
-		})
-	}
-
-	// Only set nextToken if we got a full page and there might be more
-	if req.GetMaxEntries() > 0 && len(volumes) >= listOpts.PageSize {
-		nextToken = strconv.Itoa(listOpts.Page + 1)
-	}
+	entries := make([]*csi.ListVolumesResponse_Entry, offsetHigh-offsetLow)
+	copy(entries, cs.volumeEntries[offsetLow:offsetHigh])
 
 	resp := &csi.ListVolumesResponse{
 		Entries:   entries,
