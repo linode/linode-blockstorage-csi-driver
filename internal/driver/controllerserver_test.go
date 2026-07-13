@@ -577,12 +577,45 @@ func TestListVolumesUsesAbsoluteOffsets(t *testing.T) {
 	}
 }
 
+func TestListVolumesRetryReusesNextToken(t *testing.T) {
+	client := &fakeLinodeClient{volumes: makeTestVolumes(5)}
+	cs := &ControllerServer{client: client, volumeEntriesSeen: make(map[string]int)}
+
+	first, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{MaxEntries: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := &csi.ListVolumesRequest{MaxEntries: 1, StartingToken: first.GetNextToken()}
+	second, err := cs.ListVolumes(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retry, err := cs.ListVolumes(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if retry.GetNextToken() != second.GetNextToken() {
+		t.Fatalf("retry token = %q, want %q", retry.GetNextToken(), second.GetNextToken())
+	}
+	if got := retry.GetEntries()[0].GetVolume().GetVolumeId(); got != second.GetEntries()[0].GetVolume().GetVolumeId() {
+		t.Fatalf("retry entry = %q, want %q", got, second.GetEntries()[0].GetVolume().GetVolumeId())
+	}
+	if got := len(cs.volumeEntriesSeen); got != 2 {
+		t.Fatalf("stored tokens = %d, want 2", got)
+	}
+	if got := client.listVolumeCalls(); got != 1 {
+		t.Fatalf("provider calls = %d, want 1", got)
+	}
+}
+
 func TestListVolumesErrors(t *testing.T) {
 	tests := []struct {
 		name          string
 		request       *csi.ListVolumesRequest
 		providerError bool
 		wantCode      codes.Code
+		wantMessage   string
 		wantCalls     int
 	}{
 		{
@@ -592,10 +625,11 @@ func TestListVolumesErrors(t *testing.T) {
 			wantCalls: 0,
 		},
 		{
-			name:      "unknown token",
-			request:   &csi.ListVolumesRequest{StartingToken: "unknown"},
-			wantCode:  codes.Aborted,
-			wantCalls: 0,
+			name:        "unknown token",
+			request:     &csi.ListVolumesRequest{StartingToken: "unknown\ntoken"},
+			wantCode:    codes.Aborted,
+			wantMessage: `ListVolumes error with invalid starting token: "unknown\ntoken"`,
+			wantCalls:   0,
 		},
 		{
 			name:          "provider error",
@@ -614,6 +648,9 @@ func TestListVolumesErrors(t *testing.T) {
 			_, err := cs.ListVolumes(context.Background(), tt.request)
 			if got := status.Code(err); got != tt.wantCode {
 				t.Fatalf("error code = %v, want %v: %v", got, tt.wantCode, err)
+			}
+			if tt.wantMessage != "" && status.Convert(err).Message() != tt.wantMessage {
+				t.Fatalf("error message = %q, want %q", status.Convert(err).Message(), tt.wantMessage)
 			}
 			if got := client.listVolumeCalls(); got != tt.wantCalls {
 				t.Fatalf("provider calls = %d, want %d", got, tt.wantCalls)
