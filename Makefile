@@ -59,10 +59,9 @@ clean:
 #####################################################################
 
 CLUSTER_NAME         ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
-K8S_VERSION          ?= "v1.29.1"
-CAPI_VERSION         ?= "v1.8.5"
-HELM_VERSION         ?= "v0.2.1"
-CAPL_VERSION         ?= "v0.7.1"
+K8S_VERSION          ?= "v1.36.2"
+CAPI_VERSION         ?= "v1.13.3"
+CAPL_VERSION         ?= "v0.10.7"
 CONTROLPLANE_NODES   ?= 1
 WORKER_NODES         ?= 1
 GRAFANA_PORT ?= 3000
@@ -132,8 +131,8 @@ mgmt-cluster:
 	clusterctl init \
 		--wait-providers \
 		--wait-provider-timeout 600 \
+		--addon helm \
 		--core cluster-api:${CAPI_VERSION} \
-		--addon helm:${HELM_VERSION} \
 		--bootstrap kubeadm:$(CAPI_VERSION) \
 		--control-plane kubeadm:$(CAPI_VERSION) \
 		--infrastructure linode-linode:${CAPL_VERSION}
