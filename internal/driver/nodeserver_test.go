@@ -68,6 +68,23 @@ func TestNodePublishVolume(t *testing.T) {
 			expectedError: status.Error(codes.FailedPrecondition, "volume vol-123 is already published at a different target path"),
 		},
 		{
+			name: "legacy single node writer already published elsewhere",
+			req: &csi.NodePublishVolumeRequest{
+				VolumeId:          "vol-123",
+				TargetPath:        "/mnt/target",
+				StagingTargetPath: "/mnt/staging",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+					},
+				},
+			},
+			expectMounterCalls: func(m *mocks.MockMounter) {
+				m.EXPECT().GetMountRefs("/mnt/staging").Return([]string{"/mnt/other-target"}, nil)
+			},
+			expectedError: status.Error(codes.FailedPrecondition, "volume vol-123 is already published at a different target path"),
+		},
+		{
 			name: "single node single writer idempotent publish",
 			req: &csi.NodePublishVolumeRequest{
 				VolumeId:          "vol-123",
