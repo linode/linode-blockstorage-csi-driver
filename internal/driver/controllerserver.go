@@ -30,7 +30,6 @@ type ControllerServer struct {
 
 	volumeEntries     []*csi.ListVolumesResponse_Entry
 	volumeEntriesSeen map[string]int
-	volumeEntryTokens map[int]string
 	listVolumesLock   sync.Mutex
 
 	csi.UnimplementedControllerServer
@@ -61,7 +60,6 @@ func NewControllerServer(ctx context.Context, driver *LinodeDriver, client linod
 		client:            client,
 		metadata:          metadata,
 		volumeEntriesSeen: make(map[string]int),
-		volumeEntryTokens: make(map[int]string),
 	}
 
 	log.V(4).Info("ControllerServer created successfully")
@@ -408,7 +406,6 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	if req.GetStartingToken() == "" {
 		cs.volumeEntries = volumeEntries
 		cs.volumeEntriesSeen = make(map[string]int)
-		cs.volumeEntryTokens = make(map[int]string)
 	} else {
 		var ok bool
 		offsetLow, ok = cs.volumeEntriesSeen[req.GetStartingToken()]
@@ -428,13 +425,8 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	nextToken := ""
 	offsetHigh := min(offsetLow+maxEntries, len(cs.volumeEntries))
 	if offsetHigh < len(cs.volumeEntries) {
-		var ok bool
-		nextToken, ok = cs.volumeEntryTokens[offsetHigh]
-		if !ok {
-			nextToken = uuid.NewString()
-			cs.volumeEntriesSeen[nextToken] = offsetHigh
-			cs.volumeEntryTokens[offsetHigh] = nextToken
-		}
+		nextToken = uuid.NewString()
+		cs.volumeEntriesSeen[nextToken] = offsetHigh
 	}
 
 	entries := make([]*csi.ListVolumesResponse_Entry, offsetHigh-offsetLow)
