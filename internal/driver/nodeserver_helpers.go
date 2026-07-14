@@ -234,6 +234,36 @@ func (ns *NodeServer) ensureMountPoint(ctx context.Context, path string, fs file
 	return notMnt, nil
 }
 
+func (ns *NodeServer) isVolumePublishedElsewhere(req *csi.NodePublishVolumeRequest) (bool, error) {
+	targetPath := filepath.Clean(req.GetTargetPath())
+
+	if req.GetVolumeCapability().GetBlock() != nil {
+		devicePath := filepath.Clean(req.GetPublishContext()[devicePathKey])
+		mountPoints, err := ns.mounter.List()
+		if err != nil {
+			return false, err
+		}
+		for i := range mountPoints {
+			mountPoint := &mountPoints[i]
+			if filepath.Clean(mountPoint.Device) == devicePath && filepath.Clean(mountPoint.Path) != targetPath {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	mountRefs, err := ns.mounter.GetMountRefs(req.GetStagingTargetPath())
+	if err != nil {
+		return false, err
+	}
+	for _, mountRef := range mountRefs {
+		if filepath.Clean(mountRef) != targetPath {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // nodePublishVolumeBlock handles the NodePublishVolume call for block volumes.
 //
 // It takes a CSI NodePublishVolumeRequest, a list of mount options, and a file system interface.

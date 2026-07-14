@@ -105,6 +105,19 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, err
 	}
 
+	accessMode := req.GetVolumeCapability().GetAccessMode().GetMode()
+	if accessMode == csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER || accessMode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+		publishedElsewhere, err := ns.isVolumePublishedElsewhere(req)
+		if err != nil {
+			observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
+			return nil, errInternal("failed to check existing publications for volume %s: %v", volumeID, err)
+		}
+		if publishedElsewhere {
+			observability.RecordMetrics(observability.NodePublishTotal, observability.NodePublishDuration, observability.Failed, functionStartTime)
+			return nil, status.Errorf(codes.FailedPrecondition, "volume %s is already published at a different target path", volumeID)
+		}
+	}
+
 	// Set mount options
 	options := []string{bindMountOption}
 	if req.GetReadonly() {

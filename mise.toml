@@ -14,7 +14,7 @@ kubectl = "1.36.2"
 kustomize = "5.8.1"
 "go:github.com/kyverno/chainsaw" = "0.2.15"
 "go:github.com/golang/mock/mockgen" = "1.6.0"
-"go:github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity" = "5.4.0"
+"go:github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity" = "5.5.0"
 yq = "4.52.2"
 envsubst = "1.4.3"
 jq = "1.8.2"
@@ -67,4 +67,3 @@ run = "make upstream-e2e-tests"
 [tasks.csi-sanity-test]
 description = "Run CSI sanity tests"
 run = "make csi-sanity-test"
-
