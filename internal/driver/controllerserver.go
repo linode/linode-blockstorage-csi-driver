@@ -19,10 +19,6 @@ import (
 	"github.com/linode/linode-blockstorage-csi-driver/pkg/observability"
 )
 
-// maxListVolumesResponseEntries keeps default responses below gRPC message
-// limits while allowing callers to request a different page size explicitly.
-const maxListVolumesResponseEntries = 500
-
 type ControllerServer struct {
 	driver   *LinodeDriver
 	client   linodeclient.LinodeClient
@@ -419,7 +415,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	if maxEntries == 0 {
 		// Keep responses bounded when accounts have more than 500 volumes. The
 		// sidecar follows next_token to retrieve the remaining cached entries.
-		maxEntries = maxListVolumesResponseEntries
+		maxEntries = linodeclient.DefaultListPageSize
 	}
 
 	nextToken := ""
