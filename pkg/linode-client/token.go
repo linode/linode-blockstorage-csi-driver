@@ -38,7 +38,7 @@ type staticTokenProvider struct {
 
 func (t staticTokenProvider) GetToken(context.Context) (string, error) {
 	if t.token == "" {
-		return "", fmt.Errorf("%s must be set in the environment (use a k8s secret)", AccessTokenEnv)
+		return "", fmt.Errorf("linode API token is empty; set %s (flag, env, or k8s secret)", AccessTokenEnv)
 	}
 	return t.token, nil
 }
