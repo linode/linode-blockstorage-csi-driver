@@ -1,4 +1,16 @@
 {{- if .Values.controller.enabled }}
+{{- $secretName := "linode" }}
+{{- $apiTokenKey := "token" }}
+{{- $mountSecret := false }}
+{{- $tokenFilePath := "/var/run/secrets/linode/api-token" }}
+{{- if .Values.secretRef }}
+{{- $secretName = (.Values.secretRef.name | default "linode") }}
+{{- $apiTokenKey = (.Values.secretRef.apiTokenRef | default "token") }}
+{{- $mountSecret = (.Values.secretRef.mountSecret | default false) }}
+{{- $tokenFilePath = (.Values.secretRef.mountPath | default "/var/run/secrets/linode/api-token") }}
+{{- end }}
+{{- $tokenFileDir := dir $tokenFilePath }}
+{{- $tokenFileName := base $tokenFilePath }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -166,11 +178,16 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+            {{- if $mountSecret }}
+            - name: LINODE_API_TOKEN_FILE
+              value: {{ $tokenFilePath | quote }}
+            {{- else }}
             - name: LINODE_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
-                  key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
+                  name: {{ $secretName }}
+                  key: {{ $apiTokenKey }}
+            {{- end }}
             - name: ENABLE_METRICS
               value: {{ .Values.enableMetrics | quote}}
             - name: METRICS_PORT
@@ -193,6 +210,11 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
+            {{- if $mountSecret }}
+            - mountPath: {{ $tokenFileDir | quote }}
+              name: linode-api-token
+              readOnly: true
+            {{- end }}
             {{- with .Values.csiLinodePlugin.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -226,6 +248,14 @@ spec:
             path: /dev
             type: Directory
           name: dev
+        {{- if $mountSecret }}
+        - name: linode-api-token
+          secret:
+            secretName: {{ $secretName }}
+            items:
+              - key: {{ $apiTokenKey }}
+                path: {{ $tokenFileName }}
+        {{- end }}
         {{- with .Values.controller.kubeconfig }}
           {{- if and .secretName .secretKey }}
         - name: controller-kubeconfig

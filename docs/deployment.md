@@ -74,6 +74,37 @@ _See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade/) for command documen
 - Modify variables using the `--set var=value` flag or by providing a custom `values.yaml` with `-f custom-values.yaml`.
 - For a comprehensive list of configurable variables, refer to [`helm-chart/csi-driver/values.yaml`](https://github.com/linode/linode-blockstorage-csi-driver/blob/main/helm-chart/csi-driver/values.yaml).
 
+###### Hot-reload Linode API token (optional)
+
+By default the controller receives `LINODE_TOKEN` from a Kubernetes Secret via env injection. Environment variables are fixed for the lifetime of the pod, so rotating the PAT normally requires restarting the CSI controller.
+
+To rotate the token **without restarting** the controller, mount the Secret as a file instead. The controller re-reads the file periodically (default cache TTL: 1 minute; override with `LINODE_API_TOKEN_CACHE_TTL_SECONDS`).
+
+```yaml
+# values.yaml — use an existing Secret (or create one named "linode" yourself)
+secretRef:
+  name: linode
+  apiTokenRef: token
+  regionRef: region
+  mountSecret: true
+  # optional; default shown
+  mountPath: /var/run/secrets/linode/api-token
+```
+
+Helm example:
+
+```sh
+helm upgrade --install linode-csi-driver \
+  --set secretRef.name=linode \
+  --set secretRef.apiTokenRef=token \
+  --set secretRef.mountSecret=true \
+  linode-csi/linode-blockstorage-csi-driver
+```
+
+After enabling mount mode, update the Secret data and wait past the cache TTL; the controller will pick up the new token on subsequent Linode API calls. The node DaemonSet is unchanged and does not mount the API token.
+
+For kubectl/kustomize installs, see the commented `LINODE_API_TOKEN_FILE` / `linode-api-token` volume blocks in `deploy/kubernetes/base/ss-csi-linode-controller.yaml`.
+
 ###### Controller kubeconfig (optional)
 
 If your environment requires the controller to use a kubeconfig file explicitly, enable the controller kubeconfig by providing the following values. The Secret will be mounted as a directory and the sidecars will read the file `<mountDir>/<secretKey>`.

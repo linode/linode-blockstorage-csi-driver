@@ -29,8 +29,16 @@ kubeletPath: "/var/lib/kubelet"
 # Set these values if your APIToken and region are already present in a k8s secret.
 # secretRef:
 #   name: "linode"
-#   apiTokenRef: "apiToken"
+#   apiTokenRef: "token"
 #   regionRef: "region"
+#   # Enable mounted token file mode on the controller only. Default false/unset
+#   # keeps legacy LINODE_TOKEN env injection via secretKeyRef.
+#   # When true, the Secret is mounted and the controller re-reads the token
+#   # (with a short cache) so you can rotate the PAT without restarting CSI controller pods.
+#   mountSecret: false
+#   # Optional token file path used when mountSecret=true.
+#   # Defaults to /var/run/secrets/linode/api-token.
+#   mountPath: /var/run/secrets/linode/api-token
 
 # Default storageClass is "linode-block-storage-retain" but it can be set to
 # "linode-block-storage" or left as an empty string
