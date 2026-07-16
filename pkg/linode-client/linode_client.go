@@ -2,6 +2,8 @@ package linodeclient
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
 	"github.com/linode/linodego/v2"
 )
@@ -34,17 +36,60 @@ type LinodeClient interface {
 // linodego.Client implements LinodeClient
 var _ LinodeClient = (*linodego.Client)(nil)
 
+type tokenTransport struct {
+	base          http.RoundTripper
+	tokenProvider TokenProvider
+}
+
+func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	token, err := t.tokenProvider(req.Context())
+	if err != nil {
+		return nil, err
+	}
+
+	clone := req.Clone(req.Context())
+	// Node plugin may intentionally supply an empty token (no Linode API calls).
+	// Omit Authorization rather than sending "Bearer " with no credentials.
+	if token != "" {
+		clone.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(clone)
+}
+
+// NewLinodeClient creates a Linode API client authenticated with a static token.
+// Prefer NewLinodeClientWithTokenProvider when tokens may rotate without restart.
 func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
+	return NewLinodeClientWithTokenProvider(ua, apiURL, StaticTokenProvider(token))
+}
+
+// NewLinodeClientWithTokenProvider creates a Linode API client that obtains the
+// Authorization bearer token from tokenProvider on each HTTP request.
+func NewLinodeClientWithTokenProvider(ua, apiURL string, tokenProvider TokenProvider) (*linodego.Client, error) {
+	if tokenProvider == nil {
+		return nil, fmt.Errorf("token provider is required")
+	}
+
+	httpClient := &http.Client{
+		Transport: &tokenTransport{
+			base:          http.DefaultTransport,
+			tokenProvider: tokenProvider,
+		},
+	}
+
 	// Use linodego built-in http client which supports setting root CA cert
-	linodeClient, err := linodego.NewClient(nil)
+	// when no custom transport is set; with a custom transport we inject the token.
+	linodeClient, err := linodego.NewClient(httpClient)
 	if err != nil {
 		return nil, err
 	}
 	// Only override the base URL if a custom API URL is provided. Recent versions
 	// of linodego return an error when given an empty string to UseURL.
-	var (
-		client *linodego.Client
-	)
+	var client *linodego.Client
 	if apiURL != "" {
 		client, err = linodeClient.UseURL(apiURL)
 		if err != nil {
@@ -54,7 +99,8 @@ func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
 		client = &linodeClient
 	}
 	client.SetUserAgent(ua)
-	client.SetToken(token)
+	// Do not call SetToken: auth is applied per-request by tokenTransport so
+	// file-backed tokens can rotate without reconstructing the client.
 
 	return client, nil
 }

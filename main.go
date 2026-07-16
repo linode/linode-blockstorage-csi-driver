@@ -130,16 +130,23 @@ func handle(ctx context.Context) error {
 	log.V(4).Info("Driver vendor version", "version", vendorVersion)
 
 	cfg := loadConfig()
+	// staticToken covers --LINODE_TOKEN and LINODE_TOKEN via envflag; file mount
+	// is preferred when present so tokens can rotate without restart.
+	tokenProvider, tokenSource, tokenErr := linodeclient.TokenProviderFromFileOrEnv(ctx, cfg.linodeToken)
 	if cfg.driverRole == "controller" {
-		if cfg.linodeToken == "" {
-			return errors.New("linode token required")
+		if tokenErr != nil {
+			return fmt.Errorf("linode token required: %w", tokenErr)
 		}
+		log.V(2).Info("Using Linode API token", "source", tokenSource)
+	} else if tokenErr != nil {
+		// Node plugin typically does not need a Linode API token.
+		tokenProvider = func(context.Context) (string, error) { return "", nil }
 	}
 	linodeDriver := driver.GetLinodeDriver(ctx)
 
 	// Initialize Linode Driver (Move setup to main?)
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
-	cloudProvider, err := linodeclient.NewLinodeClient(cfg.linodeToken, uaPrefix, cfg.linodeURL)
+	cloudProvider, err := linodeclient.NewLinodeClientWithTokenProvider(uaPrefix, cfg.linodeURL, tokenProvider)
 	if err != nil {
 		return fmt.Errorf("failed to set up linode client: %w", err)
 	}
