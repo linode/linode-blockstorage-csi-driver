@@ -563,7 +563,7 @@ func TestListVolumes(t *testing.T) {
 				},
 			}
 
-			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{StartingToken: "10"})
+			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{StartingToken: "1"})
 			switch {
 			case (err != nil && !tt.throwErr):
 				t.Fatal("failed to list volumes:", err)
@@ -635,19 +635,101 @@ func TestListVolumes(t *testing.T) {
 	}
 }
 
+func TestListVolumesPagination(t *testing.T) {
+	tests := []struct {
+		name              string
+		request           *csi.ListVolumesRequest
+		volumeCount       int
+		expectedPage      int
+		expectedNextToken string
+		expectErr         bool
+	}{
+		{
+			name:              "empty token starts first page",
+			request:           &csi.ListVolumesRequest{},
+			volumeCount:       linodeclient.DefaultPageSize,
+			expectedPage:      1,
+			expectedNextToken: "2",
+		},
+		{
+			name:              "max_entries is ignored",
+			request:           &csi.ListVolumesRequest{StartingToken: "1", MaxEntries: 10},
+			volumeCount:       linodeclient.DefaultPageSize,
+			expectedPage:      1,
+			expectedNextToken: "2",
+		},
+		{
+			name:         "token selects the requested page",
+			request:      &csi.ListVolumesRequest{StartingToken: "2"},
+			volumeCount:  1,
+			expectedPage: 2,
+		},
+		{
+			name:         "partial page ends pagination",
+			request:      &csi.ListVolumesRequest{StartingToken: "3"},
+			volumeCount:  linodeclient.DefaultPageSize - 1,
+			expectedPage: 3,
+		},
+		{
+			name:      "non-numeric token is rejected",
+			request:   &csi.ListVolumesRequest{StartingToken: "abc"},
+			expectErr: true,
+		},
+		{
+			name:      "zero token is rejected",
+			request:   &csi.ListVolumesRequest{StartingToken: "0"},
+			expectErr: true,
+		},
+		{
+			name:      "negative token is rejected",
+			request:   &csi.ListVolumesRequest{StartingToken: "-1"},
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := &fakeLinodeClient{volumes: make([]linodego.Volume, test.volumeCount)}
+			cs := &ControllerServer{client: client}
+
+			response, err := cs.ListVolumes(context.Background(), test.request)
+			if test.expectErr {
+				if err == nil {
+					t.Fatal("ListVolumes() expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ListVolumes() error = %v", err)
+			}
+			if client.listOptions.Page != test.expectedPage {
+				t.Errorf("page = %d, want %d", client.listOptions.Page, test.expectedPage)
+			}
+			if client.listOptions.PageSize != linodeclient.DefaultPageSize {
+				t.Errorf("page size = %d, want %d", client.listOptions.PageSize, linodeclient.DefaultPageSize)
+			}
+			if response.GetNextToken() != test.expectedNextToken {
+				t.Errorf("next token = %q, want %q", response.GetNextToken(), test.expectedNextToken)
+			}
+		})
+	}
+}
+
 var _ linodeclient.LinodeClient = &fakeLinodeClient{}
 
 type fakeLinodeClient struct {
-	volumes  []linodego.Volume
-	disks    []linodego.InstanceDisk
-	throwErr bool
+	volumes     []linodego.Volume
+	disks       []linodego.InstanceDisk
+	listOptions *linodego.ListOptions
+	throwErr    bool
 }
 
 func (flc *fakeLinodeClient) ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) {
 	return nil, nil
 }
 
-func (flc *fakeLinodeClient) ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error) {
+func (flc *fakeLinodeClient) ListVolumes(_ context.Context, options *linodego.ListOptions) ([]linodego.Volume, error) {
+	flc.listOptions = options
 	if flc.throwErr {
 		return nil, errors.New("sad times mate")
 	}
