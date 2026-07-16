@@ -6,6 +6,19 @@ import (
 	"github.com/linode/linodego/v2"
 )
 
+// DefaultPageSize is the page size used for all Linode API list calls.
+// 500 is the maximum page size allowed by the Linode API.
+const DefaultPageSize = 500
+
+// DefaultListOptions builds ListOptions for a Linode API list call with the
+// page size pinned to DefaultPageSize. Pass page 0 to fetch all pages, or a
+// 1-based page number to fetch a single page.
+func DefaultListOptions(page int, filter string) *linodego.ListOptions {
+	opts := linodego.NewListOptions(page, filter)
+	opts.PageSize = DefaultPageSize
+	return opts
+}
+
 type LinodeClient interface {
 	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) // Needed for metadata
 	ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error)

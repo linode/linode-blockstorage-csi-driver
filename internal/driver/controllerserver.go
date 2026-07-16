@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"math"
 	"strconv"
 	"time"
 
@@ -351,9 +350,10 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 }
 
 // ListVolumes returns a list of all volumes known to the provider,
-// including their IDs, sizes, and accessibility information. It
-// supports pagination through the starting token and maximum entries
-// parameters as specified in the CSI Driver Spec.
+// including their IDs, sizes, and accessibility information. The starting
+// token is the 1-based page number to fetch; max_entries is intentionally
+// ignored, as pages are always sized to DefaultPageSize to bound the number
+// of Linode API requests.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	log, ctx := logger.GetLogger(ctx)
@@ -365,23 +365,23 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	startingToken := req.GetStartingToken()
 	nextToken := ""
 
-	listOpts := linodego.NewListOptions(0, "")
-	if req.GetMaxEntries() > 0 {
-		listOpts.PageSize = int(req.GetMaxEntries())
-	}
+	// Page is 1-based; DefaultListOptions pins PageSize to the API max so a
+	// full page signals more results and a partial page ends pagination.
+	listOpts := linodeclient.DefaultListOptions(1, "")
 
 	if startingToken != "" {
-		startingPage, errParse := strconv.ParseInt(startingToken, 10, 0)
+		page, errParse := strconv.ParseInt(startingToken, 10, 0)
 		if errParse != nil {
 			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
 				"invalid starting token: %q", startingToken)
 		}
 
-		if startingPage < math.MinInt || startingPage > math.MaxInt {
+		// linodego treats Page == 0 as "fetch all pages", so reject anything below 1.
+		if page < 1 {
 			return &csi.ListVolumesResponse{}, status.Errorf(codes.Aborted,
 				"starting token out of bounds: %q", startingToken)
 		}
-		listOpts.Page = int(startingPage)
+		listOpts.Page = int(page)
 	}
 
 	// List all volumes
@@ -404,7 +404,7 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	}
 
 	// Only set nextToken if we got a full page and there might be more
-	if req.GetMaxEntries() > 0 && len(volumes) >= listOpts.PageSize {
+	if len(volumes) >= linodeclient.DefaultPageSize {
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
 
