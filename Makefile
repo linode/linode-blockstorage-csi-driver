@@ -58,11 +58,10 @@ clean:
 # Dev Setup
 #####################################################################
 
-CLUSTER_NAME         ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
-K8S_VERSION          ?= "v1.29.1"
-CAPI_VERSION         ?= "v1.8.5"
-HELM_VERSION         ?= "v0.2.1"
-CAPL_VERSION         ?= "v0.7.1"
+CLUSTER_NAME         ?= bs-csi-$(shell git rev-parse --short HEAD)
+K8S_VERSION          ?= "v1.36.2"
+CAPI_VERSION         ?= "v1.13.3"
+CAPL_VERSION         ?= "v0.10.7"
 CONTROLPLANE_NODES   ?= 1
 WORKER_NODES         ?= 1
 GRAFANA_PORT ?= 3000
@@ -109,7 +108,7 @@ generate-capl-cluster-manifests:
 create-capl-cluster:
 	# Create a CAPL cluster without CSI driver and wait for it to be ready
 	kubectl apply -f capl-cluster-manifests.yaml
-	kubectl wait --for=condition=ControlPlaneReady cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml)
+	kubectl wait --for=condition=ControlPlaneInitialized cluster/$(CLUSTER_NAME) --timeout=600s || (kubectl get cluster -o yaml; kubectl get linodecluster -o yaml; kubectl get linodemachines -o yaml; kubectl logs -n capl-system deployments/capl-controller-manager --tail=100)
 	kubectl wait --for=condition=NodeHealthy=true machines -l cluster.x-k8s.io/cluster-name=$(CLUSTER_NAME) --timeout=900s
 	clusterctl get kubeconfig $(CLUSTER_NAME) > test-cluster-kubeconfig.yaml
 	KUBECONFIG=$(KUBECONFIG) kubectl wait --for=condition=Ready nodes --all --timeout=600s
@@ -132,8 +131,8 @@ mgmt-cluster:
 	clusterctl init \
 		--wait-providers \
 		--wait-provider-timeout 600 \
+		--addon helm \
 		--core cluster-api:${CAPI_VERSION} \
-		--addon helm:${HELM_VERSION} \
 		--bootstrap kubeadm:$(CAPI_VERSION) \
 		--control-plane kubeadm:$(CAPI_VERSION) \
 		--infrastructure linode-linode:${CAPL_VERSION}
