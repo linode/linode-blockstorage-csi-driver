@@ -58,7 +58,7 @@ clean:
 # Dev Setup
 #####################################################################
 
-CLUSTER_NAME         ?= csi-driver-cluster-$(shell git rev-parse --short HEAD)
+CLUSTER_NAME         ?= bs-csi-$(shell git rev-parse --short HEAD)
 K8S_VERSION          ?= "v1.36.2"
 CAPI_VERSION         ?= "v1.13.3"
 CAPL_VERSION         ?= "v0.10.7"
