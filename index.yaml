@@ -2,6 +2,21 @@ apiVersion: v1
 entries:
   linode-blockstorage-csi-driver:
   - apiVersion: v2
+    appVersion: v1.1.4
+    created: "2026-07-17T16:06:32.604577215Z"
+    description: The Container Storage Interface (CSI) Driver for Linode Block Storage
+      enables container orchestrators such as Kubernetes to manage the life-cycle
+      of persistant storage claims.
+    digest: e2cadcfdeb9af501aa31cfccc37366c8fa130198da4857264e3b02b6ae3e6715
+    home: https://github.com/linode/linode-blockstorage-csi-driver
+    maintainers:
+    - name: linode
+    name: linode-blockstorage-csi-driver
+    type: application
+    urls:
+    - https://github.com/linode/linode-blockstorage-csi-driver/releases/download/helm-v1.1.4/linode-blockstorage-csi-driver-v1.1.4.tgz
+    version: v1.1.4
+  - apiVersion: v2
     appVersion: v1.1.3
     created: "2026-05-14T19:08:33.297346876Z"
     description: The Container Storage Interface (CSI) Driver for Linode Block Storage
@@ -361,4 +376,4 @@ entries:
     urls:
     - https://github.com/linode/linode-blockstorage-csi-driver/releases/download/helm-v0.6.3/linode-blockstorage-csi-driver-v0.6.3.tgz
     version: v0.6.3
-generated: "2026-05-14T19:08:33.297539717Z"
+generated: "2026-07-17T16:06:32.604772911Z"
