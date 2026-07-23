@@ -1,3 +1,4 @@
-# Any file that is not a doc *.md file
+# Any file that is not a doc *.md file or renovate config
 src:
   - "!**/**.md"
+  - "!renovate.json5"
