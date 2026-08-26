@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -58,7 +59,7 @@ type TokenFileProvider struct {
 // NewTokenFileProvider constructs a file-backed token provider.
 func NewTokenFileProvider(path string, cacheTTL time.Duration) *TokenFileProvider {
 	return &TokenFileProvider{
-		path:     path,
+		path:     filepath.Clean(path),
 		cacheTTL: cacheTTL,
 	}
 }
@@ -90,7 +91,11 @@ func (t *TokenFileProvider) GetToken(_ context.Context) (string, error) {
 	}
 	t.mu.RUnlock()
 
-	rawToken, err := os.ReadFile(t.path)
+	cleanPath := filepath.Clean(t.path)
+	if !filepath.IsAbs(cleanPath) {
+		return "", fmt.Errorf("token file path %q must be absolute", cleanPath)
+	}
+	rawToken, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read token file %q: %w", t.String(), err)
 	}

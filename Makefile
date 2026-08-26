@@ -9,12 +9,15 @@ else
 IMAGE_VERSION           ?= $(REV)
 endif
 IMAGE_TAG               ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
-GOLANGCI_LINT_IMG       := golangci/golangci-lint:v2.12-alpine
 RELEASE_DIR             ?= release
 DOCKERFILE              ?= Dockerfile
-GOLANGCI_LINT_VERSION   ?= v2.12.2
 E2E_SELECTOR            ?= all
 LINODE_FIREWALL_ENABLED ?= true
+
+# run in the built container if outside of GHA
+ifndef GITHUB_ACTIONS
+DOCKER_RUN              := docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG)
+endif
 
 #####################################################################
 # OS / ARCH
@@ -33,19 +36,39 @@ endif
 #####################################################################
 .PHONY: fmt
 fmt:
-	docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG) go fmt ./...
+	go fmt ./...
 
 .PHONY: vet
 vet: fmt
-	docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG) go vet ./...
+	$(DOCKER_RUN) go vet ./...
 
 .PHONY: lint
 lint: vet
-	docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG) golangci-lint run -v -c .golangci.yml --fix
+	$(DOCKER_RUN) golangci-lint run -v -c .golangci.yml
+
+.PHONY: lint-fix
+lint-fix: vet
+	$(DOCKER_RUN) golangci-lint run -v -c .golangci.yml --fix
+
+.PHONY: gosec
+gosec: ## Run gosec against code.
+	gosec -exclude-dir=bin -confidence medium -terse -exclude-generated ./...
+
+.PHONY: vulncheck
+vulncheck: ## Run vulnerability check against code.
+	$(DOCKER_RUN) ./hack/vulncheck.sh
+
+.PHONY: build-nilaway
+build-nilaway:
+	mkdir -p ./bin && golangci-lint custom
+
+.PHONY: nilcheck
+nilcheck: build-nilaway
+	$(DOCKER_RUN) ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml
 
 .PHONY: verify
 verify:
-	docker run --rm --platform=$(PLATFORM) -it $(IMAGE_TAG) go mod verify
+	go mod verify
 
 .PHONY: clean
 clean:
@@ -79,7 +102,6 @@ docker-build:
 	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain \
 		-t $(IMAGE_TAG) \
 		--build-arg REV=$(IMAGE_VERSION) \
-		--build-arg GOLANGCI_LINT_VERSION=$(GOLANGCI_LINT_VERSION) \
 		-f ./$(DOCKERFILE) .
 
 .PHONY: docker-push
@@ -161,7 +183,7 @@ generate-mock:
 
 .PHONY: test
 test:
-	docker run --rm --platform=$(PLATFORM) --privileged -it $(IMAGE_TAG) go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS)
+	$(DOCKER_RUN) go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS) -coverprofile ./coverage.out
 
 .PHONY: e2e-test
 e2e-test:
@@ -175,12 +197,6 @@ csi-sanity-test:
 .PHONY: upstream-e2e-tests
 upstream-e2e-tests:
 	OS=$(OS) ARCH=$(ARCH_SHORT) K8S_VERSION=$(K8S_VERSION) KUBECONFIG=$(KUBECONFIG) ./tests/upstream-e2e/run-tests.sh
-
-#####################################################################
-# CI Setup
-#####################################################################
-.PHONY: ci
-ci: vet lint test build
 
 #####################################################################
 # Release
