@@ -9,14 +9,16 @@ else
 IMAGE_VERSION           ?= $(REV)
 endif
 IMAGE_TAG               ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE_VERSION)
+TEST_IMAGE_TAG          ?= $(REGISTRY_NAME)/$(DOCKER_USER)/alpine-libcrypt:$(IMAGE_VERSION)
 RELEASE_DIR             ?= release
 DOCKERFILE              ?= Dockerfile
+TEST_DOCKERFILE         ?= test.Dockerfile
 E2E_SELECTOR            ?= all
 LINODE_FIREWALL_ENABLED ?= true
 
-# run in the built container if outside of GHA
+# run in the built test container if outside of GHA
 ifndef GITHUB_ACTIONS
-DOCKER_RUN              := docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(IMAGE_TAG)
+DOCKER_RUN              := docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(TEST_IMAGE_TAG)
 endif
 
 #####################################################################
@@ -59,7 +61,9 @@ vulncheck: ## Run vulnerability check against code.
 	$(DOCKER_RUN) ./hack/vulncheck.sh
 
 .PHONY: build-nilaway
-build-nilaway:
+build-nilaway: ./bin/golangci-lint-nilaway
+
+./bin/golangci-lint-nilaway:
 	mkdir -p ./bin && golangci-lint custom
 
 .PHONY: nilcheck
@@ -103,6 +107,11 @@ docker-build:
 		-t $(IMAGE_TAG) \
 		--build-arg REV=$(IMAGE_VERSION) \
 		-f ./$(DOCKERFILE) .
+
+docker-build-test:
+	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain \
+                -t $(TEST_IMAGE_TAG) \
+                -f ./$(TEST_DOCKERFILE) .
 
 .PHONY: docker-push
 docker-push:

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -uo pipefail
 trap 'rm -f govulncheck.out' EXIT
+eval "$(mise activate bash)"
+mise trust
+mise install
 govulncheck ./... > govulncheck.out
 RC=$?
 if [[ "${RC}" == 0 ]]; then
