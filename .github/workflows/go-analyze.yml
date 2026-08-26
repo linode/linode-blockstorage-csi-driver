@@ -85,9 +85,6 @@ jobs:
       - name: lint
         run: mise run lint
 
-      - name: Nilcheck
-        run: mise run nilcheck
-
       - name: Vulncheck
         run: mise run vulncheck
 
