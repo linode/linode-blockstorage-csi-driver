@@ -12,13 +12,19 @@ IMAGE_TAG               ?= $(REGISTRY_NAME)/$(DOCKER_USER)/$(IMAGE_NAME):$(IMAGE
 TEST_IMAGE_TAG          ?= $(REGISTRY_NAME)/$(DOCKER_USER)/alpine-libcrypt:$(IMAGE_VERSION)
 RELEASE_DIR             ?= release
 DOCKERFILE              ?= Dockerfile
-TEST_DOCKERFILE         ?= test.Dockerfile
+DEV_DOCKERFILE          ?= Dockerfile.dev
 E2E_SELECTOR            ?= all
 LINODE_FIREWALL_ENABLED ?= true
 
 # run in the built test container if outside of GHA
 ifndef GITHUB_ACTIONS
-DOCKER_RUN              := docker run --rm -w /workdir -v $(PWD):/workdir --platform=$(PLATFORM) -it $(TEST_IMAGE_TAG)
+define DOCKER_RUN
+docker run --rm -w /workdir -v $(PWD):/workdir -v csi-driver-go-build-cache:/root/.cache/go-build --platform=$(PLATFORM) $(TEST_IMAGE_TAG) bash -c 'eval "$$(mise activate bash)" && $(1)'
+endef
+else
+define DOCKER_RUN
+$(1)
+endef
 endif
 
 #####################################################################
@@ -42,23 +48,19 @@ fmt:
 
 .PHONY: vet
 vet: fmt
-	$(DOCKER_RUN) go vet ./...
+	$(call DOCKER_RUN,go vet ./...)
 
 .PHONY: lint
 lint: vet
-	$(DOCKER_RUN) golangci-lint run -v -c .golangci.yml
+	$(call DOCKER_RUN,golangci-lint run -v -c .golangci.yml)
 
 .PHONY: lint-fix
 lint-fix: vet
-	$(DOCKER_RUN) golangci-lint run -v -c .golangci.yml --fix
-
-.PHONY: gosec
-gosec: ## Run gosec against code.
-	gosec -exclude-dir=bin -confidence medium -terse -exclude-generated ./...
+	$(call DOCKER_RUN,golangci-lint run -v -c .golangci.yml --fix)
 
 .PHONY: vulncheck
 vulncheck: ## Run vulnerability check against code.
-	$(DOCKER_RUN) ./hack/vulncheck.sh
+	$(call DOCKER_RUN,./hack/vulncheck.sh)
 
 .PHONY: build-nilaway
 build-nilaway: ./bin/golangci-lint-nilaway
@@ -68,7 +70,7 @@ build-nilaway: ./bin/golangci-lint-nilaway
 
 .PHONY: nilcheck
 nilcheck: build-nilaway
-	$(DOCKER_RUN) ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml
+	$(call DOCKER_RUN,./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml)
 
 .PHONY: verify
 verify:
@@ -108,10 +110,10 @@ docker-build:
 		--build-arg REV=$(IMAGE_VERSION) \
 		-f ./$(DOCKERFILE) .
 
-docker-build-test:
+docker-build-dev:
 	DOCKER_BUILDKIT=1 docker build --platform=$(PLATFORM) --progress=plain \
                 -t $(TEST_IMAGE_TAG) \
-                -f ./$(TEST_DOCKERFILE) .
+                -f ./$(DEV_DOCKERFILE) .
 
 .PHONY: docker-push
 docker-push:
@@ -192,7 +194,7 @@ generate-mock:
 
 .PHONY: test
 test:
-	$(DOCKER_RUN) go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS) -coverprofile ./coverage.out
+	$(call DOCKER_RUN,go test `go list ./... | grep -v ./mocks$$` -cover $(TEST_ARGS) -coverprofile ./coverage.out)
 
 .PHONY: e2e-test
 e2e-test:

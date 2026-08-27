@@ -17,7 +17,6 @@ kustomize = "5.8.1"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.1.4"
 "go:github.com/golang/mock/mockgen" = "1.6.0"
 "go:github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity" = "5.5.0"
-"aqua:securego/gosec" = "2.28.0"
 yq = "4.52.2"
 envsubst = "1.4.3"
 jq = "1.8.2"
@@ -26,10 +25,6 @@ clusterctl = "1.13.3"
 [tasks.fmt]
 description = "Run go fmt"
 run = "make fmt"
-
-[tasks.gosec]
-description = "Run gosec in the project containerized workflow"
-run = "make gosec"
 
 [tasks.vet]
 description = "Run go vet"
