@@ -9,10 +9,12 @@ GOTOOLCHAIN = "auto"
 ctlptl = "0.9.4"
 ginkgo = "2.32.0"
 go = "1.26.7"
+golangci-lint = "2.11.4"
 kind = "0.32.0"
 kubectl = "1.36.2"
 kustomize = "5.8.1"
 "go:github.com/kyverno/chainsaw" = "0.2.15"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.1.4"
 "go:github.com/golang/mock/mockgen" = "1.6.0"
 "go:github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity" = "5.5.0"
 yq = "4.52.2"
@@ -20,13 +22,33 @@ envsubst = "1.4.3"
 jq = "1.8.2"
 clusterctl = "1.13.3"
 
+[tasks.fmt]
+description = "Run go fmt"
+run = "make fmt"
+
+[tasks.vet]
+description = "Run go vet"
+run = "make vet"
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "make lint"
+
+[tasks.lint-fix]
+description = "Run golangci-lint --fix"
+run = "make lint-fix"
+
+[tasks.nilcheck]
+description = "Run nilaway lint checks"
+run = "make nilcheck"
+
+[tasks.vulncheck]
+description = "Run go vulncheck"
+run = "make vulncheck"
+
 [tasks.build]
 description = "Build the binary"
 run = "make build"
-
-[tasks.lint]
-description = "Run lint"
-run = "make lint"
 
 [tasks.test]
 description = "Run integration tests"

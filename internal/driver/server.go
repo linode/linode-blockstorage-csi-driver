@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -130,6 +130,9 @@ func (s *nonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, c
 	urlObj, err := url.Parse(endpoint)
 	if err != nil {
 		klog.Fatal(err.Error())
+	}
+	if urlObj == nil {
+		klog.Fatal("invalid endpoint")
 	}
 
 	var addr string
