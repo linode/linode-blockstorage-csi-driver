@@ -567,6 +567,9 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 	if err != nil {
 		return nil, err
 	}
+	if vol == nil {
+		return nil, errInternal("volume was not created")
+	}
 
 	// Check if the created volume's size matches the requested size.
 	// if not, and sourceInfo is nil, it indicates that the volume was not created from a source.
