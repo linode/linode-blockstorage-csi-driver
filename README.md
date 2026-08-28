@@ -1,8 +1,32 @@
 # Linode Block Storage CSI Driver
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/linode/linode-blockstorage-csi-driver)](https://goreportcard.com/report/github.com/linode/linode-blockstorage-csi-driver)
-[![codecov](https://codecov.io/gh/linode/linode-blockstorage-csi-driver/graph/badge.svg?token=b5HeEgMdAd)](https://codecov.io/gh/linode/linode-blockstorage-csi-driver)
-[![Docker Pulls](https://img.shields.io/docker/pulls/linode/linode-blockstorage-csi-driver.svg)](https://hub.docker.com/r/linode/linode-blockstorage-csi-driver/)
+<p align="center">
+<!-- go doc / reference card -->
+<a href="https://pkg.go.dev/github.com/linode/linode-blockstorage-csi-driver">
+<img src="https://pkg.go.dev/badge/github.com/linode/linode-blockstorage-csi-driver.svg"></a>
+<!-- codecov badge -->
+<a href="https://codecov.io/github/linode/linode-blockstorage-csi-driver" > 
+<img src="https://codecov.io/github/linode/linode-blockstorage-csi-driver/graph/badge.svg?token=YQFKF86KJ6"/> 
+</a>
+<!-- docker pulls badge -->
+<a href="https://hub.docker.com/r/linode/linode-blockstorage-csi-driver/" > 
+<img src="https://img.shields.io/docker/pulls/linode/linode-blockstorage-csi-driver.svg"/> 
+</a>
+<!-- join kubernetes slack channel for linode -->
+<a href="https://kubernetes.slack.com/messages/CD4B15LUR">
+<img src="https://img.shields.io/badge/join%20slack-%23linode-brightgreen"></a>
+<!-- PRs welcome -->
+<a href="http://makeapullrequest.com">
+<img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
+</p>
+<p align="center">
+<!-- go build / test CI -->
+<a href="https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/ci.yml">
+<img src="https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/ci.yml/badge.svg"></a>
+<!-- image build CI -->
+<a href="https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/release.yml">
+<img src="https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/release.yml/badge.svg"></a>
+</p>
 
 ## Table of Contents
 
