@@ -84,16 +84,16 @@ return status.Error(codes.ResourceExhausted, "max volumes per node exceeded")
 ```bash
 # Build in container (required for consistent cross-platform builds)
 export DOCKERFILE=Dockerfile.dev  # Use dev Dockerfile for development
-make docker-build
+mise run image-build
 
 # Run unit tests (in container)
-make test
+mise run test
 
 # Generate mocks after interface changes
-make generate-mock
+mise run generate-mock
 
 # Full CI pipeline
-make ci  # vet + lint + test + build
+mise run ci  # vet + lint + test + build
 ```
 
 ### E2E Testing Workflow
@@ -101,16 +101,16 @@ The project uses a sophisticated E2E setup with CAPI (Cluster API) and CAPL (Clu
 
 ```bash
 # Create management cluster + workload cluster with CSI driver
-make mgmt-and-capl-cluster
+mise run mgmt-and-capl-cluster
 
 # Run E2E tests with chainsaw
-make e2e-test
+mise run e2e-test
 
 # Run CSI sanity tests
-make csi-sanity-test
+mise run csi-sanity-test
 
 # Clean up clusters
-make cleanup-cluster
+mise run cleanup-cluster
 ```
 
 Environment variables required:
@@ -119,7 +119,7 @@ Environment variables required:
 
 ### Release Process
 ```bash
-make release IMAGE_VERSION=v1.2.3
+IMAGE_VERSION=v1.2.3 mise run release
 ```
 Generates release manifests and Helm chart in `release/` directory.
 
@@ -218,7 +218,7 @@ CreateVolume → ControllerPublishVolume → NodeStageVolume → NodePublishVolu
 ### Mock Generation
 All interfaces have generated mocks in `mocks/`. Regenerate after interface changes:
 ```bash
-make generate-mock
+mise run generate-mock
 ```
 
 ### Test Structure
