@@ -1,10 +1,14 @@
-## 💡 Example Usage
+---
+nav_order: 3
+---
 
-This repository contains example manifests that demonstrate the usage of the Linode BlockStorage CSI Driver. These manifests create a PersistentVolumeClaim (PVC) using the `linode-block-storage-retain` storage class and then consume it in a minimal pod. 
+# 💡 Example Usage
+
+This repository contains example manifests that demonstrate the usage of the Linode BlockStorage CSI Driver. These manifests create a PersistentVolumeClaim (PVC) using the `linode-block-storage-retain` storage class and then consume it in a minimal pod.
 
 You can find more example manifests [here](https://github.com/linode/linode-blockstorage-csi-driver/tree/main/internal/driver/examples/kubernetes).
 
-### Creating a PersistentVolumeClaim
+## Creating a PersistentVolumeClaim
 
 ```sh
 kubectl create -f https://raw.githubusercontent.com/linode/linode-blockstorage-csi-driver/master/internal/driver/examples/kubernetes/csi-pvc.yaml

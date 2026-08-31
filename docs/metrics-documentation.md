@@ -1,12 +1,18 @@
-## Grafana Dashboard Documentation: **CSI Driver Metrics**
+---
+nav_order: 8
+---
 
-### 1. **Introduction**
+# 📈 Grafana Dashboard Documentation: **CSI Driver Metrics**
+
+## 1. Introduction
+
 This Grafana dashboard provides an in-depth view of the CSI Driver operations for Linode Block Storage, with real-time data on volume creation, deletion, publication, and expansion. It also tracks persistent volume claims and potential runtime errors. The data is sourced from Prometheus, making it ideal for monitoring and diagnosing issues with CSI Driver operations.
 
-### 2. **Dashboard Structure**
+## 2. Dashboard Structure
+
 The dashboard is divided into several panels. Each panel focuses on a different aspect of CSI Driver operations, including Create/Delete/Publish Volume requests, runtime operation errors, and Persistent Volume (PV) and Persistent Volume Claim (PVC) events.
 
-##### **Key points to know in-order to understand the graphs**:
+### **Key points to know in-order to understand the graphs**
 
 - The below graphs are metrics obtained from the following resources
   - sidecars
@@ -21,11 +27,11 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-### 3. **Sidecar Metrics**
+## 3. Sidecar Metrics
 
 ---
 
-#### **Controller Create Volume**
+### Controller Create Volume
 
 - **Create Volume Requests**
   - **Description**: This graph represents the total number of requests made to create volumes in the cluster.
@@ -46,7 +52,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Controller Delete Volume**
+### Controller Delete Volume
 
 - **Delete Volume Requests**
   - **Description**: Shows the number of requests to delete volumes through the CSI Driver.
@@ -66,7 +72,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Controller Expand Volume**
+### Controller Expand Volume
 
 - **Expand Volume Requests**
   - **Description**: Monitors requests to expand volumes.
@@ -86,7 +92,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Controller Publish Volume**
+### Controller Publish Volume
 
 - **Publish Volume Requests**
   - **Description**: The number of requests made to attach or publish volumes to nodes.
@@ -106,7 +112,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Controller Unpublish Volume**
+### Controller Unpublish Volume
 
 - **Unpublish Volume Requests**
   - **Description**: Tracks the number of requests to unpublish volumes.
@@ -127,11 +133,11 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-### 4. **Additional Metrics**
+## 4. Additional Metrics
 
 ---
 
-#### **Persistent Volumes (PV)**
+### Persistent Volumes (PV)
 
 - **Description**: Displays the total number of PV-related events that the CSI controller processed.
 - **Query**: `workqueue_adds_total{name="volumes"}`
@@ -139,9 +145,10 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 - **Y-axis**: Number of PVRs made over time.
 - **Graph**:  
   ![Persistent Volumes](example-images/sidecars/pvr.jpg)
+
 ---
 
-#### **Volume Claims (PVC)**
+### Volume Claims (PVC)
 
 - **Description**: Tracks the number of PVC-related events that the controller reconciles.
 - **Query**: `workqueue_adds_total{name="claims"}`
@@ -152,7 +159,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Runtime Operation Errors**
+### Runtime Operation Errors
 
 - **Description**: Visualizes errors encountered by the CSI Driver during operations.
 - **Query**: `kubelet_runtime_operations_errors_total`
@@ -163,7 +170,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **CSI Sidecar Operations Seconds Sum**
+### CSI Sidecar Operations Seconds Sum
 
 - **Description**: Shows the cumulative time taken for operations handled by CSI sidecars (attacher, provisioner, etc.).
 - **Query**: `csi_sidecar_operations_seconds_sum`
@@ -174,11 +181,11 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-### 5. **Node Server Metrics**
+## 5. Node Server Metrics
 
 ---
 
-#### **Expand volume**
+### Expand Volume
 
 - **Description**: Shows the time taken for expand volume operation
 - **Query**: `csi_node_expand_duration_seconds_count{functionStatus="true"}`
@@ -189,7 +196,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Stage volume**
+### Stage Volume
 
 - **Description**: Shows the time taken for stage volume operation
 - **Query**: `csi_node_stage_duration_seconds_count{functionStatus="true"}`
@@ -200,7 +207,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Unstage volume**
+### Unstage Volume
 
 - **Description**: Shows the time taken for unstage volume operation
 - **Query**: `csi_node_unstage_duration_seconds_count{functionStatus="true"}`
@@ -211,7 +218,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Publish volume**
+### Publish Volume
 
 - **Description**: Shows the time taken for publish volume operation
 - **Query**: `csi_node_publish_duration_seconds_count{functionStatus="true"}`
@@ -222,7 +229,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Unpublish volume**
+### Unpublish Volume
 
 - **Description**: Shows the time taken for unpublish volume operation
 - **Query**: `csi_node_unpublish_duration_seconds_count{functionStatus="true"}`
@@ -233,11 +240,11 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-### 6. **Controller Server Metrics**
+## 6. Controller Server Metrics
 
 ---
 
-#### **Create Volume**
+### Create Volume
 
 - **Description**: This graph tracks the time taken for each "Create Volume" request made by the CSI driver on a Kubernetes node.
 - **Query**: `csi_controller_create_volume_duration_seconds_count{functionStatus="true"}`
@@ -248,7 +255,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Delete Volume**
+### Delete Volume
 
 - **Description**: This graph tracks the time taken for "Delete Volume" operations.
 - **Query**: `csi_controller_delete_volume_duration_seconds_count{functionStatus="true"}`
@@ -259,7 +266,7 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Publish Volume**
+### Publish Volume
 
 - **Description**: This graph records the time taken to publish (attach) a volume to a node within the Kubernetes cluster.
 - **Query**: `csi_controller_publish_volume_duration_seconds_count{functionStatus="true"}`
@@ -270,11 +277,11 @@ The dashboard is divided into several panels. Each panel focuses on a different 
 
 ---
 
-#### **Unpublish Volume**
+### Unpublish Volume
 
 - **Description**: This graph shows the time taken for each "Unpublish Volume" operation, where a volume is detached from the node.
 - **Query**: `csi_controller_unpublish_volume_duration_seconds_count{functionStatus="true"}`
 - **X-axis**: Timeline of the unpublish operations.
 - **Y-axis**: Time taken for each unpublish operation.
 - **Graph**:
-  ![Unpublish Volume](example-images/controller-server/unpublish-volume.jpg) 
+  ![Unpublish Volume](example-images/controller-server/unpublish-volume.jpg)

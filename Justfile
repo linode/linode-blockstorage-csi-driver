@@ -30,6 +30,10 @@ grafana_username := env_var_or_default("GRAFANA_USERNAME", "admin")
 grafana_password := env_var_or_default("GRAFANA_PASSWORD", "admin")
 data_retention_period := env_var_or_default("DATA_RETENTION_PERIOD", "15d")
 kubeconfig := env_var_or_default("KUBECONFIG", "test-cluster-kubeconfig.yaml")
+docs_image := "jekyll/jekyll:pages"
+docs_container := "linode-blockstorage-csi-driver-docs"
+docs_port := "4000"
+docs_livereload_port := "35729"
 
 # Format Go source files.
 fmt:
@@ -163,6 +167,15 @@ clean:
 # Build the CSI driver binary.
 build:
     CGO_ENABLED=1 go build -o linode-blockstorage-csi-driver -a -ldflags '-X main.vendorVersion={{ image_version }}' ./main.go
+
+# Serve the documentation site locally with live reload.
+serve-docs:
+    @echo "Serving the docs on http://localhost:{{ docs_port }}, press Ctrl-C to stop"
+    docker run --rm --interactive --tty --name {{ docs_container }} --publish {{ docs_port }}:4000 --publish {{ docs_livereload_port }}:35729 --volume "{{ justfile_directory() }}:/srv/jekyll" {{ docs_image }} jekyll serve --host 0.0.0.0 --livereload --force-polling
+
+# Build the documentation site the way GitHub Pages does.
+build-docs:
+    docker run --rm --volume "{{ justfile_directory() }}:/srv/jekyll" {{ docs_image }} jekyll build
 
 # Build the driver container image.
 docker-build:

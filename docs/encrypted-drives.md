@@ -1,3 +1,9 @@
+---
+nav_order: 4
+---
+
+# 🔒 Encrypted Storage
+
 ## 📜 Table of Contents
 
 1. [🔒 Encrypted Block Storage](#encrypted-block-storage)
@@ -9,7 +15,7 @@
 
 **NOTE**: LUKS encryption allows users to bring their own keys and manage them, while BlockStorage encryption is managed by Linode and it's automatically handled on the backend.
 
-### Encrypted Block Storage
+## Encrypted Block Storage
 
 **Notes**:
 
@@ -21,11 +27,11 @@
 
 3. **Default StorageClass Annotation**: By marking both StorageClasses with `storageclass.kubernetes.io/is-default-class: "true"`, they’re eligible to act as default classes. However, Kubernetes will only treat one StorageClass as the actual default. Consider applying this annotation only to the preferred default StorageClass.
 4. **Region Compatibility**: Ensure that encryption is supported in the Linode region where the volumes will be created. If encryption is not available in a specific region, the CSI driver will return an error.
-   - To check if the region has encryption capability visit https://techdocs.akamai.com/linode-api/reference/get-regions
+   - To check if the region has encryption capability visit <https://techdocs.akamai.com/linode-api/reference/get-regions>
    - For your specific region, check the `capabilities` and see if `Block Storage Encryption` is listed in it.
 5. **Usage in PersistentVolumeClaims (PVCs)**: Use the `storageClassName` field in a PVC to reference the desired StorageClass (`linode-block-storage-encrypted` or `linode-block-storage-retain-encrypted`). Each PVC will inherit the encryption settings defined in the referenced StorageClass.
 
-#### Example StorageClass with BlockStorage
+### Example StorageClass with BlockStorage
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -50,7 +56,7 @@ provisioner: linodebs.csi.linode.com
 reclaimPolicy: Retain
 ```
 
-#### Example PVC for BlockStorage
+### Example PVC for BlockStorage
 
 ```yaml
 apiVersion: v1
@@ -80,7 +86,7 @@ spec:
 
 ---
 
-### Encrypted Drives using LUKS
+## Encrypted Drives using LUKS
 
 **Notes:**
 
@@ -94,7 +100,7 @@ spec:
     The CSI driver is careful to otherwise keep the secret on an ephemeral tmpfs
     mount and otherwise refuses to continue.
 
-#### Example StorageClass with LUKS
+### Example StorageClass with LUKS
 
 > [!TIP]
 > To use an encryption key per PVC you can make a new StorageClass/Secret
@@ -127,7 +133,7 @@ stringData:
   luksKey: "SECRETGOESHERE"  
 ```
 
-#### Example PVC with LUKS
+### Example PVC with LUKS
 
 ```yaml
 apiVersion: v1
@@ -154,4 +160,5 @@ spec:
       storage: 10Gi
   storageClassName: linode-block-storage-retain-luks
 ```
+
 ---

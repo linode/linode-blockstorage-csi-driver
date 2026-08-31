@@ -1,3 +1,7 @@
+---
+nav_order: 12
+---
+
 # 🤝 Contributing Guidelines
 
 :+1::tada: First off, we appreciate you taking the time to contribute! THANK YOU! :tada::+1:
@@ -27,21 +31,26 @@ Detailed bug reports and requests are easier for us to work with. Please include
 We follow the [fork and pull model](https://opensource.guide/how-to-contribute/#opening-a-pull-request) for open source contributions.
 
 Tips for a faster merge:
- * address one feature or bug per pull request. 
- * large formatting changes make it hard for us to focus on your work.
- * follow language coding conventions.
- * make sure that tests pass.
- * make sure your commits are atomic, [addressing one change per commit](https://chris.beams.io/posts/git-commit/). 
- * add tests!
+
+* address one feature or bug per pull request.
+* large formatting changes make it hard for us to focus on your work.
+* follow language coding conventions.
+* make sure that tests pass.
+* make sure your commits are atomic, [addressing one change per commit](https://chris.beams.io/posts/git-commit/).
+* add tests!
 
 ## Cutting Releases
+
 When a release is published, the [release workflow](https://github.com/linode/linode-blockstorage-csi-driver/actions/workflows/release.yml) builds and pushes the docker image to Dockerhub.
 
 ## Code of Conduct
-This project follows the [Linode Community Code of Conduct](https://www.linode.com/community/questions/conduct). 
+
+This project follows the [Linode Community Code of Conduct](https://www.linode.com/community/questions/conduct).
 
 ## Vulnerability Reporting
+
 If you discover a potential security issue in this project we ask that you notify Linode Security via our [vulnerability reporting process](https://hackerone.com/linode). Please do **not** create a public github issue.
 
 ## Licensing
+
 See the [LICENSE file](/LICENSE) for our project's licensing.

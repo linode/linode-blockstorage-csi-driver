@@ -51,6 +51,14 @@ run = "just vulncheck"
 description = "Build the binary"
 run = "just build"
 
+[tasks.serve-docs]
+description = "Serve the documentation site locally with live reload"
+run = "just serve-docs"
+
+[tasks.build-docs]
+description = "Build the documentation site the way GitHub Pages does"
+run = "just build-docs"
+
 [tasks.test]
 description = "Run integration tests"
 run = "just test"

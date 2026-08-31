@@ -1,4 +1,8 @@
-# Observability for CSI Driver
+---
+nav_order: 7
+---
+
+# 📊 Observability for CSI Driver
 
 This document explains how to use the `grafana-dashboard` and `setup-tracing` mise tasks to install and configure observability tools.
 

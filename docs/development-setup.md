@@ -1,6 +1,10 @@
-## 🛠️ Developer Setup
+---
+nav_order: 10
+---
 
-### 📦 Prerequisites
+# 🛠️ Developer Setup
+
+## 📦 Prerequisites
 
 - **Go**: Ensure you have Go installed. You can download it from [here](https://golang.org/dl/).
 - **Docker**: Required for building and testing Docker images. Download from [here](https://www.docker.com/get-started).
@@ -8,7 +12,7 @@
 - **Helm**: Package manager for Kubernetes. Install instructions [here](https://helm.sh/docs/intro/install/).
 - **Mise**: For managing development environments. Install instructions [here](https://mise.jdx.dev/getting-started.html).
 
-### 🚀 Setting Up the Local Development Environment
+## 🚀 Setting Up the Local Development Environment
 
 1. **Clone the Repository**
 
@@ -23,12 +27,13 @@
 mise install
 ```
 
-3. Run commands through mise so the pinned toolchain is used:
+1. Run commands through mise so the pinned toolchain is used:
 
 ```bash
 mise run test
 ```
-4. **Setup Environment Variables**
+
+1. **Setup Environment Variables**
 
     Create a `.env` file in the root directory or export them directly in your shell:
 
@@ -40,7 +45,7 @@ mise run test
     export LINODE_MACHINE_TYPE=g6-standard-2
     ```
 
-### 🛠️ Building the Project
+## 🛠️ Building the Project
 
 To build the project binaries in a container(builds are run in a docker container to allow consistent builds regardless of underlying unix/linux systems):
 
@@ -48,7 +53,7 @@ To build the project binaries in a container(builds are run in a docker containe
 mise run image-build
 ```
 
-### 🧪 Running Unit Tests
+## 🧪 Running Unit Tests
 
 Unit tests, vetting, and linting automatically build and use the Dockerfile.dev image. Formatting and dependency verification run directly through the mise-managed Go toolchain:
 
@@ -56,7 +61,7 @@ Unit tests, vetting, and linting automatically build and use the Dockerfile.dev 
 mise run test
 ```
 
-### 🧪 Create a Development Cluster
+## 🧪 Create a Development Cluster
 
 To set up a development cluster for running any e2e testing/workflows, follow these steps:
 
@@ -98,7 +103,7 @@ This will create a testing cluster with the necessary components to run end-to-e
 
 For more detailed instructions on running the actual end-to-end tests, refer to the [e2e Tests README](./testing.md).
 
-### 🔧 Linting and Formatting
+## 🔧 Linting and Formatting
 
 Ensure your code adheres to the project's coding standards by running:
 
@@ -106,7 +111,6 @@ Ensure your code adheres to the project's coding standards by running:
 mise run lint
 ```
 
-### 📝 Documentation
+## 📝 Documentation
 
 Update and maintain documentation as you develop new features or make changes. Ensure that all new functionalities are well-documented in the `README.md` or relevant documentation files.
-
