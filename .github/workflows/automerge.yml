@@ -1,0 +1,39 @@
+name: 'Auto Merge GH-Pages'
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  merge-main-to-gh-pages:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # Full clone necessary for proper merge
+
+      - name: Set git config
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+
+      - name: Merge main into gh-pages
+        run: |
+          git checkout gh-pages
+          git pull
+          git merge --no-ff main -m "Automatically merge main into gh-pages"
+          git push

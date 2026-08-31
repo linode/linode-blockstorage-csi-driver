@@ -1,0 +1,41 @@
+remote_theme: just-the-docs/just-the-docs
+
+# GitHub Pages turns the plugins below on by default; a local `jekyll build`
+# does not, which is why pages that rely on them (markdown without front
+# matter, titles taken from the first heading) are missing from the local nav
+# unless they are listed here. Listing them changes nothing in production.
+plugins:
+  - jekyll-remote-theme
+  - jekyll-default-layout
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-relative-links
+  - jekyll-titles-from-headings
+
+title: Linode Block Storage CSI Driver
+search_enabled: true
+heading_anchors: true
+color_scheme: dark
+
+# Everything that is not documentation. Without this the site carries the whole
+# Go tree, and CHANGELOG.md is published as a stray page nothing links to.
+exclude:
+  - bin/
+  - deploy/
+  - hack/
+  - helm-chart/
+  - internal/
+  - mocks/
+  - observability/
+  - pkg/
+  - tests/
+  - vendor/
+  - CHANGELOG.md
+  - codecov.yml
+  - coverage.out
+  - Dockerfile
+  - Dockerfile.dev
+  - main.go
+  - Makefile
+  - mise.toml
+  - renovate.json5

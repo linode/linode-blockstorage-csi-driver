@@ -1,16 +1,21 @@
-# Linode Block Storage CSI Driver
+---
+nav_order: 1
+permalink: /
+---
+
+# 💾 Linode Block Storage CSI Driver
 
 <p align="center">
 <!-- go doc / reference card -->
 <a href="https://pkg.go.dev/github.com/linode/linode-blockstorage-csi-driver">
 <img src="https://pkg.go.dev/badge/github.com/linode/linode-blockstorage-csi-driver.svg"></a>
 <!-- codecov badge -->
-<a href="https://codecov.io/github/linode/linode-blockstorage-csi-driver" > 
-<img src="https://codecov.io/github/linode/linode-blockstorage-csi-driver/graph/badge.svg?token=YQFKF86KJ6"/> 
+<a href="https://codecov.io/github/linode/linode-blockstorage-csi-driver" >
+<img src="https://codecov.io/github/linode/linode-blockstorage-csi-driver/graph/badge.svg?token=YQFKF86KJ6"/>
 </a>
 <!-- docker pulls badge -->
-<a href="https://hub.docker.com/r/linode/linode-blockstorage-csi-driver/" > 
-<img src="https://img.shields.io/docker/pulls/linode/linode-blockstorage-csi-driver.svg"/> 
+<a href="https://hub.docker.com/r/linode/linode-blockstorage-csi-driver/" >
+<img src="https://img.shields.io/docker/pulls/linode/linode-blockstorage-csi-driver.svg"/>
 </a>
 <!-- join kubernetes slack channel for linode -->
 <a href="https://kubernetes.slack.com/messages/CD4B15LUR">
@@ -30,7 +35,7 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Overview](#-overview)
 - [Deployment](docs/deployment.md)
   - [Requirements](docs/deployment.md#-requirements)
   - [Secure a Linode API Access Token](docs/deployment.md#-secure-a-linode-api-access-token)
@@ -57,7 +62,7 @@
   - [Tracing](docs/tracing-documentation.md)
     - [How to opt-in for Tracing](docs/observability.md#steps-to-opt-in-for-tracing-in-the-csi-driver)
 - [License](#license)
-- [Disclaimers](#-disclaimers)
+- [Disclaimers](#️-disclaimers)
 - [Community](#-join-us-on-slack)
 
 ## 📚 Overview

@@ -1,8 +1,12 @@
-## 🏷️ Adding Tags to Created Volumes
+---
+nav_order: 5
+---
+
+# 🏷️ Adding Tags to Created Volumes
 
 Add tags to volumes for better tracking by specifying the `linodebs.csi.linode.com/volumeTags` parameter.
 
-#### 🔑 Example StorageClass with Tags
+## 🔑 Example StorageClass with Tags
 
 ```yaml
 allowVolumeExpansion: true

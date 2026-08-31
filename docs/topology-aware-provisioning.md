@@ -1,4 +1,8 @@
-## 🌐 Topology-Aware Provisioning
+---
+nav_order: 6
+---
+
+# 🌐 Topology-Aware Provisioning
 
 This CSI driver supports topology-aware provisioning, optimizing volume placement based on the physical infrastructure layout.
 
@@ -11,7 +15,7 @@ This CSI driver supports topology-aware provisioning, optimizing volume placemen
 > [!IMPORTANT]
 > Make sure you are using the latest release v0.8.6+ to utilize the remote provisioning feature.
 
-#### 📝 Example StorageClass and PVC
+## 📝 Example StorageClass and PVC
 
 ```yaml
 allowVolumeExpansion: true
@@ -38,7 +42,7 @@ spec:
 
 > **Important**: The `volumeBindingMode: WaitForFirstConsumer` setting is crucial for topology-aware provisioning. It delays volume binding and creation until a pod using the PVC is scheduled. This allows the system to consider the pod's scheduling requirements and node assignment when selecting the most appropriate storage location, ensuring optimal data locality and performance.
 
-#### 🖥️ Example Pod
+## 🖥️ Example Pod
 
 ```yaml
 apiVersion: v1
@@ -71,14 +75,16 @@ This example demonstrates how to set up topology-aware provisioning using the Li
 
 > [!IMPORTANT]
 > To enable topology-aware provisioning, make sure to pass the following argument to the csi-provisioner sidecar:
-> ```
+>
+> ```text
 > --feature-gates=CSINodeInfo=true
 > ```
+>
 > This enables the CSINodeInfo feature gate, which is required for topology-aware provisioning to function correctly.
-> 
+>
 > Note: This feature is enabled by default in release v0.8.6 and later versions.
 
-#### Provisioning Process
+## Provisioning Process
 
 1. CO (Kubernetes) determines required topology based on application needs (pod scheduled region) and cluster layout.
 2. external-provisioner gathers topology requirements from CO and includes `TopologyRequirement` in `CreateVolume` call.

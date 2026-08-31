@@ -45,3 +45,7 @@ coverage.txt
 *junit.xml
 .devbox/*
 .envrc
+
+# Jekyll local preview
+_site/
+.sass-cache/
