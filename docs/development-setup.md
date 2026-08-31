@@ -50,10 +50,9 @@ mise run image-build
 
 ### 🧪 Running Unit Tests
 
-To run the unit tests, use the Dockerfile.dev that copies the directory into the container allowing us to run make targets:
+Unit tests, vetting, and linting automatically build and use the Dockerfile.dev image. Formatting and dependency verification run directly through the mise-managed Go toolchain:
 
 ```sh
-export DOCKERFILE=Dockerfile.dev
 mise run test
 ```
 
@@ -74,17 +73,17 @@ To set up a development cluster for running any e2e testing/workflows, follow th
 
     ```sh
     # Build the Docker image with your changes
-    mise run image-build IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test
+    IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test mise run image-build
 
     # Push the image to the container registry
-    mise run image-push IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test
+    IMAGE_TAG=ghcr.io/yourusername/linode-blockstorage-csi-driver:test mise run image-push
     ```
 
     Note: Replace `yourusername` with your actual GitHub username or organization name.
 
     If you need to make changes to the Dockerfile or build process:
     1. Modify the `Dockerfile` in the project root if needed.
-    2. Update the `Makefile` if you need to change build arguments or processes.
+    2. Update the `Justfile` if you need to change build arguments or processes.
     3. If you've added new dependencies, ensure they're properly included in the build.
 
     After pushing, verify that your image is available in the GitHub Container Registry before proceeding to create the test cluster.
