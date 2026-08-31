@@ -1,50 +1,48 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - rbac.yaml
+- rbac.yaml
 namespace: kube-system
-patchesStrategicMerge:
-  - |-
+patches:
+- patch: |-
+    - op: replace
+      path: /metadata/name
+      value: external-resizer-role
+  target:
+    group: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: external-resizer-runner
+    version: v1
+- patch: |-
+    - op: replace
+      path: /metadata/name
+      value: csi-controller-resizer-binding
+    - op: replace
+      path: /subjects/0/name
+      value: csi-controller-sa
+    - op: replace
+      path: /subjects/0/namespace
+      value: kube-system
+  target:
+    group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+    name: csi-resizer-role
+    version: v1
+- patch: |-
     kind: RoleBinding
     apiVersion: rbac.authorization.k8s.io/v1
     metadata:
       name: csi-resizer-role-cfg
     $patch: delete
-  - |-
+- patch: |-
     kind: Role
     apiVersion: rbac.authorization.k8s.io/v1
     metadata:
       name: external-resizer-cfg
     $patch: delete
-  - |-
+- patch: |-
     apiVersion: v1
     kind: ServiceAccount
     metadata:
       name: csi-resizer
     $patch: delete
-patchesJson6902:
-  - target:
-      group: rbac.authorization.k8s.io
-      version: v1
-      kind: ClusterRole
-      name: external-resizer-runner
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: external-resizer-role
-  - target:
-      group: rbac.authorization.k8s.io
-      version: v1
-      kind: ClusterRoleBinding
-      name: csi-resizer-role
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: csi-controller-resizer-binding
-      - op: replace
-        path: /subjects/0/name
-        value: csi-controller-sa
-      - op: replace
-        path: /subjects/0/namespace
-        value: kube-system
-   

@@ -1,0 +1,119 @@
+package linodeclient
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/linode/linodego/v2"
+)
+
+// DefaultPageSize is the page size used for all Linode API list calls.
+// 500 is the maximum page size allowed by the Linode API.
+const DefaultPageSize = 500
+
+// DefaultListOptions builds ListOptions for a Linode API list call with the
+// page size pinned to DefaultPageSize. Pass page 0 to fetch all pages, or a
+// 1-based page number to fetch a single page.
+func DefaultListOptions(page int, filter string) *linodego.ListOptions {
+	opts := linodego.NewListOptions(page, filter)
+	opts.PageSize = DefaultPageSize
+	return opts
+}
+
+type LinodeClient interface {
+	ListInstances(context.Context, *linodego.ListOptions) ([]linodego.Instance, error) // Needed for metadata
+	ListVolumes(context.Context, *linodego.ListOptions) ([]linodego.Volume, error)
+	ListInstanceVolumes(ctx context.Context, instanceID int, options *linodego.ListOptions) ([]linodego.Volume, error)
+	ListInstanceDisks(ctx context.Context, instanceID int, options *linodego.ListOptions) ([]linodego.InstanceDisk, error)
+
+	GetRegion(ctx context.Context, regionID string) (*linodego.Region, error)
+	GetInstance(context.Context, int) (*linodego.Instance, error)
+	GetVolume(context.Context, int) (*linodego.Volume, error)
+
+	CreateVolume(context.Context, linodego.VolumeCreateOptions) (*linodego.Volume, error)
+	CloneVolume(context.Context, int, linodego.VolumeCloneOptions) (*linodego.Volume, error)
+
+	AttachVolume(context.Context, int, *linodego.VolumeAttachOptions) (*linodego.Volume, error)
+	DetachVolume(context.Context, int) error
+
+	WaitForVolumeLinodeID(context.Context, int, *int) (*linodego.Volume, error)
+	WaitForVolumeStatus(context.Context, int, linodego.VolumeStatus) (*linodego.Volume, error)
+	DeleteVolume(context.Context, int) error
+
+	ResizeVolume(context.Context, int, linodego.VolumeResizeOptions) error
+
+	NewEventPoller(context.Context, any, linodego.EntityType, linodego.EventAction) (*linodego.EventPoller, error)
+}
+
+// linodego.Client implements LinodeClient
+var _ LinodeClient = (*linodego.Client)(nil)
+
+type tokenTransport struct {
+	base          http.RoundTripper
+	tokenProvider TokenProvider
+}
+
+func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	token, err := t.tokenProvider(req.Context())
+	if err != nil {
+		return nil, err
+	}
+
+	clone := req.Clone(req.Context())
+	// Node plugin may intentionally supply an empty token (no Linode API calls).
+	// Omit Authorization rather than sending "Bearer " with no credentials.
+	if token != "" {
+		clone.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(clone)
+}
+
+// NewLinodeClient creates a Linode API client authenticated with a static token.
+// Prefer NewLinodeClientWithTokenProvider when tokens may rotate without restart.
+func NewLinodeClient(token, ua, apiURL string) (*linodego.Client, error) {
+	return NewLinodeClientWithTokenProvider(ua, apiURL, StaticTokenProvider(token))
+}
+
+// NewLinodeClientWithTokenProvider creates a Linode API client that obtains the
+// Authorization bearer token from tokenProvider on each HTTP request.
+func NewLinodeClientWithTokenProvider(ua, apiURL string, tokenProvider TokenProvider) (*linodego.Client, error) {
+	if tokenProvider == nil {
+		return nil, fmt.Errorf("token provider is required")
+	}
+
+	httpClient := &http.Client{
+		Transport: &tokenTransport{
+			base:          http.DefaultTransport,
+			tokenProvider: tokenProvider,
+		},
+	}
+
+	// Use linodego built-in http client which supports setting root CA cert
+	// when no custom transport is set; with a custom transport we inject the token.
+	linodeClient, err := linodego.NewClient(httpClient)
+	if err != nil {
+		return nil, err
+	}
+	// Only override the base URL if a custom API URL is provided. Recent versions
+	// of linodego return an error when given an empty string to UseURL.
+	var client *linodego.Client
+	if apiURL != "" {
+		client, err = linodeClient.UseURL(apiURL)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		client = &linodeClient
+	}
+	client.SetUserAgent(ua)
+	// Do not call SetToken: auth is applied per-request by tokenTransport so
+	// file-backed tokens can rotate without reconstructing the client.
+
+	return client, nil
+}

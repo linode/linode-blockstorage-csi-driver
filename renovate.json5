@@ -1,0 +1,155 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "helpers:githubDigestChangelogs"
+  ],
+  "schedule": [
+    "* 0 1,15 * *",
+  ],
+  "labels": ["dependencies"],
+  "postUpdateOptions": ["gomodTidy"],
+   "vulnerabilityAlerts": {
+    "enabled": true,
+    "groupName": "security updates",
+  },
+  "osvVulnerabilityAlerts": true,
+  "platformAutomerge": true,
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/deploy/kubernetes/.+\\.yaml$/"
+    ]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)mise\\.toml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-zA-Z0-9-._]+?) depName=(?<depName>[^\\s]+?)(?: (?:packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+\\n[A-Za-z0-9_-]+\\s*=\\s*[\"']?(?<currentValue>.+?)[\"']?"
+      ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/helm-chart\\/.*values\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "\\s+image:\\s+(?<depName>[^\\s]+)\\r?\\n(?:\\s+[a-zA-Z]+:.*\\r?\\n)*?\\s+tag:\\s+(?<currentValue>v[\\d][\\w.+-]*)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
+      "prPriority": 10
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "separateMajorMinor": false
+    },
+    {
+      "groupName": "kubernetes",
+      "groupSlug": "kubernetes-go",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**"
+      ]
+    },
+    {
+      "groupName": "otel",
+      "groupSlug": "otel-go",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "go.opentelemetry.io/**"
+      ]
+    },
+    {
+      "groupName": "golang.org/x",
+      "groupSlug": "golang-x",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "golang.org/x/**"
+      ]
+    },
+    {
+      "groupName": "google gRPC",
+      "groupSlug": "google-grpc",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "google.golang.org/**"
+      ]
+    },
+    {
+      "groupName": "linode sdks",
+      "groupSlug": "linode-sdks",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "github.com/linode/**"
+      ]
+    },
+    {
+      "groupName": "CSI sidecar images",
+      "groupSlug": "csi-sidecar-images",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "registry.k8s.io/sig-storage/**"
+      ]
+    },
+    {
+      "groupName": "github actions ci",
+      "groupSlug": "github-actions-ci",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "dorny/paths-filter",
+        "codecov/codecov-action",
+        "actions/upload-artifact",
+      ]
+    },
+    {
+      "groupName": "github actions core",
+      "groupSlug": "github-actions-core",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "actions/checkout",
+        "actions/setup-go",
+        "step-security/harden-runner",
+      ]
+    },
+    {
+      "description": "Group development toolchain bumps from mise.toml.",
+      "matchManagers": ["mise"],
+      "groupName": "mise tools",
+    },
+    {
+      "description": "Keep the Go version in sync between go.mod and mise.toml.",
+      "matchManagers": ["mise", "gomod"],
+      "matchDepNames": ["go"],
+      "groupName": "go version",
+      "groupSlug": "go-version",
+    }
+  ]
+}

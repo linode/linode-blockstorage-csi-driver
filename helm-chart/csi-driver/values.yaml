@@ -1,55 +1,140 @@
 # Secrets:
-# apiToken [Required if secretRef is not set] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
+# apiToken [Required unless using an externally managed Secret] - Must be a Linode APIv4 Personal Access Token with all permissions. (https://cloud.linode.com/profile/tokens)
+# When set, the chart creates a Secret named secretRef.name. Leave empty if the Secret already exists.
 apiToken: ""
 
-# region [Required if secretRef is not set] - Must be a Linode region. (https://api.linode.com/v4/regions)
+# region [Required when apiToken is set] - Must be a Linode region. (https://api.linode.com/v4/regions)
 region: ""
+
+# enableMetrics: This variable must be set to true to get metrics
+enableMetrics: false
+
+# default metrics address port
+metricsPort: 8081
+
+# enableTracing: This variable must be set to true to get metrics
+enableTracing: false
+
+# default tracing address port
+tracingPort: 4318
+
+# (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
+volumeLabelPrefix: ""
 
 # Default namespace is "kube-system" but it can be set to another namespace
 namespace: kube-system
 
-# Set these values if your APIToken and region are already present in a k8s secret.
-# secretRef:
-#   name: "linode"
-#   apiTokenRef: "apiToken"
-#   regionRef: "region"
+# Add a kubelet path variable to be used across containers for alternate k8s distros (e.g K0s, K3s)
+kubeletPath: "/var/lib/kubelet"
+
+# Secret used by the controller for the Linode API token (and by the chart-created
+# Secret when apiToken/region are set). Override name/keys when using an existing Secret.
+# Leave apiToken empty and point name at your Secret to use an externally managed one.
+secretRef:
+  name: "linode"
+  apiTokenRef: "token"
+  regionRef: "region"
+  # Enable mounted token file mode on the controller only. Default false keeps
+  # legacy LINODE_TOKEN env injection via secretKeyRef.
+  # When true, the Secret is mounted and the controller re-reads the token
+  # (with a short cache) so you can rotate the PAT without restarting CSI controller pods.
+  mountSecret: false
+  # Token file path used when mountSecret=true.
+  mountPath: /var/run/secrets/linode/api-token
 
 # Default storageClass is "linode-block-storage-retain" but it can be set to
 # "linode-block-storage" or left as an empty string
 defaultStorageClass: linode-block-storage-retain
 
-# set these value to a comma seperated string if you'd like to add tags to the created volumes
+# set these value to a comma separated string if you'd like to add tags to the created volumes
 # volumeTags:
 #  - example
 #  - test
 
 # Images - Default
-
 csiProvisioner:
   image: registry.k8s.io/sig-storage/csi-provisioner
-  tag: v3.0.0
+  tag: v6.2.0
   pullPolicy: IfNotPresent
+  metrics:
+    address: "0.0.0.0:10248"
+    port: 10248  # Metrics port for csi-provisioner
 
 csiAttacher:
   image: registry.k8s.io/sig-storage/csi-attacher
-  tag: v3.3.0
+  tag: v4.11.0
   pullPolicy: IfNotPresent
+  metrics:
+    address: "0.0.0.0:10249"
+    port: 10249  # Metrics port for csi-attacher
 
 csiResizer:
   image: registry.k8s.io/sig-storage/csi-resizer
-  tag: v1.3.0
+  tag: v2.1.0
   pullPolicy: IfNotPresent
+  metrics:
+    address: "0.0.0.0:10250"
+    port: 10250  # Metrics port for csi-resizer
 
 csiLinodePlugin:
   image: linode/linode-blockstorage-csi-driver
   tag:  # only set if required, defaults to .Chart.AppVersion set during release or "latest" by default
   pullPolicy: IfNotPresent
   podsMountDir: /var/lib/kubelet
-
-kubectl:
-  image: alpine/k8s  # This needs to be alpine based and have both kubectl and curl installed.
-  tag: 1.25.14
+  # This section adds the ability to pass environment variables to adjust CSI defaults
+  env:
+  #  - name: EXAMPLE_ENV_VAR
+  #    value: "true"
+  # This section adds the ability to pass volumes to the DaemonSet
+  volumes:
+  #  - name: test-volume
+  #    emptyDir:
+  #      sizeLimit: 500Mi
+  # this section adds the ability to pass volumeMounts to the container
+  volumeMounts:
+  #  - mountPath: /tmp/
+  #    name: test-volume
+  # This section adds the ability to pass resources to the container
+  resources:
 
 csiNodeDriverRegistrar:
   image: registry.k8s.io/sig-storage/csi-node-driver-registrar
-  tag: v1.3.0
+  tag: v2.16.0
+  # Additional environment variables for the node driver registrar container
+  env: []
+  # Additional volume mounts for the node driver registrar container
+  volumeMounts: []
+
+controller:
+  enabled: true
+  hostNetwork: false
+  dnsPolicy: Default
+  kubeconfig:
+    mountDir: ""
+    secretName: ""
+    secretKey: ""
+  serviceAccount:
+    enabled: true
+    name: "csi-controller-sa"
+  rbac:
+    enabled: true
+  nodeSelector: {}
+  affinity: {}
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+    - effect: NoExecute
+      operator: Exists
+
+daemonSet:
+  enabled: true
+  serviceAccount:
+    enabled: true
+    name: "csi-node-sa"
+  rbac:
+    enabled: true
+# Add custom annotations to all pods
+podAnnotations: {}
+
+# Add custom labels to all pods
+podLabels: {}

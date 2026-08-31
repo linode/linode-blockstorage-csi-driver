@@ -1,0 +1,58 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: csi-example-pod-luks
+spec:
+  containers:
+    - name: csi-example-container
+      image: busybox
+      volumeMounts:
+        - mountPath: "/data"
+          name: csi-example-volume-luks
+      command: ["sleep", "1000000"]
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
+  volumes:
+    - name: csi-example-volume-luks
+      persistentVolumeClaim:
+        claimName: csi-example-pvc-luks
+---
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  name: linode-block-storage-luks-luks
+  namespace: kube-system
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Delete
+parameters:
+  linodebs.csi.linode.com/luks-encrypted: "true"
+  linodebs.csi.linode.com/luks-cipher: "aes-xts-plain64"
+  linodebs.csi.linode.com/luks-key-size: "512"
+  csi.storage.k8s.io/node-stage-secret-namespace: default
+  csi.storage.k8s.io/node-stage-secret-name: csi-encrypt-example-luks-key
+  linodebs.csi.linode.com/volumeTags: default
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: csi-encrypt-example-luks-key
+stringData:
+  luksKey: klOMgxvP7v2lJ1LXjQQ4oMQ0n/axuGAjT311C6qbJO/Z7D6dIYYlz/qFn7+AF0oZm5Y2qJos+R/kZaEk/MA9vw==
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-example-pvc-luks
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: linode-block-storage-luks-luks

@@ -10,7 +10,7 @@ if [[ -z "${TAG}" ]]; then
     exit 1
 fi
 
-RELEASES="pkg/linode-bs/deploy/releases"
+RELEASES="internal/driver/deploy/releases"
 TAGGED_RELEASE="linode-blockstorage-csi-driver-${TAG}.yaml"
 GENERIC_RELEASE="linode-blockstorage-csi-driver.yaml"
 

@@ -1,0 +1,46 @@
+# This StorageClass is for topology-aware provisioning based on the pod region
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: linode-block-storage-wait-for-consumer
+provisioner: linodebs.csi.linode.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-filesystem
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: linode-block-storage-wait-for-consumer
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-topology-aware
+spec:
+  nodeSelector:
+    topology.linode.com/region: us-ord
+  tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  containers:
+  - name: pod-topology-aware
+    image: ubuntu
+    command:
+    - sleep
+    - "1000000"
+    volumeMounts:
+    - mountPath: /data
+      name: csi-volume
+  volumes:
+  - name: csi-volume
+    persistentVolumeClaim:
+      claimName: pvc-filesystem

@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: kube-system
+  labels:
+    app: jaeger
+spec:
+  type: LoadBalancer
+  selector:
+    app: jaeger
+  ports:
+    - name: jaeger-ui
+      port: 16686
+      targetPort: 16686
+    - name: jaeger-collector-http
+      port: 14268
+      targetPort: 14268
+    - name: jaeger-collector-grpc
+      port: 14250
+      targetPort: 14250
+    - name: zipkin
+      port: 9411
+      targetPort: 9411

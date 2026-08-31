@@ -1,0 +1,16 @@
+StorageClass:
+  FromName: true
+DriverInfo:
+  Name: linodebs.csi.linode.com
+  SupportedFsType: {"ext2", "ext3", "ext4", "xfs"}
+  Capabilities:
+    block: true
+    controllerExpansion: false
+    exec: true
+    multipods: true
+    persistence: true
+    pvcDataSource: true
+    snapshotDataSource: false
+  SupportedSizeRange:
+    Min: 10G
+    Max: 10T

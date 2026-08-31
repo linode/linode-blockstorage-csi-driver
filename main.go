@@ -14,80 +14,174 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 
-	driver "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-bs"
-	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
-	metadataservice "github.com/linode/linode-blockstorage-csi-driver/pkg/metadata"
-	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
+	"github.com/go-logr/logr"
+	"github.com/ianschenck/envflag"
+	"github.com/linode/linodego/v2"
+	"go.uber.org/automaxprocs/maxprocs"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
+	"github.com/linode/linode-blockstorage-csi-driver/internal/driver"
+	cryptsetupclient "github.com/linode/linode-blockstorage-csi-driver/pkg/cryptsetup-client"
+	devicemanager "github.com/linode/linode-blockstorage-csi-driver/pkg/device-manager"
+	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
+	linodeclient "github.com/linode/linode-blockstorage-csi-driver/pkg/linode-client"
+	"github.com/linode/linode-blockstorage-csi-driver/pkg/logger"
+	mountmanager "github.com/linode/linode-blockstorage-csi-driver/pkg/mount-manager"
 )
 
-const (
-	driverName = "linodebs.csi.linode.com"
-)
+var vendorVersion string // set by the linker
 
-var (
-	vendorVersion string
-	endpoint      = flag.String("endpoint", "unix:/tmp/csi.sock", "CSI endpoint")
-	token         = flag.String("token", "", "Linode API Token")
-	url           = flag.String("url", "", "Linode API URL")
-	node          = flag.String("node", "", "Node name")
-	bsPrefix      = flag.String("bs-prefix", "", "Linode BlockStorage Volume label prefix")
-)
+type configuration struct {
+	// The UNIX socket to listen on for RPC requests.
+	csiEndpoint string
 
-func init() {
-	_ = flag.Set("logtostderr", "true")
+	// Linode personal access token, used to make requests to the Linode
+	// API.
+	linodeToken string
+
+	// driverRole role that the driver is executing, can be controller or nodeserver
+	driverRole string
+	// Linode API URL.
+	linodeURL string
+
+	// Optional label prefix to use when creating new Linode Block Storage
+	// Volumes.
+	volumeLabelPrefix string
+
+	// Name of the current node, when running as the node plugin.
+	//
+	// Deprecated: This is not needed as the CSI driver now uses the Linode
+	// Metadata Service to source information about the current
+	// node/instance. It will be removed in a future change.
+	nodeName string
+
+	// Flag to enable metrics
+	enableMetrics string
+
+	// Flag to specify the port on which the metrics http server will run
+	metricsPort string
+
+	// Flag to enable tracing
+	enableTracing string
+
+	// Flag to specify the port on which the tracing http server will run
+	tracingPort string
+}
+
+func loadConfig() configuration {
+	var cfg configuration
+	envflag.StringVar(&cfg.csiEndpoint, "CSI_ENDPOINT", "unix:/tmp/csi.sock", "Path to the CSI endpoint socket")
+	envflag.StringVar(&cfg.linodeToken, "LINODE_TOKEN", "", "Linode API token")
+	envflag.StringVar(&cfg.driverRole, "DRIVER_ROLE", "controller", "Driver Role, controller or nodeserver")
+	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", fmt.Sprintf("%s://%s", linodego.APIProto, linodego.APIHost), "Linode API URL")
+	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
+	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
+	envflag.StringVar(&cfg.enableMetrics, "ENABLE_METRICS", "", "This flag conditionally runs the metrics servers")
+	envflag.StringVar(&cfg.metricsPort, "METRICS_PORT", "8081", "This flag specifies the port on which the metrics https server will run")
+	envflag.StringVar(&cfg.enableTracing, "OTEL_TRACING", "", "This flag conditionally enables tracing")
+	envflag.StringVar(&cfg.tracingPort, "OTEL_TRACING_PORT", "4318", "This flag specifies the port on which the tracing https server will run")
+	envflag.Parse()
+	return cfg
 }
 
 func main() {
+	// Create a base context with the logger
+	log, ctx := logger.NewLogger(context.Background())
+
 	klog.InitFlags(nil)
-	flag.Parse()
-	if err := handle(); err != nil {
-		klog.Fatal(err)
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		log.Error(err, "Fatal error")
+		os.Exit(0)
 	}
+	flag.Parse()
+	maxProcs(log)
+
+	if err := handle(ctx); err != nil {
+		log.Error(err, "Fatal error")
+		os.Exit(1)
+	}
+
 	os.Exit(0)
 }
 
-func handle() error {
+func maxProcs(log logr.Logger) {
+	undoMaxprocs, maxprocsError := maxprocs.Set(maxprocs.Logger(func(msg string, keysAndValues ...interface{}) {
+		log.WithValues("component", "maxprocs", "version", maxprocs.Version).V(2).Info(fmt.Sprintf(msg, keysAndValues...))
+	}))
+	defer undoMaxprocs()
+	if maxprocsError != nil {
+		log.Error(maxprocsError, "Failed to set GOMAXPROCS")
+	}
+}
+
+func handle(ctx context.Context) error {
+	log, ctx := logger.GetLogger(ctx)
+
 	if vendorVersion == "" {
 		return errors.New("vendorVersion must be set at compile time")
 	}
-	if *token == "" {
-		return errors.New("linode token required")
+	log.V(4).Info("Driver vendor version", "version", vendorVersion)
+
+	cfg := loadConfig()
+	// staticToken covers --LINODE_TOKEN and LINODE_TOKEN via envflag; file mount
+	// is preferred when present so tokens can rotate without restart.
+	tokenProvider, tokenSource, tokenErr := linodeclient.TokenProviderFromFileOrEnv(ctx, cfg.linodeToken)
+	if cfg.driverRole == "controller" {
+		if tokenErr != nil {
+			return fmt.Errorf("linode token required: %w", tokenErr)
+		}
+		log.V(2).Info("Using Linode API token", "source", tokenSource)
+	} else if tokenErr != nil {
+		// Node plugin typically does not need a Linode API token.
+		tokenProvider = func(context.Context) (string, error) { return "", nil }
 	}
-	klog.V(4).Infof("Driver vendor version %v", vendorVersion)
+	linodeDriver := driver.GetLinodeDriver(ctx)
 
-	linodeDriver := driver.GetLinodeDriver()
-
-	//Initialize Linode Driver (Move setup to main?)
+	// Initialize Linode Driver (Move setup to main?)
 	uaPrefix := fmt.Sprintf("LinodeCSI/%s", vendorVersion)
-	cloudProvider, err := linodeclient.NewLinodeClient(*token, uaPrefix, *url)
+	cloudProvider, err := linodeclient.NewLinodeClientWithTokenProvider(uaPrefix, cfg.linodeURL, tokenProvider)
 	if err != nil {
-		return fmt.Errorf("failed to set up linode client: %s", err)
+		return fmt.Errorf("failed to set up linode client: %w", err)
 	}
 
 	mounter := mountmanager.NewSafeMounter()
-	deviceUtils := mountmanager.NewDeviceUtils()
+	fileSystem := filesystem.NewFileSystem()
+	deviceUtils := devicemanager.NewDeviceUtils(fileSystem, mounter.Exec)
+	cryptSetup := cryptsetupclient.NewCryptSetup()
+	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
+	resizer := mount.NewResizeFs(mounter.Exec)
 
-	ms, err := metadataservice.NewMetadataService(cloudProvider, *node)
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem)
 	if err != nil {
-		return fmt.Errorf("failed to set up metadata service: %v", err)
-	}
-
-	prefix := ""
-	if bsPrefix != nil {
-		prefix = *bsPrefix
+		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
 
 	if err := linodeDriver.SetupLinodeDriver(
-		cloudProvider, mounter, deviceUtils, ms, driverName, vendorVersion, prefix); err != nil {
-		return fmt.Errorf("failed to initialize Linode CSI Driver: %v", err)
+		ctx,
+		cloudProvider,
+		mounter,
+		deviceUtils,
+		resizer,
+		nodeMetadata,
+		driver.Name,
+		vendorVersion,
+		cfg.volumeLabelPrefix,
+		encrypt,
+		cfg.enableMetrics,
+		cfg.metricsPort,
+		cfg.enableTracing,
+		cfg.tracingPort,
+	); err != nil {
+		return fmt.Errorf("setup driver: %w", err)
 	}
 
-	linodeDriver.Run(*endpoint)
+	linodeDriver.Run(ctx, cfg.csiEndpoint)
 	return nil
 }

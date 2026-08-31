@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: kube-system
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:latest
+          args:
+            - "--collector.zipkin.host-port=:9411"  # Enable Zipkin API on port 9411
+          ports:
+            - containerPort: 16686  # Jaeger UI
+            - containerPort: 14268  # HTTP ingestion
+            - containerPort: 14250  # gRPC ingestion
+            - containerPort: 9411   # Zipkin API

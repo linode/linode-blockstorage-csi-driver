@@ -1,0 +1,25 @@
+FROM golang:1.26-alpine AS builder
+# from Justfile
+ARG REV
+ARG GOLANGCI_LINT_VERSION
+
+# /workdir matches the mount point the Justfile uses at runtime (docker run -w /workdir -v $(PWD):/workdir ...)
+# so that mise's per-directory trust/config state (keyed by path) built here at image-build time
+# is still valid at container-run time, avoiding a redundant "mise install" on every invocation.
+RUN mkdir -p /workdir
+WORKDIR /workdir
+
+RUN apk add bash mise cryptsetup cryptsetup-libs cryptsetup-dev gcc musl-dev pkgconfig git
+
+# go mod download (not tidy) so all deps in go.sum are pre-fetched into the image's
+# module cache without needing source files present; this cache lives outside /workdir
+# (GOPATH=/go) so it survives the runtime bind-mount of the repo over /workdir.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN mise trust
+RUN mise install
+
+CMD ["bash"]

@@ -1,3 +1,10 @@
+{{- if .Values.controller.enabled }}
+{{- $secretName := .Values.secretRef.name }}
+{{- $apiTokenKey := .Values.secretRef.apiTokenRef }}
+{{- $mountSecret := .Values.secretRef.mountSecret }}
+{{- $tokenFilePath := .Values.secretRef.mountPath }}
+{{- $tokenFileDir := dir $tokenFilePath }}
+{{- $tokenFileName := base $tokenFilePath }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -16,123 +23,244 @@ spec:
       labels:
         app: csi-linode-controller
         role: csi-linode
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      hostNetwork: {{ .Values.controller.hostNetwork }}
+      dnsPolicy: {{ .Values.controller.dnsPolicy }}
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - args:
-        - --default-fstype=ext4
-        - --volume-name-prefix=pvc
-        - --volume-name-uuid-length=16
-        - --csi-address=$(ADDRESS)
-        - --v=2
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: {{ .Values.csiProvisioner.image }}:{{ .Values.csiProvisioner.tag }}
-        imagePullPolicy: {{ .Values.csiProvisioner.pullPolicy }}
-        name: csi-provisioner
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      - args:
-        - --v=2
-        - --csi-address=$(ADDRESS)
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: {{ .Values.csiAttacher.image }}:{{ .Values.csiAttacher.tag }}
-        imagePullPolicy: {{ .Values.csiAttacher.pullPolicy }}
-        name: csi-attacher
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      - args:
-        - --v=2
-        - --csi-address=$(ADDRESS)
-        env:
-        - name: ADDRESS
-          value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: {{ .Values.csiResizer.image }}:{{ .Values.csiResizer.tag }}
-        imagePullPolicy: {{ .Values.csiResizer.pullPolicy }}
-        name: csi-resizer
-        volumeMounts:
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --token=$(LINODE_TOKEN)
-        - --url=$(LINODE_API_URL)
-        - --node=$(NODE_NAME)
-        - --bs-prefix=$(LINODE_BS_PREFIX)
-        - --v=2
-        env:
-        - name: CSI_ENDPOINT
-          value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
-        - name: LINODE_API_URL
-          value: https://api.linode.com/v4
-        - name: LINODE_BS_PREFIX
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: spec.nodeName
-        - name: LINODE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
-              key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
-        image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
-        name: linode-csi-plugin
-        volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
-        - mountPath: /var/lib/csi/sockets/pluginproxy/
-          name: socket-dir
-      hostNetwork: true
-      initContainers:
-      - command:
-        - /scripts/get-linode-id.sh
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: spec.nodeName
-        image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
-        securityContext:
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-            - SYS_ADMIN
-          privileged: true
-        name: init
-        volumeMounts:
-        - mountPath: /dev
-          name: dev
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
-      serviceAccount: csi-controller-sa
+        - args:
+            - --default-fstype=ext4
+            - --volume-name-prefix=pvc
+            - --volume-name-uuid-length=16
+            - --csi-address=$(ADDRESS)
+            - --feature-gates=Topology=true
+            - --v=2
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretKey }}
+            - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.enableMetrics}}
+            - --metrics-address={{ .Values.csiProvisioner.metrics.address }}
+            {{- end }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: {{ .Values.csiProvisioner.image }}:{{ .Values.csiProvisioner.tag }}
+          imagePullPolicy: {{ .Values.csiProvisioner.pullPolicy }}
+          name: csi-provisioner
+          {{- if .Values.enableMetrics}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.csiProvisioner.metrics.port }}
+              protocol: TCP
+          {{- end}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretName }}
+            - mountPath: {{ .mountDir }}
+              name: controller-kubeconfig
+              readOnly: true
+              {{- end }}
+            {{- end }}
+        - args:
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            - --timeout=30s
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretKey }}
+            - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.enableMetrics}}
+            - --metrics-address={{ .Values.csiAttacher.metrics.address }}
+            {{- end }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: {{ .Values.csiAttacher.image }}:{{ .Values.csiAttacher.tag }}
+          imagePullPolicy: {{ .Values.csiAttacher.pullPolicy }}
+          name: csi-attacher
+          {{- if .Values.enableMetrics}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.csiAttacher.metrics.port }}
+              protocol: TCP
+          {{- end}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretName }}
+            - mountPath: {{ .mountDir }}
+              name: controller-kubeconfig
+              readOnly: true
+              {{- end }}
+            {{- end }}
+        - args:
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretKey }}
+            - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.enableMetrics}}
+            - --metrics-address={{ .Values.csiResizer.metrics.address }}
+            {{- end }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          image: {{ .Values.csiResizer.image }}:{{ .Values.csiResizer.tag }}
+          imagePullPolicy: {{ .Values.csiResizer.pullPolicy }}
+          name: csi-resizer
+          {{- if .Values.enableMetrics}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.csiResizer.metrics.port }}
+              protocol: TCP
+          {{- end}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+            {{- with .Values.controller.kubeconfig }}
+              {{- if and .mountDir .secretName }}
+            - mountPath: {{ .mountDir }}
+              name: controller-kubeconfig
+              readOnly: true
+              {{- end }}
+            {{- end }}
+        - args:
+            - --v=2
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: LINODE_URL
+              value: https://api.linode.com
+            - name: DRIVER_ROLE
+              value: controller
+            - name: LINODE_VOLUME_LABEL_PREFIX
+              value: {{ .Values.volumeLabelPrefix | default "" | quote }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            {{- if $mountSecret }}
+            - name: LINODE_API_TOKEN_FILE
+              value: {{ $tokenFilePath | quote }}
+            {{- else }}
+            - name: LINODE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName | quote }}
+                  key: {{ $apiTokenKey | quote }}
+            {{- end }}
+            - name: ENABLE_METRICS
+              value: {{ .Values.enableMetrics | quote}}
+            - name: METRICS_PORT
+              value: {{ .Values.metricsPort | quote}}
+            - name: OTEL_TRACING
+              value: {{.Values.enableTracing | quote}}
+            - name: OTEL_TRACING_PORT
+              value: {{.Values.tracingPort | quote}}
+            {{- with .Values.csiLinodePlugin.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
+          name: csi-linode-plugin
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/pluginproxy/
+              name: socket-dir
+            {{- if $mountSecret }}
+            - mountPath: {{ $tokenFileDir | quote }}
+              name: linode-api-token
+              readOnly: true
+            {{- end }}
+            {{- with .Values.csiLinodePlugin.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.csiLinodePlugin.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if .Values.controller.serviceAccount.enabled }}
+      serviceAccount: {{ default "csi-controller-sa" .Values.controller.serviceAccount.name }}
+      {{- end }}
+      {{- if .Values.controller.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.controller.affinity }}
+      affinity:
+        {{- toYaml .Values.controller.affinity | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.tolerations }}
       tolerations:
-      - effect: NoSchedule
-        operator: Exists
-      - key: CriticalAddonsOnly
-        operator: Exists
-      - effect: NoExecute
-        operator: Exists
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
-      - emptyDir: {}
-        name: socket-dir
-      - emptyDir: {}
-        name: linode-info
-      - configMap:
-          defaultMode: 493
+        - emptyDir: {}
+          name: socket-dir
+        - configMap:
+            defaultMode: 493
+            name: get-linode-id
           name: get-linode-id
-        name: get-linode-id
-      - hostPath:
-          path: /dev
-          type: Directory
-        name: dev
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev
+        {{- if $mountSecret }}
+        - name: linode-api-token
+          secret:
+            secretName: {{ $secretName | quote }}
+            items:
+              - key: {{ $apiTokenKey | quote }}
+                path: {{ $tokenFileName | quote }}
+        {{- end }}
+        {{- with .Values.controller.kubeconfig }}
+          {{- if and .secretName .secretKey }}
+        - name: controller-kubeconfig
+          secret:
+            secretName: {{ .secretName }}
+            items:
+              - key: {{ .secretKey }}
+                path: {{ .secretKey }}
+          {{- end }}
+        {{- end }}
+        {{- with .Values.csiLinodePlugin.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}

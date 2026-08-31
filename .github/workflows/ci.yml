@@ -4,51 +4,146 @@ on:
   push:
     branches:
       - main
-  pull_request: null
+  pull_request:
+    branches:
+      - "*"
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
-  ci:
+  changes:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ 'stable', 'oldstable' ]
+    outputs:
+      paths: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          base: ${{ github.ref }}
+          filters: .github/filters.yml
+          predicate-quantifier: 'every'
+
+  codecov:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            golang.org:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            *.githubusercontent.com:443
+            storage.googleapis.com:443
+            cli.codecov.io:443
+            api.codecov.io:443
+            ingest.codecov.io:443
+            mise.jdx.dev:443
+            mise-versions.jdx.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+            dl.google.com:443
+            dl.k8s.io:443
+            get.helm.sh:443
+            githubapp.com:443
+            auth.docker.io:443
+            identity.docker.io:443
+
+      - name: Install cryptsetup
+        run: |
+          sudo apt-get update
+          sudo apt install libcryptsetup12 libcryptsetup-dev
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Vet
-        run: make vet
-      - name: Lint
-        run: make lint
+
+      - name: Set up Mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
       - name: Test
-        run: make test
-      - name: Build
-        run: make build
-  docker-build:
+        run: mise run test
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: ./coverage.out
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: linode/linode-blockstorage-csi-driver
+
+  e2e-tests:
     runs-on: ubuntu-latest
+    environment: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository) && 'prod-external' || 'prod' }}
+    needs: changes
+    if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.github_token }}
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      IMAGE_VERSION: ${{ github.ref == 'refs/heads/main' && 'latest' || format('pr-{0}', github.event.number) || github.ref_name }}
+      LINODE_REGION: us-lax
+      LINODE_CONTROL_PLANE_MACHINE_TYPE: g6-standard-2
+      LINODE_MACHINE_TYPE: g6-standard-2
+      WORKER_NODES: ${{ github.ref == 'refs/heads/main' && '3' || '1' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          egress-policy: audit
+      - name: Install cryptsetup
+        run: |
+          sudo apt-get update
+          sudo apt install libcryptsetup12 libcryptsetup-dev
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@v5
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        env:
+          DOCKERHUB_OIDC_CONNECTIONID: ${{ secrets.DOCKERHUB_OIDC_CONNECTIONID }}
         with:
-          images: |
-            linode/linode-blockstorage-csi-driver
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=semver,pattern={{raw}},value=${{ github.ref_name }}
-      - name: Build and Push to Docker Hub
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          file: "./Dockerfile"
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            REV=${{ github.ref_name }}
+          username: ${{ github.repository_owner }}
+
+      - name: Set up Mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
+      - name: Setup CAPL Management Kind Cluster and CAPL Child Cluster For Testing
+        run: mise run mgmt-and-capl-cluster
+
+      - name: Run E2E Tests
+        run: mise run e2e-test
+
+      - name: Run CSI-Sanity Tests
+        run: mise run csi-sanity-test
+
+      - name: run upstream E2E Tests
+        if: github.ref == 'refs/heads/main'
+        run: mise run upstream-e2e-tests
+
+      - name: Cleanup Resources
+        if: always()
+        run: mise run cleanup-cluster

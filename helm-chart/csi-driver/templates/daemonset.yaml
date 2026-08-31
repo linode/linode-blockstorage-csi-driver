@@ -1,3 +1,4 @@
+{{- if .Values.daemonSet.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -14,7 +15,17 @@ spec:
       labels:
         app: csi-linode-node
         role: csi-linode
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - args:
         - --v=2
@@ -24,52 +35,57 @@ spec:
         - name: ADDRESS
           value: /csi/csi.sock
         - name: DRIVER_REG_SOCK_PATH
-          value: /var/lib/kubelet/plugins/linodebs.csi.linode.com/csi.sock
+          value: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins/linodebs.csi.linode.com/csi.sock
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        {{- with .Values.csiNodeDriverRegistrar.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         image: {{ .Values.csiNodeDriverRegistrar.image}}:{{ .Values.csiNodeDriverRegistrar.tag}}
         name: csi-node-driver-registrar
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
         - mountPath: /registration
           name: registration-dir
+        {{- with .Values.csiNodeDriverRegistrar.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       - args:
-        - --endpoint=$(CSI_ENDPOINT)
-        - --token=$(LINODE_TOKEN)
-        - --url=$(LINODE_API_URL)
-        - --node=$(NODE_NAME)
         - --v=2
         env:
         - name: CSI_ENDPOINT
           value: unix:///csi/csi.sock
-        - name: LINODE_API_URL
-          value: https://api.linode.com/v4
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: LINODE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: {{ if .Values.secretRef }}{{ .Values.secretRef.name | default "linode" }}{{ else }}"linode"{{ end }}
-              key: {{ if .Values.secretRef }}{{ .Values.secretRef.apiTokenRef | default "token" }}{{ else }}"token"{{ end }}
+        - name: DRIVER_ROLE
+          value: nodeserver
+        - name: ENABLE_METRICS
+          value: {{ .Values.enableMetrics | quote}}
+        - name: METRICS_PORT
+          value: {{ .Values.metricsPort | quote}}
+        {{- with .Values.csiLinodePlugin.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         image: {{ .Values.csiLinodePlugin.image }}:{{ .Values.csiLinodePlugin.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.csiLinodePlugin.pullPolicy }}
         name: csi-linode-plugin
         securityContext:
+          # This container must run as privileged due to the requirement for bidirectional mount propagation
+          # See https://github.com/kubernetes/kubernetes/issues/94400
+          privileged: true
           allowPrivilegeEscalation: true
           capabilities:
+            drop:
+            - ALL
             add:
             - SYS_ADMIN
-          privileged: true
         volumeMounts:
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
         - mountPath: /csi
           name: plugin-dir
         - mountPath: {{ .Values.csiLinodePlugin.podsMountDir }}
@@ -79,32 +95,18 @@ spec:
           name: device-dir
         - mountPath: /tmp
           name: tmp
+        {{- with .Values.csiLinodePlugin.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.csiLinodePlugin.resources }}
+        resources:
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       hostNetwork: true
-      initContainers:
-      - command:
-        - /scripts/get-linode-id.sh
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        image: {{ .Values.kubectl.image }}:{{ .Values.kubectl.tag }}
-        securityContext:
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-            - SYS_ADMIN
-          privileged: true
-        name: init
-        volumeMounts:
-        - mountPath: /dev
-          name: device-dir
-        - mountPath: /linode-info
-          name: linode-info
-        - mountPath: /scripts
-          name: get-linode-id
       priorityClassName: system-node-critical
-      serviceAccount: csi-node-sa
+      {{- if .Values.daemonSet.serviceAccount.enabled }}
+      serviceAccount: {{ default "csi-node-sa" .Values.daemonSet.serviceAccount.name }}
+      {{- end }}
       tolerations:
       - effect: NoSchedule
         operator: Exists
@@ -113,22 +115,16 @@ spec:
       - effect: NoExecute
         operator: Exists
       volumes:
-      - emptyDir: {}
-        name: linode-info
-      - configMap:
-          defaultMode: 493
-          name: get-linode-id
-        name: get-linode-id
       - hostPath:
-          path: /var/lib/kubelet/plugins_registry/
+          path: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins_registry/
           type: DirectoryOrCreate
         name: registration-dir
       - hostPath:
-          path: /var/lib/kubelet
+          path: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}
           type: Directory
         name: kubelet-dir
       - hostPath:
-          path: /var/lib/kubelet/plugins/linodebs.csi.linode.com
+          path: {{ .Values.kubeletPath | default "/var/lib/kubelet" }}/plugins/linodebs.csi.linode.com
           type: DirectoryOrCreate
         name: plugin-dir
       - hostPath:
@@ -158,3 +154,7 @@ spec:
           path: /tmp
           type: Directory
         name: tmp
+      {{- with .Values.csiLinodePlugin.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+{{- end }}

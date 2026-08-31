@@ -7,6 +7,7 @@
 # Folders
 _obj
 _test
+bin
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -23,6 +24,9 @@ _cgo_export.*
 _output
 _testmain.go
 linode-blockstorage-csi-driver
+test-cluster-kubeconfig.yaml
+capl-cluster-manifests.yaml
+csi-manifests.yaml
 
 *.exe
 *.test
@@ -38,6 +42,10 @@ dist/
 coverage.txt
 *.coverprofile
 
-*.terraform
-e2e/test/terraform*
 *junit.xml
+.devbox/*
+.envrc
+
+# Jekyll local preview
+_site/
+.sass-cache/

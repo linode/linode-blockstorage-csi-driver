@@ -1,0 +1,144 @@
+[settings]
+minimum_release_age = "7d"  # only install versions released more than 7 days ago - https://mise.en.dev/security.html#minimum-release-age
+
+[env]
+EXP_CLUSTER_RESOURCE_SET = "true"
+GOTOOLCHAIN = "auto"
+
+[tools]
+ctlptl = "0.9.4"
+ginkgo = "2.32.0"
+go = "1.26.7"
+golangci-lint = "2.11.4"
+kind = "0.32.0"
+kubectl = "1.36.2"
+kustomize = "5.8.1"
+"go:github.com/kyverno/chainsaw" = "0.2.15"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.1.4"
+"go:github.com/golang/mock/mockgen" = "1.6.0"
+"go:github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity" = "5.5.0"
+yq = "4.52.2"
+envsubst = "1.4.3"
+jq = "1.8.2"
+clusterctl = "1.13.3"
+just = "1.58.0"
+
+[tasks.fmt]
+description = "Run go fmt"
+run = "just fmt"
+
+[tasks.vet]
+description = "Run go vet"
+run = "just vet"
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "just lint"
+
+[tasks.lint-fix]
+description = "Run golangci-lint --fix"
+run = "just lint-fix"
+
+[tasks.nilcheck]
+description = "Run nilaway lint checks"
+run = "just nilcheck"
+
+[tasks.vulncheck]
+description = "Run go vulncheck"
+run = "just vulncheck"
+
+[tasks.build]
+description = "Build the binary"
+run = "just build"
+
+[tasks.serve-docs]
+description = "Serve the documentation site locally with live reload"
+run = "just serve-docs"
+
+[tasks.build-docs]
+description = "Build the documentation site the way GitHub Pages does"
+run = "just build-docs"
+
+[tasks.test]
+description = "Run integration tests"
+run = "just test"
+
+[tasks.image-build]
+description = "Build the container image"
+run = "just docker-build"
+
+[tasks.dev-image-build]
+description = "Build the development container image"
+run = "just dev-image-build"
+
+[tasks.image-push]
+description = "Push the container image"
+run = "just docker-push"
+
+[tasks.mgmt-and-capl-cluster]
+description = "Create a management and CAPL cluster"
+run = "just mgmt-and-capl-cluster"
+
+[tasks.mgmt-cluster]
+description = "Create management cluster"
+run = "just mgmt-cluster"
+
+[tasks.capl-cluster]
+description = "Create CAPL cluster"
+run = "just capl-cluster"
+
+[tasks.cleanup-cluster]
+description = "Cleanup the management and CAPL clusters"
+run = "just cleanup-cluster"
+
+[tasks.e2e-test]
+description = "Run e2e tests"
+run = "just e2e-test"
+
+[tasks.upstream-e2e-tests]
+description = "Run upstream e2e tests"
+run = "just upstream-e2e-tests"
+
+[tasks.csi-sanity-test]
+description = "Run CSI sanity tests"
+run = "just csi-sanity-test"
+
+[tasks.verify]
+description = "Verify Go module dependencies"
+run = "just verify"
+
+[tasks.clean]
+description = "Remove local build and release artifacts"
+run = "just clean"
+
+[tasks.grafana-dashboard]
+description = "Set up the Grafana dashboard"
+run = "just grafana-dashboard"
+
+[tasks.install-prometheus]
+description = "Install Prometheus for monitoring"
+run = "just install-prometheus"
+
+[tasks.install-grafana]
+description = "Install Grafana for monitoring"
+run = "just install-grafana"
+
+[tasks.setup-dashboard]
+description = "Configure the Grafana dashboard"
+run = "just setup-dashboard"
+
+[tasks.setup-tracing]
+description = "Set up tracing for the CSI driver"
+run = "just setup-tracing"
+
+[tasks.generate-mock]
+description = "Generate mocks"
+run = "just generate-mock"
+
+[tasks.ci]
+description = "Run CI checks"
+run = "just ci"
+
+[tasks.release]
+description = "Create release artifacts"
+run = "just release"

@@ -15,27 +15,15 @@ spec:
         app: csi-linode-node
         role: csi-linode
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-node-critical
       serviceAccount: csi-node-sa
-      initContainers:
-        - name: init
-          image: bitnami/kubectl:1.16.3-debian-10-r36
-          command:
-            - /scripts/get-linode-id.sh
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-          - name: linode-info
-            mountPath: /linode-info
-          - name: get-linode-id
-            mountPath: /scripts
       hostNetwork: true
       containers:
         - name: csi-node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v1.3.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.16.0
           args:
             - "--v=2"
             - "--csi-address=$(ADDRESS)"
@@ -49,6 +37,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
@@ -57,36 +50,24 @@ spec:
         - name: csi-linode-plugin
           image: linode/linode-blockstorage-csi-driver:latest
           args :
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--token=$(LINODE_TOKEN)"
-            - "--url=$(LINODE_API_URL)"
-            - "--node=$(NODE_NAME)"
             - "--v=2"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
-            - name: LINODE_API_URL
-              value: https://api.linode.com/v4
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: LINODE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: linode
-                  key: token
+            - name: DRIVER_ROLE
+              value: nodeserver
           imagePullPolicy: "Always"
           securityContext:
+            # This container must run as privileged due to the requirement for bidirectional mount propagation
+            # See https://github.com/kubernetes/kubernetes/issues/94400
             privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - SYS_ADMIN
           volumeMounts:
-            - name: linode-info
-              mountPath: /linode-info
-            - name: get-linode-id
-              mountPath: /scripts
             - name: plugin-dir
               mountPath: /csi
             - name: pods-mount-dir
@@ -99,12 +80,6 @@ spec:
             - mountPath: /tmp
               name: tmp
       volumes:
-        - name: linode-info
-          emptyDir: {}
-        - name: get-linode-id
-          configMap:
-            name: get-linode-id
-            defaultMode: 493
         - name: registration-dir
           hostPath:
             path: /var/lib/kubelet/plugins_registry/

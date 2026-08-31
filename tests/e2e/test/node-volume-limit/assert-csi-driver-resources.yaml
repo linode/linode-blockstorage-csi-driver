@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-linode-node
+  namespace: kube-system
+status:
+  numberAvailable: ($nodes)
+  numberReady: ($nodes)
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: csi-linode-controller
+  namespace: kube-system
+status:
+  availableReplicas: 1
+  readyReplicas: 1 
