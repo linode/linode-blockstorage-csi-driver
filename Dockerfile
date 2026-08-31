@@ -1,5 +1,5 @@
 FROM golang:1.26-alpine AS builder
-# from makefile
+# from Justfile
 ARG REV
 
 RUN mkdir -p /linode

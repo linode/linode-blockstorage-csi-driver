@@ -1,9 +1,9 @@
 FROM golang:1.26-alpine AS builder
-# from makefile
+# from Justfile
 ARG REV
 ARG GOLANGCI_LINT_VERSION
 
-# /workdir matches the mount point the Makefile uses at runtime (docker run -w /workdir -v $(PWD):/workdir ...)
+# /workdir matches the mount point the Justfile uses at runtime (docker run -w /workdir -v $(PWD):/workdir ...)
 # so that mise's per-directory trust/config state (keyed by path) built here at image-build time
 # is still valid at container-run time, avoiding a redundant "mise install" on every invocation.
 RUN mkdir -p /workdir
