@@ -21,8 +21,10 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+      - name: Set up Mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
       - name: Create Release Artifacts
-        run: make release
+        run: mise run release
         env:
           IMAGE_VERSION: ${{ github.ref_name }}
       - name: Upload Release Artifacts

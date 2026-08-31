@@ -32,14 +32,14 @@ This will download all the necessary binaries to local bin and create a local mg
 If you have a PR open, GHA will build & push to docker hub and tag it with the current branch name.
 
 If you do not have PR open, follow the steps below:
-- Build a docker image passing the `IMAGE_TAG` argument to the make target
+- Build a docker image with `IMAGE_TAG` set for the Mise task
   so a custom tag is applied. Then push the image to a public repository.
 
   > You can use any public repository that you have access to. The tags used below are just examples
 
   ```
-  mise run image-build IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
-  mise run image-push IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e
+  IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e mise run image-build
+  IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e mise run image-push
   ```
 
 ### 🔄 Setup a CAPL Child Test Cluster
