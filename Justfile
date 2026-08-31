@@ -13,8 +13,8 @@ dev_tag_extension := env_var_or_default("DEV_TAG_EXTENSION", "")
 image_version := env_var_or_default("IMAGE_VERSION", if dev_tag_extension == "" { rev } else { rev + "-" + dev_tag_extension })
 image_tag := env_var_or_default("IMAGE_TAG", registry_name + "/" + docker_user + "/" + image_name + ":" + image_version)
 dev_image_tag := env_var_or_default("DEV_IMAGE_TAG", image_tag + "-dev")
-go_mod_cache_volume := env_var_or_default("GO_MOD_CACHE_VOLUME", "linode-blockstorage-csi-driver-go-mod-cache")
-go_build_cache_volume := env_var_or_default("GO_BUILD_CACHE_VOLUME", "linode-blockstorage-csi-driver-go-build-cache")
+go_mod_cache_volume := "linode-blockstorage-csi-driver-go-mod-cache"
+go_build_cache_volume := "linode-blockstorage-csi-driver-go-build-cache"
 release_dir := env_var_or_default("RELEASE_DIR", "release")
 dockerfile := env_var_or_default("DOCKERFILE", "Dockerfile")
 e2e_selector := env_var_or_default("E2E_SELECTOR", "all")
@@ -37,27 +37,117 @@ fmt:
 
 # Run Go vet after formatting source files.
 vet: fmt dev-image-build
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then mise exec go -- env GOFLAGS=-mod=readonly go vet ./...; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build -it {{ dev_image_tag }} mise exec go -- env GOFLAGS=-mod=readonly go vet ./...; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        mise exec go -- env GOFLAGS=-mod=readonly go vet ./...
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            -it \
+            {{ dev_image_tag }} \
+            mise exec go -- env GOFLAGS=-mod=readonly go vet ./...
+    fi
 
 # Run golangci-lint after vetting source files.
 lint: vet
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build -it {{ dev_image_tag }} mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            -it \
+            {{ dev_image_tag }} \
+            mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml
+    fi
 
 # Apply golangci-lint suggested fixes after vetting source files.
 lint-fix: vet
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml --fix; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build -it {{ dev_image_tag }} mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml --fix; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml --fix
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            -it \
+            {{ dev_image_tag }} \
+            mise exec golangci-lint -- env GOFLAGS=-mod=readonly golangci-lint run -v -c .golangci.yml --fix
+    fi
 
 # Run vulnerability checks.
 vulncheck: dev-image-build
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then mise exec "go:golang.org/x/vuln/cmd/govulncheck" -- ./hack/vulncheck.sh; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build -it {{ dev_image_tag }} mise exec "go:golang.org/x/vuln/cmd/govulncheck" -- ./hack/vulncheck.sh; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        mise exec "go:golang.org/x/vuln/cmd/govulncheck" -- ./hack/vulncheck.sh
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            -it \
+            {{ dev_image_tag }} \
+            mise exec "go:golang.org/x/vuln/cmd/govulncheck" -- ./hack/vulncheck.sh
+    fi
 
 # Build the nilaway-enabled golangci-lint binary.
 build-nilaway: dev-image-build
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then mise exec golangci-lint -- golangci-lint custom; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build -it {{ dev_image_tag }} mise exec golangci-lint -- golangci-lint custom; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        mise exec golangci-lint -- golangci-lint custom
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            -it \
+            {{ dev_image_tag }} \
+            mise exec golangci-lint -- golangci-lint custom
+    fi
 
 # Run nilaway checks.
 nilcheck: build-nilaway
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build -it {{ dev_image_tag }} ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            -it \
+            {{ dev_image_tag }} \
+            ./bin/golangci-lint-nilaway run -c .golangci-nilaway.yml
+    fi
 
 # Verify Go module dependencies.
 verify:
@@ -143,7 +233,23 @@ generate-mock:
 
 # Run unit tests in the driver image.
 test: dev-image-build
-    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then mise exec go -- env GOFLAGS=-mod=readonly go test ./... -cover ${TEST_ARGS:-} -coverprofile ./coverage.out; else docker run --rm -w /workdir -v {{ justfile_directory() }}:/workdir --platform={{ dev_platform }} --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build --privileged -it {{ dev_image_tag }} mise exec go -- env GOFLAGS=-mod=readonly go test ./... -cover ${TEST_ARGS:-} -coverprofile ./coverage.out; fi
+    #!/usr/bin/env bash
+    set -u
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        mise exec go -- env GOFLAGS=-mod=readonly go test ./... -cover ${TEST_ARGS:-} -coverprofile ./coverage.out
+    else
+        docker run \
+            --rm \
+            -w /workdir \
+            -v {{ justfile_directory() }}:/workdir \
+            --platform={{ dev_platform }} \
+            --mount type=volume,source={{ go_mod_cache_volume }},target=/go/pkg/mod \
+            --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
+            --privileged \
+            -it \
+            {{ dev_image_tag }} \
+            mise exec go -- env GOFLAGS=-mod=readonly go test ./... -cover ${TEST_ARGS:-} -coverprofile ./coverage.out
+    fi
 
 # Run end-to-end tests.
 e2e-test:

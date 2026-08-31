@@ -9,7 +9,7 @@ ARG GOLANGCI_LINT_VERSION
 RUN mkdir -p /workdir
 WORKDIR /workdir
 
-RUN apk add bash mise cryptsetup cryptsetup-libs cryptsetup-dev gcc musl-dev pkgconfig
+RUN apk add bash mise cryptsetup cryptsetup-libs cryptsetup-dev gcc musl-dev pkgconfig git
 
 # go mod download (not tidy) so all deps in go.sum are pre-fetched into the image's
 # module cache without needing source files present; this cache lives outside /workdir
