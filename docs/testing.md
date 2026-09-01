@@ -2,93 +2,169 @@
 nav_order: 11
 ---
 
-# 🚀 How to Run End-to-End (e2e) Tests
+# 🚀 Testing
 
-In order to run these e2e tests, you'll need the following:
+This repository provides unit tests and three Kubernetes test suites. The Kubernetes suites can run against either a disposable Cluster API Provider Linode (CAPL) cluster or an existing Linode Kubernetes Engine (LKE) cluster.
 
-- CAPL Management Cluster
-- CAPL Child Test Cluster
-- Test Image
+| Suite | Command | Purpose |
+| --- | --- | --- |
+| Unit tests | `mise run test` | Tests driver packages in the development image. |
+| Chainsaw e2e tests | `mise run e2e-test` | Exercises common CSI workflows, including encrypted volumes. |
+| CSI sanity tests | `mise run csi-sanity-test` | Checks CSI RPC behavior through the driver. |
+| Upstream Kubernetes storage tests | `mise run upstream-e2e-tests` | Runs the non-disruptive `External.Storage` Kubernetes conformance tests. |
 
-## 📋 Pre-requisites: Setup Development Environment
+## Prerequisites
 
-Follow the steps outlined in the [development setup](./development-setup.md) to set up your development environment.
+Follow the [development setup](./development-setup.md) first and run `mise install`. Mise installs the pinned test tooling, including `kubectl`, `chainsaw`, `csi-sanity`, `clusterctl`, and `ctlptl`.
 
-## 🏗️ Setup a CAPL Management Cluster
+The Kubernetes test workflows additionally require:
 
-We will be using a kind cluster and install CAPL plus various other providers.
+- A Docker-compatible container engine available through the `docker` CLI, such as Docker Engine or Colima.
+- A container registry where you can push a test image, and credentials to push to it.
+- A Linode Personal Access Token with read/write access to Linodes and Volumes. Keep the token in your shell environment or a local secret manager. Do not commit it, add it to manifests, or pass it on a command line that may be retained in shell history.
 
-Setup the env vars and run the following command to create a kind mgmt cluster:
+Set the values used by the test setup:
 
 ```sh
-# Make sure to set the following env vars
-export LINODE_TOKEN="your linode api token"
-export LINODE_REGION="your preferred region"
-export KUBERNETES_VERSION=v1.29.1
-export LINODE_CONTROL_PLANE_MACHINE_TYPE=g6-standard-2
-export LINODE_MACHINE_TYPE=g6-standard-2
+export LINODE_TOKEN="your-linode-api-token"
+export LINODE_REGION="us-east"
+```
+
+`LINODE_REGION` selects the region for CAPL-provisioned infrastructure. The driver determines volume topology from the nodes it serves. Each Kubernetes workflow creates a `linode` Secret in the `kube-system` namespace containing `LINODE_TOKEN`.
+
+## Run Unit Tests
+
+Run the unit suite from the repository root:
+
+```sh
+mise run test
+```
+
+The command builds the development image when necessary and writes coverage data to `coverage.out`.
+
+## Prepare a Test Image
+
+Kubernetes tests must use an image containing the driver revision under test. Build and push it to a public registry that the test cluster can pull from:
+
+```sh
+export REGISTRY_NAME="index.docker.io"
+export DOCKER_USER="your-account"
+export IMAGE_NAME="linode-blockstorage-csi-driver"
+export IMAGE_VERSION="local-$(git rev-parse --short HEAD)"
+export CSI_IMAGE_NAME="$REGISTRY_NAME/$DOCKER_USER/$IMAGE_NAME"
+
+docker login "$REGISTRY_NAME"
+mise run image-build
+mise run image-push
+```
+
+Use a new `IMAGE_VERSION` after every change you want to test. The controller image uses the `IfNotPresent` pull policy, so reusing a tag can run a cached image rather than your latest local build.
+
+For a private registry, configure image-pull credentials in the cluster before installing the driver. Do not place registry credentials in this repository.
+
+## Option 1: Create a CAPL Test Cluster
+
+This workflow creates a local kind management cluster, provisions a temporary Linode workload cluster through CAPL, installs the test image, and writes its kubeconfig to `test-cluster-kubeconfig.yaml`.
+
+```sh
+export MANAGEMENT_KUBECONFIG="$HOME/.kube/config"
+export KUBECONFIG="$MANAGEMENT_KUBECONFIG"
+export K8S_VERSION="v1.36.2"
+export CONTROLPLANE_NODES="1"
+export WORKER_NODES="1"
 
 mise run mgmt-cluster
+mise run capl-cluster
+export KUBECONFIG="$PWD/test-cluster-kubeconfig.yaml"
 ```
 
-This will download all the necessary binaries to local bin and create a local mgmt cluster.
-
-## 📦 Build and Push Test Image
-
-If you have a PR open, GHA will build & push to docker hub and tag it with the current branch name.
-
-If you do not have PR open, follow the steps below:
-
-- Build a docker image with `IMAGE_TAG` set for the Mise task
-  so a custom tag is applied. Then push the image to a public repository.
-
-  > You can use any public repository that you have access to. The tags used below are just examples
-
-  ```text
-  IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e mise run image-build
-  IMAGE_TAG=ghcr.io/avestuk/linode-blockstorage-csi-driver:test-e2e mise run image-push
-  ```
-
-## 🔄 Setup a CAPL Child Test Cluster
-
-In order create a test cluster, run the following command:
+After changing the driver, publish a new image version, regenerate the driver manifest, apply it, and wait for both workloads to use the new image:
 
 ```sh
-IMAGE_NAME=ghcr.io/avestuk/linode-blockstorage-csi-driver IMAGE_VERSION=test-e2e mise run capl-cluster
+export IMAGE_VERSION="local-$(git rev-parse --short HEAD)-$(date +%s)"
+
+mise run image-build
+mise run image-push
+hack/generate-yaml.sh "$IMAGE_VERSION" "$CSI_IMAGE_NAME" > csi-manifests.yaml
+kubectl --kubeconfig "$KUBECONFIG" apply -f csi-manifests.yaml
+kubectl --kubeconfig "$KUBECONFIG" rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
+kubectl --kubeconfig "$KUBECONFIG" rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
 ```
 
-> You don't need to pass IMAGE_NAME and IMAGE_VERSION if you have a PR open
+`mise run cleanup-cluster` deletes CAPL-managed clusters and the local kind management cluster. It must run against the management cluster, not the workload cluster:
 
-The above command will create a test cluster, install CSI driver using the test image, and export kubeconfig of test-cluster to the root directory
+```sh
+KUBECONFIG="$MANAGEMENT_KUBECONFIG" mise run cleanup-cluster
+```
 
-## 🧪 Run E2E Tests
+## Option 2: Use an Existing LKE Cluster
 
-Run the following command to run all e2e tests:
+Use a dedicated non-production LKE cluster. The driver installation replaces any existing release manifests with the generated test manifest, so do not use a production cluster or one running a driver version that must remain available.
+
+Point `KUBECONFIG` at the LKE cluster, create or update the driver Secret without exposing its value in a manifest, generate the test manifests, install them, and wait for the new image to roll out:
+
+```sh
+export KUBECONFIG="/path/to/lke-kubeconfig.yaml"
+
+kubectl --kubeconfig "$KUBECONFIG" create secret generic linode \
+  --namespace kube-system \
+  --from-literal=token="$LINODE_TOKEN" \
+  --from-literal=region="$LINODE_REGION" \
+  --dry-run=client -o yaml | kubectl --kubeconfig "$KUBECONFIG" apply -f -
+
+hack/generate-yaml.sh "$IMAGE_VERSION" "$CSI_IMAGE_NAME" > csi-manifests.yaml
+kubectl --kubeconfig "$KUBECONFIG" apply -f csi-manifests.yaml
+kubectl --kubeconfig "$KUBECONFIG" rollout status -n kube-system daemonset/csi-linode-node --timeout=600s
+kubectl --kubeconfig "$KUBECONFIG" rollout status -n kube-system statefulset/csi-linode-controller --timeout=600s
+```
+
+Confirm that every node has a ready CSI node pod before running tests:
+
+```sh
+kubectl --kubeconfig "$KUBECONFIG" get pods -n kube-system -l app=csi-linode-node
+kubectl --kubeconfig "$KUBECONFIG" get pods -n kube-system -l app=csi-linode-controller
+```
+
+The `cleanup-cluster` task does not remove an existing LKE cluster. Remove only the driver resources and test data that you installed after reviewing the generated manifest.
+
+## Run Kubernetes Test Suites
+
+Run all Chainsaw tests:
 
 ```sh
 mise run e2e-test
 ```
 
-This will run the chainsaw e2e tests under the `e2e/test` directory
-
-We also label our e2e tests. The labels can be found in the `chainsaw-test.yaml` file under `metadata` in each of the individual chainsaw test directories.
-This always users to select and run specific tests.
-For example:
-If you would like to only run the test that creates a luks volume and shuffles it between the CP and worker nodes, you could run
+The command creates a local `luks.key` and passes it to the test suite. Run a labeled subset with `E2E_SELECTOR`:
 
 ```sh
-export E2E_SELECTOR=luksmove
-mise run e2e-test
+E2E_SELECTOR=luksmove mise run e2e-test
 ```
 
-## 🧹 Cleanup
-
-Run the following command to cleanup the test cluster:
+Run CSI sanity tests:
 
 ```sh
-mise run cleanup-cluster
+mise run csi-sanity-test
 ```
 
-### ⚠️ Warning
+CSI sanity temporarily patches the CSI node DaemonSet and creates a `csi-socat` StatefulSet. Run it only on a dedicated test cluster and wait for the script to finish before changing the driver deployment.
 
-This will destroy the CAPL test cluster and kind mgmt cluster
+Run the upstream Kubernetes storage tests:
+
+```sh
+mise run upstream-e2e-tests
+```
+
+This suite downloads the Kubernetes test binaries for `K8S_VERSION`, runs non-disruptive `External.Storage` coverage, and can run for up to two hours.
+
+## Cleanup
+
+After any workflow, remove test-created PersistentVolumeClaims, PersistentVolumes, and volumes that remain after a failed test. The CSI sanity task removes its temporary StatefulSet and restores the CSI node DaemonSet. For CAPL-created infrastructure, use the management-cluster cleanup command in Option 1.
+
+For an existing LKE cluster, retain the cluster and remove only the driver manifests, Secret, and test resources that you created for this run after confirming they are not in use.
+
+Remove the locally generated encryption key after Chainsaw tests:
+
+```sh
+rm -f luks.key
+```
