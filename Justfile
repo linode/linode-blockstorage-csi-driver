@@ -13,6 +13,7 @@ dev_tag_extension := env_var_or_default("DEV_TAG_EXTENSION", "")
 image_version := env_var_or_default("IMAGE_VERSION", if dev_tag_extension == "" { rev } else { rev + "-" + dev_tag_extension })
 image_tag := env_var_or_default("IMAGE_TAG", registry_name + "/" + docker_user + "/" + image_name + ":" + image_version)
 dev_image_tag := env_var_or_default("DEV_IMAGE_TAG", image_tag + "-dev")
+csi_image_name := env_var_or_default("CSI_IMAGE_NAME", docker_user + "/" + image_name)
 go_mod_cache_volume := "linode-blockstorage-csi-driver-go-mod-cache"
 go_build_cache_volume := "linode-blockstorage-csi-driver-go-build-cache"
 release_dir := env_var_or_default("RELEASE_DIR", "release")
@@ -213,7 +214,7 @@ create-capl-cluster:
 
 # Generate CSI driver manifests.
 generate-csi-driver-manifests:
-    hack/generate-yaml.sh {{ image_version }} {{ docker_user }}/{{ image_name }} > csi-manifests.yaml
+    hack/generate-yaml.sh {{ image_version }} {{ csi_image_name }} > csi-manifests.yaml
 
 # Install the CSI driver in the CAPL cluster.
 install-csi:
