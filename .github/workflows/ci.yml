@@ -51,14 +51,16 @@ jobs:
 
   codecov:
     runs-on: ubuntu-latest
-    environment: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository) && 'prod-external' || 'prod' }}
+    environment:
+      name: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository) && 'prod-external' || 'prod' }}
+      deployment: false
     needs: changes
     if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
         with:
-          disable-sudo: true
+          disable-sudo: false
           egress-policy: block
           allowed-endpoints: >
             api.github.com:443
@@ -109,7 +111,9 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-22.04
-    environment: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository) && 'prod-external' || 'prod' }}
+    environment:
+      name: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository) && 'prod-external' || 'prod' }}
+      deployment: false
     needs: changes
     if: ${{ contains(fromJSON(needs.changes.outputs.paths), 'src') }}
     env:
