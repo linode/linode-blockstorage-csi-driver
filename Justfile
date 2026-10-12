@@ -121,7 +121,7 @@ build-nilaway: dev-image-build
     #!/usr/bin/env bash
     set -u
     if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-        mise exec golangci-lint -- golangci-lint custom
+        mise exec golangci-lint -- golangci-lint custom --version v$(mise current golangci-lint)
     else
         docker run \
             --rm \
@@ -132,7 +132,7 @@ build-nilaway: dev-image-build
             --mount type=volume,source={{ go_build_cache_volume }},target=/root/.cache/go-build \
             -it \
             {{ dev_image_tag }} \
-            mise exec golangci-lint -- golangci-lint custom
+            mise exec golangci-lint -- golangci-lint custom --version v$(mise current golangci-lint)
     fi
 
 # Run nilaway checks.
