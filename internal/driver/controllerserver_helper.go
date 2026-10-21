@@ -403,13 +403,13 @@ func determineOptimalSize(reqSize, maxSize int64) int64 {
 // SINGLE_NODE_WRITER.
 func validVolumeCapabilities(caps []*csi.VolumeCapability) bool {
 	// Iterate through each capability in the provided slice
-	for _, cap := range caps {
+	for _, capability := range caps {
 		// Check if the capability is nil; if so, return false
-		if cap == nil {
+		if capability == nil {
 			return false
 		}
 		// Retrieve the access mode for the capability
-		accMode := cap.GetAccessMode()
+		accMode := capability.GetAccessMode()
 
 		// Check if the access mode is nil; if so, return false
 		if accMode == nil {

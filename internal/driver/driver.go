@@ -169,8 +169,8 @@ func (linodeDriver *LinodeDriver) ValidateControllerServiceRequest(ctx context.C
 		return nil
 	}
 
-	for _, cap := range linodeDriver.cscap {
-		if rpcType == cap.GetRpc().GetType() {
+	for _, capability := range linodeDriver.cscap {
+		if rpcType == capability.GetRpc().GetType() {
 			log.V(4).Info("Controller service request validated successfully")
 			return nil
 		}
