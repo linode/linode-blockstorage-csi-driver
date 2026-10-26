@@ -116,19 +116,11 @@ func UnaryServerInterceptorWithParams() grpc.UnaryServerInterceptor {
 			return handler(ctx, req) // No span, proceed normally
 		}
 
-		// Log the request parameters as attributes on the existing span
-		reqData, err := json.Marshal(req)
-		if err == nil {
-			span.SetAttributes(attribute.String("grpc.request", string(reqData)))
-		} else {
-			span.SetAttributes(attribute.String("grpc.request.error", err.Error()))
-		}
-
 		// Call the actual handler to process the request
 		resp, err := handler(ctx, req)
 
-		// Log the response parameters as attributes on the existing span
-		if resp != nil {
+		// Add response parameters only when the span records attributes.
+		if span.IsRecording() && resp != nil {
 			respData, er := json.Marshal(resp)
 			if er == nil {
 				span.SetAttributes(attribute.String("grpc.response", string(respData)))
