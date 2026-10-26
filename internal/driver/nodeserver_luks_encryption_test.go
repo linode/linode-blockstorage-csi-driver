@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	cryptsetup "github.com/martinjungblut/go-cryptsetup"
 	"go.uber.org/mock/gomock"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
@@ -60,10 +61,10 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Format(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+				m.EXPECT().Format(cryptsetup.LUKS2{SectorSize: 512}, cryptsetup.GenericParams{Cipher: "aes", CipherMode: "xts-plain64", VolumeKey: "", VolumeKeySize: 512 / 8}).Return(nil)
+				m.EXPECT().KeyslotAddByVolumeKey(0, "", "test").Return(nil)
 				m.EXPECT().Free().Return(true).AnyTimes()
-				m.EXPECT().ActivateByPassphrase("test", gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+				m.EXPECT().ActivateByPassphrase("test", 0, "test", 0).Return(nil)
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(true).AnyTimes()
@@ -101,9 +102,11 @@ func TestNodeServer_mountVolume_luks(t *testing.T) {
 				mc.EXPECT().Init(gomock.Any()).Return(md, nil).AnyTimes()
 			},
 			expectCryptDeviceCalls: func(m *mocks.MockDevice) {
-				m.EXPECT().Free().Return(true).AnyTimes()
-				m.EXPECT().Load(gomock.Any()).Return(nil).AnyTimes()
-				m.EXPECT().ActivateByPassphrase(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+				m.EXPECT().Format(gomock.Any(), gomock.Any()).Times(0)
+				m.EXPECT().KeyslotAddByVolumeKey(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				m.EXPECT().Load(cryptsetup.LUKS2{SectorSize: 512}).Return(nil)
+				m.EXPECT().Free().Return(true)
+				m.EXPECT().ActivateByPassphrase("test", 0, "test", 0).Return(nil)
 			},
 			expectFsCalls: func(m *mocks.MockFileSystem) {
 				m.EXPECT().IsNotExist(gomock.Any()).Return(true).AnyTimes()

@@ -95,7 +95,12 @@ spec:
 2. **Key Rotation**: Key rotation process is not handled by driver but is possible via similar
     steps to out of band resize operations.
 3. **PVC Requirement**: Encryption only possible on a new/empty PVC.
-4. **Secret Handling**: LUKS key is currently pulled from a native Kubernetes secret.
+4. **Key Separation and Upgrades**: Newly formatted LUKS2 volumes use a randomly
+   generated volume key. The configured `luksKey` is only the keyslot passphrase
+   used to unlock it through cryptsetup's LUKS2 key derivation. Staging or upgrading
+   the driver does not reformat or re-key existing volumes. Re-encrypt existing
+   volumes out of band to receive this protection.
+5. **Secret Handling**: The `luksKey` passphrase is pulled from a native Kubernetes secret.
     Take note of how your cluster handles secrets in etcd.
     The CSI driver is careful to otherwise keep the secret on an ephemeral tmpfs
     mount and otherwise refuses to continue.
