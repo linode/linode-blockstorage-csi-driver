@@ -205,6 +205,7 @@ Verify the secret was created:
 ```sh
 kubectl get secret linode -n kube-system
 ```
+The release manifest injects the `LINODE_TOKEN` value from this Secret only into the controller. The node DaemonSet runs with `DRIVER_ROLE=nodeserver` and does not receive `LINODE_TOKEN`.
 
 #### 🚀 Deploy the CSI Driver
 

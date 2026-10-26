@@ -142,3 +142,11 @@ run = "just ci"
 [tasks.release]
 description = "Create release artifacts"
 run = "just release"
+
+[tasks.generate-release-manifest]
+description = "Regenerate the checked-in raw release manifest"
+run = "just generate-release-manifest"
+
+[tasks.check-release-manifest]
+description = "Check the generated raw release manifest"
+run = "just check-release-manifest"

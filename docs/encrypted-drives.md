@@ -100,10 +100,10 @@ spec:
    used to unlock it through cryptsetup's LUKS2 key derivation. Staging or upgrading
    the driver does not reformat or re-key existing volumes. Re-encrypt existing
    volumes out of band to receive this protection.
-5. **Secret Handling**: The `luksKey` passphrase is pulled from a native Kubernetes secret.
-    Take note of how your cluster handles secrets in etcd.
-    The CSI driver is careful to otherwise keep the secret on an ephemeral tmpfs
-    mount and otherwise refuses to continue.
+5. **Secret Handling**: The `luksKey` passphrase is pulled from a native Kubernetes Secret.
+    Take note of how your cluster handles secrets in etcd. CSI request secret values
+    are excluded from driver logs and traces. The CSI driver keeps the secret on an
+    ephemeral tmpfs mount and otherwise refuses to continue.
 
 ### Example StorageClass with LUKS
 

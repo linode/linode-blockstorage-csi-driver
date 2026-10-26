@@ -216,6 +216,26 @@ create-capl-cluster:
 generate-csi-driver-manifests:
     hack/generate-yaml.sh {{ image_version }} {{ csi_image_name }} > csi-manifests.yaml
 
+# Regenerate the checked-in raw release manifest.
+generate-release-manifest:
+    hack/generate-yaml.sh latest > internal/driver/deploy/releases/linode-blockstorage-csi-driver.yaml
+
+# Check that the checked-in release manifest matches the Kustomize output.
+check-release-manifest:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    manifest=internal/driver/deploy/releases/linode-blockstorage-csi-driver.yaml
+    rendered=$(mktemp)
+    trap 'rm -f "$rendered"' EXIT
+    hack/generate-yaml.sh latest > "$rendered"
+    if cmp -s "$manifest" "$rendered"; then
+        echo "The checked-in release manifest matches generated output."
+        exit 0
+    fi
+    echo "::error file=${manifest}::The release manifest is stale. Run: mise run generate-release-manifest" >&2
+    diff -u "$manifest" "$rendered" || true
+    exit 1
+
 # Install the CSI driver in the CAPL cluster.
 install-csi:
     KUBECONFIG={{ kubeconfig }} kubectl apply -f csi-manifests.yaml
