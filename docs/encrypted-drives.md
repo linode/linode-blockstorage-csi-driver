@@ -95,10 +95,10 @@ spec:
 2. **Key Rotation**: Key rotation process is not handled by driver but is possible via similar
     steps to out of band resize operations.
 3. **PVC Requirement**: Encryption only possible on a new/empty PVC.
-4. **Secret Handling**: LUKS key is currently pulled from a native Kubernetes secret.
-    Take note of how your cluster handles secrets in etcd.
-    The CSI driver is careful to otherwise keep the secret on an ephemeral tmpfs
-    mount and otherwise refuses to continue.
+4. **Secret Handling**: The LUKS key is pulled from a native Kubernetes Secret.
+    Take note of how your cluster handles secrets in etcd. CSI request secret values
+    are excluded from driver logs and traces. The CSI driver keeps the secret on an
+    ephemeral tmpfs mount and otherwise refuses to continue.
 
 ### Example StorageClass with LUKS
 
