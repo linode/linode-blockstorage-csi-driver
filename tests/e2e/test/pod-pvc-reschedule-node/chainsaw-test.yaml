@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+
+# This test confirms that a pod using a volume that was previously attached to another node
+# is mounted promptly after being rescheduled, instead of looping on
+# "Unable to find device path out of attempted paths" FailedMount errors.
+# A pod is started on the control plane node, then deleted and recreated on a worker node.
+# The new pod must become ready within a short timeout and must not report FailedMount events.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: pod-pvc-reschedule-node
+  labels:
+    all:
+    reschedule:
+spec:
+  timeouts:
+    # The moved pod must mount well within this window; a regression loops on FailedMount.
+    assert: 120s
+  bindings:
+    - name: nodes
+      # number of nodes in cluster
+      value: (length(x_k8s_list($client, 'v1', 'Node', '').items))
+    - name: linode_url
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.apiurl || base64_encode('https://api.linode.com')))
+    - name: linode_token
+      value: (base64_decode(x_k8s_get($client, 'v1', 'Secret', 'kube-system', 'linode').data.token))
+  steps:
+    - name: Check if CSI Driver is deployed
+      try:
+        - assert:
+            file: assert-csi-driver-resources.yaml
+    - name: Create PVC and Pod (on control plane node)
+      try:
+        - apply:
+            file: create-pvc-pod-control-plane.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+    - name: Check if Pod is ready and Volume is mounted (on control plane node)
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
+    - name: Write a file to the volume
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "touch /data/testfile && sync && ls /data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+    - name: Delete the Pod
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl delete pod e2e-pod -n $NAMESPACE --wait=true --timeout=120s
+            check:
+              ($error): ~
+    - name: Recreate the Pod on a worker node
+      try:
+        - apply:
+            file: create-pod-worker.yaml
+    - name: Check if Pod is ready and Volume is mounted promptly (on worker node)
+      try:
+        - assert:
+            file: assert-pvc-pod.yaml
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+        - describe:
+            apiVersion: v1
+            kind: Pod
+        - podLogs:
+            selector: app=csi-linode-node
+            namespace: kube-system
+        - podLogs:
+            selector: app=csi-linode-controller
+            namespace: kube-system
+    - name: Check the Pod is on a worker node and no mount failures occurred
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              NODE=$(kubectl get pod -n $NAMESPACE e2e-pod -o jsonpath='{.spec.nodeName}')
+              kubectl get node $NODE | grep -q 'control-plane' && echo "on-control-plane" || echo "on-worker"
+              kubectl get events -n $NAMESPACE --field-selector involvedObject.name=e2e-pod,reason=FailedMount -o name | wc -l | sed 's/^/failed-mounts:/;s/ //g'
+            check:
+              ($error): ~
+              (contains($stdout, 'on-worker')): true
+              (contains($stdout, 'failed-mounts:0')): true
+    - name: Check file still exists on worker node
+      try:
+        - script:
+            env:
+              - name: NAMESPACE
+                value: ($namespace)
+            content: |
+              kubectl exec -n $NAMESPACE e2e-pod -- sh -c "ls /data"
+            check:
+              ($error): ~
+              (contains($stdout, 'testfile')): true
+    - name: Delete the Pod
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: Pod
+              name: e2e-pod
+    - name: Check if the volume is detached on Node resource and in Linode (using API)
+      try:
+        - script:
+            env:
+              - name: TARGET_API
+                value: ($linode_url)
+              - name: TARGET_API_VERSION
+                value: v4
+              - name: URI
+                value: volumes
+              - name: LINODE_TOKEN
+                value: ($linode_token)
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              ../check-volume-detached.sh $FILTER
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume was successfully detached')): true
+              (contains($stdout, 'Volume detached in Linode')): true
+    - name: Delete PVC
+      try:
+        - delete:
+            ref:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              name: pvc-filesystem
+    - name: Check if the Volume was deleted
+      try:
+        - script:
+            env:
+              - name: TARGET_API
+                value: ($linode_url)
+              - name: TARGET_API_VERSION
+                value: v4
+              - name: URI
+                value: volumes
+              - name: LINODE_TOKEN
+                value: ($linode_token)
+              - name: FILTER
+                value: (to_string({"tags":($namespace)}))
+            content: |
+              ../check-volume-deleted.sh $FILTER
+            check:
+              ($error): ~
+              (contains($stdout, 'Volume deleted in Linode')): true
