@@ -69,6 +69,10 @@ spec:
             capabilities:
               drop:
               - ALL
+          {{- with .Values.csiProvisioner.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
@@ -108,6 +112,10 @@ spec:
             capabilities:
               drop:
               - ALL
+          {{- with .Values.csiAttacher.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir
@@ -146,6 +154,10 @@ spec:
             capabilities:
               drop:
               - ALL
+          {{- with .Values.csiResizer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /var/lib/csi/sockets/pluginproxy/
               name: socket-dir

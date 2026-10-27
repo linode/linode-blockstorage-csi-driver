@@ -56,6 +56,8 @@ csiProvisioner:
   image: registry.k8s.io/sig-storage/csi-provisioner
   tag: v6.2.0
   pullPolicy: IfNotPresent
+  # Resource requests and limits for the CSI provisioner container
+  resources: {}
   metrics:
     address: "0.0.0.0:10248"
     port: 10248  # Metrics port for csi-provisioner
@@ -64,6 +66,8 @@ csiAttacher:
   image: registry.k8s.io/sig-storage/csi-attacher
   tag: v4.11.0
   pullPolicy: IfNotPresent
+  # Resource requests and limits for the CSI attacher container
+  resources: {}
   metrics:
     address: "0.0.0.0:10249"
     port: 10249  # Metrics port for csi-attacher
@@ -72,6 +76,8 @@ csiResizer:
   image: registry.k8s.io/sig-storage/csi-resizer
   tag: v2.1.0
   pullPolicy: IfNotPresent
+  # Resource requests and limits for the CSI resizer container
+  resources: {}
   metrics:
     address: "0.0.0.0:10250"
     port: 10250  # Metrics port for csi-resizer
@@ -94,12 +100,14 @@ csiLinodePlugin:
   volumeMounts:
   #  - mountPath: /tmp/
   #    name: test-volume
-  # This section adds the ability to pass resources to the container
-  resources:
+  # Resource requests and limits for the plugin container
+  resources: {}
 
 csiNodeDriverRegistrar:
   image: registry.k8s.io/sig-storage/csi-node-driver-registrar
   tag: v2.16.0
+  # Resource requests and limits for the node driver registrar container
+  resources: {}
   # Additional environment variables for the node driver registrar container
   env: []
   # Additional volume mounts for the node driver registrar container
