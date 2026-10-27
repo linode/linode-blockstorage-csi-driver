@@ -128,6 +128,8 @@ controller:
 
 daemonSet:
   enabled: true
+  # Optional node affinity rules for DaemonSet pods
+  nodeAffinity: {}
   serviceAccount:
     enabled: true
     name: "csi-node-sa"

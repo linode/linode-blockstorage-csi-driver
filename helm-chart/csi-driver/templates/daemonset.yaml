@@ -107,6 +107,11 @@ spec:
       {{- if .Values.daemonSet.serviceAccount.enabled }}
       serviceAccount: {{ default "csi-node-sa" .Values.daemonSet.serviceAccount.name }}
       {{- end }}
+      {{- with .Values.daemonSet.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
       tolerations:
       - effect: NoSchedule
         operator: Exists
