@@ -50,6 +50,10 @@ spec:
           capabilities:
             drop:
             - ALL
+        {{- with .Values.csiNodeDriverRegistrar.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
@@ -100,7 +104,7 @@ spec:
         {{- end }}
         {{- with .Values.csiLinodePlugin.resources }}
         resources:
-          {{- toYaml . | nindent 8 }}
+          {{- toYaml . | nindent 10 }}
         {{- end }}
       hostNetwork: true
       priorityClassName: system-node-critical
