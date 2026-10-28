@@ -264,14 +264,21 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
 
 4. **Volume Expansion**
     - **Linode Block Storage does not support online expansion.** A resized volume that is still attached will not expose its new size to the node until it is detached and reattached. The CSI driver therefore supports only offline expansion.
-    - **Before resizing**, unmount the volume from all nodes. For example, delete the pod using the volume:
+    - **Before resizing**, every pod on a given node using the volume must be completely stopped so the volume is unmounted and detached from the node. Deleting a single pod is not enough if the volume is still in use elsewhere:
+      - A volume can be mounted by multiple pods on the same node (for example, with `ReadWriteOnce` access). The volume stays attached to the node until the **last** pod using it is gone.
+      - Pods managed by a Deployment, StatefulSet, or similar controller are recreated when deleted, so scale the workload down to zero instead:
 
       ```sh
-      kubectl delete pod <pod-name>
+      kubectl scale deployment <name> --replicas=0
+      kubectl scale statefulset <name> --replicas=0
       ```
+
+      - Standalone pods can be removed with `kubectl delete pod <pod-name>`.
+      - Confirm nothing still references the PVC (`kubectl describe pvc <pvc-name>` lists it under `Used By`) before resizing.
 
     - **To resize**, update the `spec.resources.requests.storage` field in the PersistentVolumeClaim (PVC) manifest and apply the change.
     - The CSI driver then automatically resizes the underlying Linode Block Storage Volume to match the size requested in the PVC.
+    - **After resizing**, scale the workloads back up. The volume is reattached and mounted with its new size.
 
 5. Driver Role Configuration
 
