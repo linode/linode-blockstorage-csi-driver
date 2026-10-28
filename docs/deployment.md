@@ -262,13 +262,23 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
 
    **Note:** To support this change, block storage volume attachments are no longer persisted across reboots.
 
-4. **Offline Volume Resizing**
+4. **Volume Expansion**
+    - **Linode Block Storage does not support online expansion.** A resized volume that is still attached will not expose its new size to the node until it is detached and reattached. The CSI driver therefore supports only offline expansion.
+    - **Before resizing**, every pod on a given node using the volume must be completely stopped so the volume is unmounted and detached from the node. Deleting a single pod is not enough if the volume is still in use elsewhere:
+      - A volume can be mounted by multiple pods on the same node (for example, with `ReadWriteOnce` access). The volume stays attached to the node until the **last** pod using it is gone.
+      - Pods managed by a Deployment, StatefulSet, or similar controller are recreated when deleted, so scale the workload down to zero instead:
 
-    - The CSI driver supports offline volume resizing. This means that the volume must be unmounted from all nodes before resizing.
-    - To resize a volume, update the `spec.resources.requests.storage` field in the PersistentVolumeClaim (PVC) manifest and apply the changes.
-    - The CSI driver will automatically resize the underlying Linode Block Storage Volume to match the new size specified in the PVC.
-    - The volume must be unmounted from all nodes before resizing.
-      It could be unmounted by deleting the pod using the volume or by using the `kubectl delete pod <pod-name>` command.
+      ```sh
+      kubectl scale deployment <name> --replicas=0
+      kubectl scale statefulset <name> --replicas=0
+      ```
+
+      - Standalone pods can be removed with `kubectl delete pod <pod-name>`.
+      - Confirm nothing still references the PVC (`kubectl describe pvc <pvc-name>` lists it under `Used By`) before resizing.
+
+    - **To resize**, update the `spec.resources.requests.storage` field in the PersistentVolumeClaim (PVC) manifest and apply the change.
+    - The CSI driver then automatically resizes the underlying Linode Block Storage Volume to match the size requested in the PVC.
+    - **After resizing**, scale the workloads back up. The volume is reattached and mounted with its new size.
 
 5. Driver Role Configuration
 
