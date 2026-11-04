@@ -79,6 +79,12 @@ const (
 
 	// volumeEncryption is the key used in the context map for encryption
 	VolumeEncryption = Name + "/encrypted"
+
+	// VolumeLabelFromPVC is the StorageClass parameter that, when set to
+	// "true", names new volumes after the PVC (<namespace>-<pvc>-<suffix>)
+	// instead of the generated pvc-<uid>. It requires the external-provisioner
+	// to run with --extra-create-metadata.
+	VolumeLabelFromPVC = Name + "/volumeLabelFromPVC"
 )
 
 // Struct to return volume parameters when prepareVolumeParams is called
@@ -494,8 +500,7 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		}
 	}
 
-	preKey := linodevolumes.CreateLinodeVolumeKey(0, req.GetName())
-	volumeName := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+	volumeName := cs.volumeLabel(ctx, req)
 	targetSizeGB := bytesToGB(size)
 
 	// Check if encryption should be enabled
@@ -524,6 +529,38 @@ func (cs *ControllerServer) prepareVolumeParams(ctx context.Context, req *csi.Cr
 		EncryptionStatus: encryptionStatus,
 		Region:           region,
 	}, nil
+}
+
+// volumeLabel returns the Linode volume label to use for a CreateVolume
+// request. By default it is the CSI volume name (pvc-<uid>) with the driver's
+// label prefix. When the StorageClass sets VolumeLabelFromPVC to "true" and
+// the external-provisioner passed the PVC namespace and name, the label is
+// built from the PVC identity instead. The volume ID returned to Kubernetes is
+// derived from the label of the created volume, so the label never has to be
+// changed after creation.
+func (cs *ControllerServer) volumeLabel(ctx context.Context, req *csi.CreateVolumeRequest) string {
+	log, _ := logger.GetLogger(ctx)
+
+	preKey := linodevolumes.CreateLinodeVolumeKey(0, req.GetName())
+	defaultLabel := preKey.GetNormalizedLabelWithPrefix(cs.driver.volumeLabelPrefix)
+
+	params := req.GetParameters()
+	if params[VolumeLabelFromPVC] != True {
+		return defaultLabel
+	}
+
+	namespace, pvcName := params[linodevolumes.PVCNamespaceKey], params[linodevolumes.PVCNameKey]
+	if namespace == "" || pvcName == "" {
+		log.V(2).Info("PVC metadata missing from CreateVolume parameters, using default volume label; is the external-provisioner running with --extra-create-metadata?", "parameter", VolumeLabelFromPVC, "label", defaultLabel)
+		return defaultLabel
+	}
+
+	label, ok := linodevolumes.PVCVolumeLabel(cs.driver.volumeLabelPrefix, namespace, pvcName, req.GetName())
+	if !ok {
+		log.V(2).Info("Could not build a valid volume label from the PVC, using default volume label", "namespace", namespace, "pvc", pvcName, "label", defaultLabel)
+		return defaultLabel
+	}
+	return label
 }
 
 // createVolumeContext creates a context map for the volume based on the request parameters.
