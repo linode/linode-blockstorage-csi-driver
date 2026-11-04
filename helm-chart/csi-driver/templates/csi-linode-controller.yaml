@@ -41,6 +41,7 @@ spec:
             - --default-fstype=ext4
             - --volume-name-prefix=pvc
             - --volume-name-uuid-length=16
+            - --extra-create-metadata
             - --csi-address=$(ADDRESS)
             - --feature-gates=Topology=true
             - --v=2
