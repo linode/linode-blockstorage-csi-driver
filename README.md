@@ -47,6 +47,7 @@ permalink: /
   - [Creating a PersistentVolumeClaim](docs/usage.md#creating-a-persistentvolumeclaim)
   - [Encrypted Drives using LUKS](docs/encrypted-drives.md)
   - [Adding Tags to Created Volumes](docs/volume-tags.md)
+  - [Naming Volumes After Their PVC](docs/volume-labels.md)
   - [Topology-Aware Provisioning](docs/topology-aware-provisioning.md)
 - [Development Setup](docs/development-setup.md)
   - [Prerequisites](docs/development-setup.md#-prerequisites)
