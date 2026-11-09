@@ -168,3 +168,13 @@ Remove the locally generated encryption key after Chainsaw tests:
 ```sh
 rm -f luks.key
 ```
+
+## Chainsaw schema lint
+
+Validate `.chainsaw.yaml` and every test manifest with the pinned Chainsaw version:
+
+```sh
+mise run chainsaw-lint
+```
+
+This is a static schema check; it does not run E2E tests or require a cluster.
