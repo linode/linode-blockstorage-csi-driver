@@ -124,6 +124,77 @@ func TestCreateVolume(t *testing.T) {
 	}
 }
 
+// With VolumeLabelFromPVC the volume is created with a PVC-derived label, the
+// handle returned to Kubernetes carries that same label, and a retried
+// CreateVolume finds the existing volume instead of creating a second one.
+func TestCreateVolume_VolumeLabelFromPVC(t *testing.T) {
+	const wantLabel = "monitoring-ingester-2-f02c4813"
+	req := &csi.CreateVolumeRequest{
+		Name: "pvc-72af5c8ff02c4813",
+		VolumeCapabilities: []*csi.VolumeCapability{
+			{
+				AccessMode: &csi.VolumeCapability_AccessMode{
+					Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+				},
+			},
+		},
+		Parameters: map[string]string{
+			VolumeLabelFromPVC:            True,
+			linodevolumes.PVCNamespaceKey: "monitoring",
+			linodevolumes.PVCNameKey:      "storage-loki-ingester-2",
+		},
+	}
+	wantFilter := fmt.Sprintf(`{"label":%q}`, wantLabel)
+
+	t.Run("create", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		m := mocks.NewMockLinodeClient(ctrl)
+		m.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, opts *linodego.ListOptions) ([]linodego.Volume, error) {
+			if opts.Filter != wantFilter {
+				t.Errorf("ListVolumes filter = %s, want %s", opts.Filter, wantFilter)
+			}
+			return nil, nil
+		})
+		m.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, opts linodego.VolumeCreateOptions) (*linodego.Volume, error) {
+			if opts.Label != wantLabel {
+				t.Errorf("CreateVolume label = %q, want %q", opts.Label, wantLabel)
+			}
+			return &linodego.Volume{ID: 1001, Label: opts.Label, Size: 10}, nil
+		})
+		m.EXPECT().WaitForVolumeStatus(gomock.Any(), 1001, linodego.VolumeActive).Return(&linodego.Volume{ID: 1001, Label: wantLabel, Size: 10, Status: linodego.VolumeActive}, nil)
+
+		s := &ControllerServer{client: m, driver: &LinodeDriver{}}
+		resp, err := s.CreateVolume(context.Background(), req)
+		if err != nil {
+			t.Fatalf("CreateVolume() error = %v", err)
+		}
+		if got, want := resp.GetVolume().GetVolumeId(), "1001-"+wantLabel; got != want {
+			t.Errorf("VolumeId = %q, want %q", got, want)
+		}
+		key, err := linodevolumes.ParseLinodeVolumeKey(resp.GetVolume().GetVolumeId())
+		if err != nil || key.GetNormalizedLabel() != wantLabel {
+			t.Errorf("volume handle does not carry the label used for device lookup: %+v, %v", key, err)
+		}
+	})
+
+	t.Run("retry is idempotent", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		m := mocks.NewMockLinodeClient(ctrl)
+		m.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return([]linodego.Volume{{ID: 1001, Label: wantLabel, Size: 10}}, nil)
+		m.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(0)
+		m.EXPECT().WaitForVolumeStatus(gomock.Any(), 1001, linodego.VolumeActive).Return(&linodego.Volume{ID: 1001, Label: wantLabel, Size: 10, Status: linodego.VolumeActive}, nil)
+
+		s := &ControllerServer{client: m, driver: &LinodeDriver{}}
+		resp, err := s.CreateVolume(context.Background(), req)
+		if err != nil {
+			t.Fatalf("CreateVolume() error = %v", err)
+		}
+		if got, want := resp.GetVolume().GetVolumeId(), "1001-"+wantLabel; got != want {
+			t.Errorf("VolumeId = %q, want %q", got, want)
+		}
+	})
+}
+
 func TestDeleteVolume(t *testing.T) {
 	tests := []struct {
 		name                    string

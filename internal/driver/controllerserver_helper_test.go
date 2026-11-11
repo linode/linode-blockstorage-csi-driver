@@ -1390,3 +1390,86 @@ func Test_getRegionFromTopology(t *testing.T) {
 		})
 	}
 }
+
+func TestPrepareVolumeParams_VolumeLabelFromPVC(t *testing.T) {
+	pvcMetadata := map[string]string{
+		linodevolumes.PVCNamespaceKey: "default",
+		linodevolumes.PVCNameKey:      "data-postgres-0",
+	}
+	withParams := func(extra map[string]string) map[string]string {
+		out := map[string]string{}
+		for k, v := range pvcMetadata {
+			out[k] = v
+		}
+		for k, v := range extra {
+			out[k] = v
+		}
+		return out
+	}
+
+	tests := []struct {
+		name       string
+		prefix     string
+		parameters map[string]string
+		want       string
+	}{
+		{
+			name:       "disabled by default even when PVC metadata is present",
+			parameters: withParams(nil),
+			want:       "pvc-72af5c8ff02c4813",
+		},
+		{
+			name:       "enabled",
+			parameters: withParams(map[string]string{VolumeLabelFromPVC: True}),
+			want:       "default-data-postgres-0-f02c4813",
+		},
+		{
+			name:       "enabled with driver label prefix",
+			prefix:     "lke1-",
+			parameters: withParams(map[string]string{VolumeLabelFromPVC: True}),
+			want:       "lke1-default-ostgres-0-f02c4813",
+		},
+		{
+			name:       "explicitly disabled",
+			parameters: withParams(map[string]string{VolumeLabelFromPVC: "false"}),
+			want:       "pvc-72af5c8ff02c4813",
+		},
+		{
+			name:       "enabled without --extra-create-metadata falls back",
+			parameters: map[string]string{VolumeLabelFromPVC: True},
+			want:       "pvc-72af5c8ff02c4813",
+		},
+		{
+			name: "enabled with a namespace that cannot start a label falls back",
+			parameters: map[string]string{
+				VolumeLabelFromPVC:            True,
+				linodevolumes.PVCNamespaceKey: "1-team",
+				linodevolumes.PVCNameKey:      "data",
+			},
+			want: "pvc-72af5c8ff02c4813",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := &ControllerServer{
+				driver: &LinodeDriver{volumeLabelPrefix: tt.prefix},
+			}
+			params, err := cs.prepareVolumeParams(context.Background(), &csi.CreateVolumeRequest{
+				Name:          "pvc-72af5c8ff02c4813",
+				Parameters:    tt.parameters,
+				CapacityRange: &csi.CapacityRange{RequiredBytes: 10 << 30},
+			})
+			if err != nil {
+				t.Fatalf("prepareVolumeParams() error = %v", err)
+			}
+			want := tt.want
+			if tt.prefix != "" && tt.parameters[VolumeLabelFromPVC] != True {
+				want = tt.prefix + want
+			}
+			if params.VolumeName != want {
+				t.Errorf("VolumeName = %q, want %q", params.VolumeName, want)
+			}
+		})
+	}
+}
