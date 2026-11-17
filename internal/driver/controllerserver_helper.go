@@ -783,10 +783,8 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		defer span.End()
 	}
 
-	persist := true
 	_, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
-		LinodeID:           linodeID,
-		PersistAcrossBoots: &persist,
+		LinodeID: linodeID,
 	})
 	if err != nil {
 		code := codes.Internal // Default error code is Internal.
