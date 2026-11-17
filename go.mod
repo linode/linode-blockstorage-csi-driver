@@ -2,7 +2,7 @@ module github.com/linode/linode-blockstorage-csi-driver
 
 go 1.27.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/container-storage-interface/spec v1.12.0
