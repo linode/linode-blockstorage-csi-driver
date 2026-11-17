@@ -783,7 +783,7 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 		defer span.End()
 	}
 
-	persist := false
+	persist := true
 	_, err := cs.client.AttachVolume(ctx, volumeID, &linodego.VolumeAttachOptions{
 		LinodeID:           linodeID,
 		PersistAcrossBoots: &persist,

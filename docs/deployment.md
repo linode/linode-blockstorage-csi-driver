@@ -259,7 +259,7 @@ kubectl apply -f https://raw.githubusercontent.com/linode/linode-blockstorage-cs
 
    This scaling also applies to dedicated, premium, GPU, and high-memory instance classes. The number of attached volumes is a combination of block storage volumes and instance disks (e.g., the boot disk).
 
-   **Note:** To support this change, block storage volume attachments are no longer persisted across reboots.
+   **Note:** New volume attachments persist across reboots. This helps keep them attached after an unexpected reboot or emergency maintenance.
 
 4. **Offline Volume Resizing**
 

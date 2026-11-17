@@ -76,7 +76,7 @@ For more information about Kubernetes CSI, refer to the [Kubernetes CSI](https:/
 - **Volume Size Constraints**:
   - Requests for Persistent Volumes with a require_size less than the Linode minimum Block Storage size will be fulfilled with a Linode Block Storage volume of the minimum size (currently 10Gi) in accordance with the CSI specification.
   - The upper-limit size constraint (`limit_bytes`) will also be honored, so the size of Linode Block Storage volumes provisioned will not exceed this parameter.
-- **Volume Attachment Persistence**: Block storage volume attachments are no longer persisted across reboots to support a higher number of attachments on larger instances.
+- **Volume Attachment Persistence**: New volume attachments persist across reboots.
 <!-- Add note about volume resizing limitations -->
 
 _For more details, refer to the [CSI specification](https://github.com/container-storage-interface/spec/blob/v1.0.0/spec.md#createvolume)._
