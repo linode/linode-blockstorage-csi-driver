@@ -32,13 +32,14 @@ SKIP_TESTS_STRING=$(
 # maximum ("san-" + 8 hex chars) and may be overridden via CSI_SANITY_VOLUME_PREFIX.
 VOLUME_PREFIX="${CSI_SANITY_VOLUME_PREFIX:-san-$(openssl rand -hex 4)}"
 echo "Using volume label prefix: ${VOLUME_PREFIX}"
-# This must happen before socat is deployed since the controller pod may be rescheduled.
-kubectl set env statefulset/csi-linode-controller \
+# socat reaches the node plugin's socket (which also serves the ControllerServer),
+# so the prefix settings must be applied to the node DaemonSet.
+kubectl set env daemonset/csi-linode-node \
    -n kube-system \
    -c csi-linode-plugin \
    LINODE_VOLUME_LABEL_PREFIX="${VOLUME_PREFIX}" \
    LINODE_LIST_VOLUMES_FILTER_BY_PREFIX="true"
-kubectl rollout status statefulset/csi-linode-controller -n kube-system --timeout=300s
+kubectl rollout status daemonset/csi-linode-node -n kube-system --timeout=300s
 
 # Create socat statefulset
 kubectl apply -f tests/csi-sanity/socat.yaml
