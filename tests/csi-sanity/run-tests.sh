@@ -27,11 +27,16 @@ SKIP_TESTS_STRING=$(
 # Scope ListVolumes to volumes created by this test run. Without this, ListVolumes
 # returns every volume in the Linode account, so unrelated volumes created or deleted
 # concurrently make the "check the presence of new volumes ..." sanity test flaky.
+# The prefix is random per run so that sanity runs for different branches/PRs sharing
+# the same Linode account do not see each other's volumes. It is exactly the 12 character
+# maximum ("san-" + 8 hex chars) and may be overridden via CSI_SANITY_VOLUME_PREFIX.
+VOLUME_PREFIX="${CSI_SANITY_VOLUME_PREFIX:-san-$(openssl rand -hex 4)}"
+echo "Using volume label prefix: ${VOLUME_PREFIX}"
 # This must happen before socat is deployed since the controller pod may be rescheduled.
 kubectl set env statefulset/csi-linode-controller \
    -n kube-system \
    -c csi-linode-plugin \
-   LINODE_VOLUME_LABEL_PREFIX="csisanity-" \
+   LINODE_VOLUME_LABEL_PREFIX="${VOLUME_PREFIX}" \
    LINODE_LIST_VOLUMES_FILTER_BY_PREFIX="true"
 kubectl rollout status statefulset/csi-linode-controller -n kube-system --timeout=300s
 
