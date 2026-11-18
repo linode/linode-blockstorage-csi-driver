@@ -8,7 +8,7 @@ GOTOOLCHAIN = "auto"
 [tools]
 ctlptl = "0.9.4"
 ginkgo = "2.32.0"
-go = "1.27.3"
+go = "1.27.4"
 golangci-lint = "2.15.0"
 kind = "0.32.0"
 kubectl = "1.36.2"
