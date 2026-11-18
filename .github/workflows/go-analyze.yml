@@ -85,5 +85,8 @@ jobs:
       - name: lint
         run: mise run lint
 
+      - name: Chainsaw lint
+        run: mise run chainsaw-lint
+
       - name: Vulncheck
         run: mise run vulncheck

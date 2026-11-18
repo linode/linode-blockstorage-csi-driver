@@ -50,6 +50,10 @@ spec:
           capabilities:
             drop:
             - ALL
+        {{- with .Values.csiNodeDriverRegistrar.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         volumeMounts:
         - mountPath: /csi
           name: plugin-dir
@@ -100,12 +104,17 @@ spec:
         {{- end }}
         {{- with .Values.csiLinodePlugin.resources }}
         resources:
-          {{- toYaml . | nindent 8 }}
+          {{- toYaml . | nindent 10 }}
         {{- end }}
       hostNetwork: true
       priorityClassName: system-node-critical
       {{- if .Values.daemonSet.serviceAccount.enabled }}
       serviceAccount: {{ default "csi-node-sa" .Values.daemonSet.serviceAccount.name }}
+      {{- end }}
+      {{- with .Values.daemonSet.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+          {{- toYaml . | nindent 10 }}
       {{- end }}
       tolerations:
       - effect: NoSchedule

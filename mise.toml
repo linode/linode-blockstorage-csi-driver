@@ -8,8 +8,8 @@ GOTOOLCHAIN = "auto"
 [tools]
 ctlptl = "0.9.4"
 ginkgo = "2.32.0"
-go = "1.27.2"
-golangci-lint = "2.14.0"
+go = "1.27.4"
+golangci-lint = "2.15.0"
 kind = "0.32.0"
 kubectl = "1.36.2"
 kustomize = "5.8.1"
@@ -34,6 +34,10 @@ run = "just vet"
 [tasks.lint]
 description = "Run golangci-lint"
 run = "just lint"
+
+[tasks.chainsaw-lint]
+description = "Validate the Chainsaw configuration and every E2E test manifest."
+run = "just chainsaw-lint"
 
 [tasks.lint-fix]
 description = "Run golangci-lint --fix"
@@ -142,3 +146,11 @@ run = "just ci"
 [tasks.release]
 description = "Create release artifacts"
 run = "just release"
+
+[tasks.generate-release-manifest]
+description = "Regenerate the checked-in raw release manifest"
+run = "just generate-release-manifest"
+
+[tasks.check-release-manifest]
+description = "Check the generated raw release manifest"
+run = "just check-release-manifest"

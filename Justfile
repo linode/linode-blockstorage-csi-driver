@@ -216,6 +216,26 @@ create-capl-cluster:
 generate-csi-driver-manifests:
     hack/generate-yaml.sh {{ image_version }} {{ csi_image_name }} > csi-manifests.yaml
 
+# Regenerate the checked-in raw release manifest.
+generate-release-manifest:
+    hack/generate-yaml.sh latest > internal/driver/deploy/releases/linode-blockstorage-csi-driver.yaml
+
+# Check that the checked-in release manifest matches the Kustomize output.
+check-release-manifest:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    manifest=internal/driver/deploy/releases/linode-blockstorage-csi-driver.yaml
+    rendered=$(mktemp)
+    trap 'rm -f "$rendered"' EXIT
+    hack/generate-yaml.sh latest > "$rendered"
+    if cmp -s "$manifest" "$rendered"; then
+        echo "The checked-in release manifest matches generated output."
+        exit 0
+    fi
+    echo "::error file=${manifest}::The release manifest is stale. Run: mise run generate-release-manifest" >&2
+    diff -u "$manifest" "$rendered" || true
+    exit 1
+
 # Install the CSI driver in the CAPL cluster.
 install-csi:
     KUBECONFIG={{ kubeconfig }} kubectl apply -f csi-manifests.yaml
@@ -270,6 +290,11 @@ e2e-test:
     openssl rand -out luks.key 64
     KUBECONFIG={{ kubeconfig }} LUKS_KEY=$(base64 luks.key | tr -d '\n') chainsaw test ./tests/e2e --parallel 2 --selector {{ e2e_selector }}
 
+# Validate the Chainsaw configuration and all E2E test manifests.
+chainsaw-lint:
+    chainsaw lint configuration --file .chainsaw.yaml
+    find tests/e2e -type f -name 'chainsaw-test.yaml' -print0 | xargs -0 -n 1 chainsaw lint test --file
+
 # Run CSI sanity tests.
 csi-sanity-test:
     KUBECONFIG={{ kubeconfig }} ./tests/csi-sanity/run-tests.sh
@@ -279,7 +304,7 @@ upstream-e2e-tests:
     OS={{ os }} ARCH={{ arch_short }} K8S_VERSION={{ k8s_version }} KUBECONFIG={{ kubeconfig }} ./tests/upstream-e2e/run-tests.sh
 
 # Run all CI checks.
-ci: vet lint vulncheck test build
+ci: vet lint chainsaw-lint vulncheck test build
 
 # Create release artifacts.
 release:

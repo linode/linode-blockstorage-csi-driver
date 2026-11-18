@@ -133,10 +133,10 @@ func (e *Encryption) luksFormat(ctx context.Context, luksCtx *LuksContext, sourc
 		return "", fmt.Errorf("keysize str to int coversion: %w", err)
 	}
 	cipherString := strings.SplitN(luksCtx.EncryptionCipher, "-", 2)
+	// Cryptsetup generates the volume key; EncryptionKey is only the keyslot passphrase.
 	genericParams := cryptsetup.GenericParams{
 		Cipher:        cipherString[0],
 		CipherMode:    cipherString[1],
-		VolumeKey:     luksCtx.EncryptionKey,
 		VolumeKeySize: keySize / 8,
 	}
 

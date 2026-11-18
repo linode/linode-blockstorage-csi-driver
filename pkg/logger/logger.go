@@ -38,7 +38,6 @@ func GetLogger(ctx context.Context) (logr.Logger, context.Context) {
 func LogGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	logger, ctx := GetLogger(ctx)
 	logger.V(3).Info("GRPC call", "method", info.FullMethod)
-	logger.V(5).Info("GRPC request", "request", req)
 	resp, err := handler(ctx, req)
 	if err != nil {
 		logger.Error(err, "GRPC error")

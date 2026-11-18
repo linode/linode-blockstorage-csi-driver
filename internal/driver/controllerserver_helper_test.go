@@ -1187,7 +1187,7 @@ func TestAttachVolume(t *testing.T) {
 			linodeID: 456,
 			setupMocks: func() {
 				mockClient.EXPECT().AttachVolume(gomock.Any(), 123, gomock.Cond(func(options *linodego.VolumeAttachOptions) bool {
-					return options != nil && options.LinodeID == 456 && options.PersistAcrossBoots == nil
+					return options != nil && options.LinodeID == 456 && options.PersistAcrossBoots != nil && *options.PersistAcrossBoots
 				})).Return(&linodego.Volume{}, nil)
 			},
 			expectedError: nil,
