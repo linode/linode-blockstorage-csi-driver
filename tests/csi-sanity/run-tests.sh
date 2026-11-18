@@ -24,6 +24,17 @@ SKIP_TESTS_STRING=$(
                              echo "${SKIP_TESTS[*]}"
 )
 
+# Scope ListVolumes to volumes created by this test run. Without this, ListVolumes
+# returns every volume in the Linode account, so unrelated volumes created or deleted
+# concurrently make the "check the presence of new volumes ..." sanity test flaky.
+# This must happen before socat is deployed since the controller pod may be rescheduled.
+kubectl set env statefulset/csi-linode-controller \
+   -n kube-system \
+   -c csi-linode-plugin \
+   LINODE_VOLUME_LABEL_PREFIX="csisanity-" \
+   LINODE_LIST_VOLUMES_FILTER_BY_PREFIX="true"
+kubectl rollout status statefulset/csi-linode-controller -n kube-system --timeout=300s
+
 # Create socat statefulset
 kubectl apply -f tests/csi-sanity/socat.yaml
 

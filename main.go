@@ -55,6 +55,10 @@ type configuration struct {
 	// Volumes.
 	volumeLabelPrefix string
 
+	// When true (and volumeLabelPrefix is set), ListVolumes only returns
+	// volumes whose label starts with volumeLabelPrefix.
+	listVolumesFilterByPrefix bool
+
 	// Name of the current node, when running as the node plugin.
 	//
 	// Deprecated: This is not needed as the CSI driver now uses the Linode
@@ -82,6 +86,7 @@ func loadConfig() configuration {
 	envflag.StringVar(&cfg.driverRole, "DRIVER_ROLE", "controller", "Driver Role, controller or nodeserver")
 	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", fmt.Sprintf("%s://%s", linodego.APIProto, linodego.APIHost), "Linode API URL")
 	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
+	envflag.BoolVar(&cfg.listVolumesFilterByPrefix, "LINODE_LIST_VOLUMES_FILTER_BY_PREFIX", false, "Only return volumes whose label starts with LINODE_VOLUME_LABEL_PREFIX from ListVolumes")
 	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
 	envflag.StringVar(&cfg.enableMetrics, "ENABLE_METRICS", "", "This flag conditionally runs the metrics servers")
 	envflag.StringVar(&cfg.metricsPort, "METRICS_PORT", "8081", "This flag specifies the port on which the metrics https server will run")
@@ -173,6 +178,7 @@ func handle(ctx context.Context) error {
 		driver.Name,
 		vendorVersion,
 		cfg.volumeLabelPrefix,
+		cfg.listVolumesFilterByPrefix,
 		encrypt,
 		cfg.enableMetrics,
 		cfg.metricsPort,
