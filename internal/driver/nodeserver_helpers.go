@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/klog/v2"
@@ -33,6 +34,15 @@ const (
 	defaultFSType                  = "ext4"
 	rwPermission                   = os.FileMode(0o755)
 	ownerGroupReadWritePermissions = os.FileMode(0o660)
+)
+
+// These are variables so tests can shorten them.
+var (
+	// devicePathWaitTimeout bounds how long NodeStageVolume waits for an
+	// attached volume's device symlink to appear.
+	devicePathWaitTimeout = 30 * time.Second
+	// devicePathPollInterval is the delay between device path lookups.
+	devicePathPollInterval = 500 * time.Millisecond
 )
 
 // ValidateNodeStageVolumeRequest validates the node stage volume request.
@@ -167,47 +177,83 @@ func (ns *NodeServer) findDevicePath(ctx context.Context, key linodevolumes.Lino
 	log, _ := logger.GetLogger(ctx)
 	log.V(4).Info("Entering findDevicePath", "key", key, "partition", partition)
 
-	// Get the device name and paths from the LinodeVolumeKey and partition.
-	deviceName := key.GetNormalizedLabel()
-	devicePaths := ns.deviceutils.GetDiskByIdPaths(deviceName, partition)
-
-	// Verify the device path by checking if any of the paths exist.
-	devicePath, err := ns.deviceutils.VerifyDevicePath(devicePaths)
+	devicePath, devicePaths, err := ns.lookupDevicePath(key, partition)
 	if err != nil {
-		return "", errInternal("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err)
+		return "", err
 	}
 
 	// If no device path is found, return an error.
 	if devicePath == "" {
-		return "", errInternal("Unable to find device path out of attempted paths: %v", devicePaths)
+		return "", errDevicePathNotFound(devicePaths)
 	}
-
-	// If a device path is found, return it.
-	klog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
 
 	log.V(4).Info("Exiting findDevicePath", "devicePath", devicePath)
 	return devicePath, nil
 }
 
+// lookupDevicePath performs a single by-id lookup. It returns an empty device
+// path and nil error if none of the candidate paths exist yet.
+func (ns *NodeServer) lookupDevicePath(key linodevolumes.LinodeVolumeKey, partition string) (devicePath string, devicePaths []string, err error) {
+	// Get the device name and paths from the LinodeVolumeKey and partition.
+	deviceName := key.GetNormalizedLabel()
+	devicePaths = ns.deviceutils.GetDiskByIdPaths(deviceName, partition)
+
+	// Verify the device path by checking if any of the paths exist.
+	devicePath, err = ns.deviceutils.VerifyDevicePath(devicePaths)
+	if err != nil {
+		return "", devicePaths, errInternal("Error verifying Linode Volume (%q) is attached: %v", key.GetVolumeLabel(), err)
+	}
+
+	if devicePath != "" {
+		klog.V(4).Infof("Successfully found attached Linode Volume %q at device path %s.", deviceName, devicePath)
+	}
+	return devicePath, devicePaths, nil
+}
+
+func errDevicePathNotFound(devicePaths []string) error {
+	return errInternal("Unable to find device path out of attempted paths: %v", devicePaths)
+}
+
 // resolveStageDevicePath prefers the controller server provided device path when it is
-// available and locally verified, then falls back to the by-id st lookup.
+// available and locally verified, then falls back to the by-id lookup.
+//
+// The Linode API reports a volume as attached before udev has necessarily created
+// the matching /dev/disk/by-id symlink on the node, so the lookup is retried for
+// up to devicePathWaitTimeout before giving up.
 func (ns *NodeServer) resolveStageDevicePath(ctx context.Context, req *csi.NodeStageVolumeRequest, key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
 	log, _ := logger.GetLogger(ctx)
 	log.V(4).Info("Entering resolveStageDevicePath", "volumeID", req.GetVolumeId(), "partition", partition)
 
-	if publishContext := req.GetPublishContext(); publishContext != nil {
-		if devicePath := publishContext[devicePathKey]; devicePath != "" {
-			verifiedDevicePath, err := ns.deviceutils.VerifyDevicePath([]string{devicePath})
-			if err == nil && verifiedDevicePath != "" {
-				log.V(4).Info("Using device path from PublishContext", "devicePath", verifiedDevicePath)
-				return verifiedDevicePath, nil
-			}
+	publishedPath := req.GetPublishContext()[devicePathKey]
 
-			log.V(4).Info("PublishContext device path was not found on this node, falling back to local lookup", "devicePath", devicePath)
+	ctx, cancel := context.WithTimeout(ctx, devicePathWaitTimeout)
+	defer cancel()
+
+	for attempt := 1; ; attempt++ {
+		if publishedPath != "" {
+			if verified, err := ns.deviceutils.VerifyDevicePath([]string{publishedPath}); err == nil && verified != "" {
+				log.V(4).Info("Using device path from PublishContext", "devicePath", verified)
+				return verified, nil
+			}
+			log.V(4).Info("PublishContext device path was not found on this node, falling back to local lookup", "devicePath", publishedPath)
+		}
+
+		devicePath, devicePaths, err := ns.lookupDevicePath(key, partition)
+		if err != nil {
+			return "", err
+		}
+		if devicePath != "" {
+			return devicePath, nil
+		}
+
+		log.V(4).Info("Device path not available yet, retrying", "attempt", attempt, "attemptedPaths", devicePaths)
+
+		select {
+		case <-ctx.Done():
+			return "", errDevicePathNotFound(devicePaths)
+		case <-time.After(devicePathPollInterval):
 		}
 	}
-
-	return ns.findDevicePath(ctx, key, partition)
 }
 
 // ensureMountPoint checks if the staging target path is a mount point or not.

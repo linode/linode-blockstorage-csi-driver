@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"go.uber.org/mock/gomock"
@@ -275,6 +276,73 @@ func TestNodeServer_findDevicePath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodeServer_resolveStageDevicePath(t *testing.T) {
+	origTimeout, origInterval := devicePathWaitTimeout, devicePathPollInterval
+	t.Cleanup(func() { devicePathWaitTimeout, devicePathPollInterval = origTimeout, origInterval })
+	devicePathPollInterval = time.Millisecond
+
+	key := linodevolumes.LinodeVolumeKey{VolumeID: 123, Label: "test"}
+	byIDPaths := []string{"/dev/disk/by-id/linode-test", "/dev/disk/by-id/scsi-0Linode_Volume_test"}
+	req := &csi.NodeStageVolumeRequest{
+		VolumeId:       key.GetVolumeKey(),
+		PublishContext: map[string]string{devicePathKey: byIDPaths[1]},
+	}
+
+	t.Run("waits for device symlink to appear", func(t *testing.T) {
+		devicePathWaitTimeout = 5 * time.Second
+		ctrl := gomock.NewController(t)
+		dUtils := mocks.NewMockDeviceUtils(ctrl)
+
+		dUtils.EXPECT().GetDiskByIdPaths(gomock.Any(), "").Return(byIDPaths).AnyTimes()
+		gomock.InOrder(
+			// Two attempts where the device is not there yet, then it shows up.
+			dUtils.EXPECT().VerifyDevicePath([]string{byIDPaths[1]}).Return("", nil),
+			dUtils.EXPECT().VerifyDevicePath(byIDPaths).Return("", nil),
+			dUtils.EXPECT().VerifyDevicePath([]string{byIDPaths[1]}).Return("", nil),
+			dUtils.EXPECT().VerifyDevicePath(byIDPaths).Return("", nil),
+			dUtils.EXPECT().VerifyDevicePath([]string{byIDPaths[1]}).Return(byIDPaths[1], nil),
+		)
+
+		ns := &NodeServer{deviceutils: dUtils}
+		got, err := ns.resolveStageDevicePath(context.Background(), req, key, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != byIDPaths[1] {
+			t.Errorf("got %q, want %q", got, byIDPaths[1])
+		}
+	})
+
+	t.Run("fails after timeout", func(t *testing.T) {
+		devicePathWaitTimeout = 20 * time.Millisecond
+		ctrl := gomock.NewController(t)
+		dUtils := mocks.NewMockDeviceUtils(ctrl)
+
+		dUtils.EXPECT().GetDiskByIdPaths(gomock.Any(), "").Return(byIDPaths).AnyTimes()
+		dUtils.EXPECT().VerifyDevicePath(gomock.Any()).Return("", nil).MinTimes(2)
+
+		ns := &NodeServer{deviceutils: dUtils}
+		_, err := ns.resolveStageDevicePath(context.Background(), req, key, "")
+		compareGRPCErrors(t, err, errDevicePathNotFound(byIDPaths))
+	})
+
+	t.Run("does not retry on verification error", func(t *testing.T) {
+		devicePathWaitTimeout = 5 * time.Second
+		ctrl := gomock.NewController(t)
+		dUtils := mocks.NewMockDeviceUtils(ctrl)
+
+		dUtils.EXPECT().GetDiskByIdPaths(gomock.Any(), "").Return(byIDPaths)
+		gomock.InOrder(
+			dUtils.EXPECT().VerifyDevicePath([]string{byIDPaths[1]}).Return("", nil),
+			dUtils.EXPECT().VerifyDevicePath(byIDPaths).Return("", fmt.Errorf("boom")),
+		)
+
+		ns := &NodeServer{deviceutils: dUtils}
+		_, err := ns.resolveStageDevicePath(context.Background(), req, key, "")
+		compareGRPCErrors(t, err, errInternal("Error verifying Linode Volume (\"test\") is attached: boom"))
+	})
 }
 
 func TestNodeServer_ensureMountPoint(t *testing.T) {
