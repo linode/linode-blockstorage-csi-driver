@@ -214,9 +214,6 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	volumeID := req.GetVolumeId()
 	log.V(2).Info("Processing request", "volumeID", volumeID)
 
-	ns.mux.Lock()
-	defer ns.mux.Unlock()
-
 	// Part 1: Validate request object
 
 	// Before to functionStartTime, validate the request object (NodeStageVolumeRequest)
@@ -258,6 +255,11 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		observability.RecordMetrics(observability.NodeStageVolumeTotal, observability.NodeStageVolumeDuration, observability.Failed, functionStartTime)
 		return nil, err
 	}
+
+	// Resolve the device before taking the node-wide lock so a udev delay
+	// doesn't block operations for other volumes.
+	ns.mux.Lock()
+	defer ns.mux.Unlock()
 
 	// Part 3: check if staging target path is a valid mount point.
 
