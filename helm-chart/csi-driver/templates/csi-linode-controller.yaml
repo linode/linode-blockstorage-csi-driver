@@ -179,6 +179,8 @@ spec:
               value: controller
             - name: LINODE_VOLUME_LABEL_PREFIX
               value: {{ .Values.volumeLabelPrefix | default "" | quote }}
+            - name: LINODE_LIST_VOLUMES_FILTER_BY_PREFIX
+              value: {{ .Values.listVolumesFilterByPrefix | default false | quote }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

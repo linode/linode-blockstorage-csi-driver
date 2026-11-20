@@ -2,8 +2,10 @@ package driver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -353,7 +355,10 @@ func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req 
 // including their IDs, sizes, and accessibility information. The starting
 // token is the 1-based page number to fetch; max_entries is intentionally
 // ignored, as pages are always sized to DefaultPageSize to bound the number
-// of Linode API requests.
+// of Linode API requests. By default every volume in the account is returned;
+// if the driver is configured with a volume label prefix and
+// LINODE_LIST_VOLUMES_FILTER_BY_PREFIX, only volumes whose label starts with
+// that prefix are returned.
 // For more details, refer to the CSI Driver Spec documentation.
 func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	log, ctx := logger.GetLogger(ctx)
@@ -367,7 +372,17 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	// Page is 1-based; DefaultListOptions pins PageSize to the API max so a
 	// full page signals more results and a partial page ends pagination.
-	listOpts := linodeclient.DefaultListOptions(1, "")
+	filter := ""
+	filterPrefix := ""
+	if cs.driver != nil && cs.driver.listVolumesFilterByPrefix && cs.driver.volumeLabelPrefix != "" {
+		filterPrefix = cs.driver.volumeLabelPrefix
+		var err error
+		filter, err = labelContainsFilter(filterPrefix)
+		if err != nil {
+			return &csi.ListVolumesResponse{}, errInternal("build volume filter: %v", err)
+		}
+	}
+	listOpts := linodeclient.DefaultListOptions(1, filter)
 
 	if startingToken != "" {
 		page, errParse := strconv.ParseInt(startingToken, 10, 0)
@@ -393,6 +408,10 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	entries := make([]*csi.ListVolumesResponse_Entry, 0, len(volumes))
 	for volNum := range volumes {
+		// The API filter matches substrings, so enforce the prefix here.
+		if !strings.HasPrefix(volumes[volNum].Label, filterPrefix) {
+			continue
+		}
 		csiVol, publishedNodeIds, volumeCondition := getVolumeResponse(&volumes[volNum])
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: csiVol,
@@ -403,7 +422,8 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 		})
 	}
 
-	// Only set nextToken if we got a full page and there might be more
+	// Only set nextToken if we got a full page and there might be more. This
+	// intentionally uses the unfiltered page size.
 	if len(volumes) >= linodeclient.DefaultPageSize {
 		nextToken = strconv.Itoa(listOpts.Page + 1)
 	}
@@ -416,6 +436,16 @@ func (cs *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolume
 	log.V(2).Info("Volumes listed")
 	log.V(6).Info("Volumes listed", "response", resp)
 	return resp, nil
+}
+
+// labelContainsFilter builds a Linode API filter matching volumes whose label
+// contains the given string.
+func labelContainsFilter(s string) (string, error) {
+	b, err := json.Marshal(map[string]map[string]string{"label": {"+contains": s}})
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 // ControllerGetCapabilities retrieves the capabilities supported by the

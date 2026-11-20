@@ -21,6 +21,11 @@ tracingPort: 4318
 # (OPTIONAL) Label prefix for the Linode Block Storage volumes created by this driver.
 volumeLabelPrefix: ""
 
+# (OPTIONAL) When true and volumeLabelPrefix is set, ListVolumes only returns volumes whose
+# label starts with volumeLabelPrefix instead of every volume in the Linode account.
+# Defaults to false to preserve the existing behavior.
+listVolumesFilterByPrefix: false
+
 # Default namespace is "kube-system" but it can be set to another namespace
 namespace: kube-system
 

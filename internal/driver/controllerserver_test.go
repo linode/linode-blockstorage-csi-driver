@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -712,6 +713,91 @@ func TestListVolumesPagination(t *testing.T) {
 				t.Errorf("next token = %q, want %q", response.GetNextToken(), test.expectedNextToken)
 			}
 		})
+	}
+}
+
+func TestListVolumesPrefixFilter(t *testing.T) {
+	volumes := []linodego.Volume{
+		{ID: 1, Label: "csi-pvc-a", Size: 10},
+		{ID: 2, Label: "other-pvc-b", Size: 10},
+		{ID: 3, Label: "my-csi-pvc-c", Size: 10}, // substring match only
+		{ID: 4, Label: "csi-pvc-d", Size: 10},
+	}
+
+	tests := []struct {
+		name          string
+		prefix        string
+		filterEnabled bool
+		wantIDs       []string
+		wantFilter    string
+	}{
+		{
+			name:          "default returns all volumes",
+			prefix:        "csi-",
+			filterEnabled: false,
+			wantIDs:       []string{"1-csi-pvc-a", "2-other-pvc-b", "3-my-csi-pvc-c", "4-csi-pvc-d"},
+		},
+		{
+			name:          "filter enabled without prefix returns all volumes",
+			prefix:        "",
+			filterEnabled: true,
+			wantIDs:       []string{"1-csi-pvc-a", "2-other-pvc-b", "3-my-csi-pvc-c", "4-csi-pvc-d"},
+		},
+		{
+			name:          "filter enabled with prefix returns only matching volumes",
+			prefix:        "csi-",
+			filterEnabled: true,
+			wantIDs:       []string{"1-csi-pvc-a", "4-csi-pvc-d"},
+			wantFilter:    `{"label":{"+contains":"csi-"}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeLinodeClient{volumes: volumes}
+			cs := &ControllerServer{
+				client: client,
+				driver: &LinodeDriver{
+					volumeLabelPrefix:         tt.prefix,
+					listVolumesFilterByPrefix: tt.filterEnabled,
+				},
+			}
+
+			resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
+			if err != nil {
+				t.Fatalf("ListVolumes() error = %v", err)
+			}
+			if client.listOptions.Filter != tt.wantFilter {
+				t.Errorf("filter = %q, want %q", client.listOptions.Filter, tt.wantFilter)
+			}
+
+			var got []string
+			for _, e := range resp.GetEntries() {
+				got = append(got, e.GetVolume().GetVolumeId())
+			}
+			if !slices.Equal(got, tt.wantIDs) {
+				t.Errorf("volume IDs = %v, want %v", got, tt.wantIDs)
+			}
+		})
+	}
+}
+
+func TestListVolumesPrefixFilterPaginationUsesRawPageSize(t *testing.T) {
+	client := &fakeLinodeClient{volumes: make([]linodego.Volume, linodeclient.DefaultPageSize)}
+	cs := &ControllerServer{
+		client: client,
+		driver: &LinodeDriver{volumeLabelPrefix: "csi-", listVolumesFilterByPrefix: true},
+	}
+
+	resp, err := cs.ListVolumes(context.Background(), &csi.ListVolumesRequest{})
+	if err != nil {
+		t.Fatalf("ListVolumes() error = %v", err)
+	}
+	if len(resp.GetEntries()) != 0 {
+		t.Errorf("entries = %d, want 0", len(resp.GetEntries()))
+	}
+	if resp.GetNextToken() != "2" {
+		t.Errorf("next token = %q, want %q", resp.GetNextToken(), "2")
 	}
 }
 
