@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/jaypipes/ghw"
@@ -539,6 +541,72 @@ func TestNodeStageVolume(t *testing.T) {
 				t.Errorf("NodeServer.NodeStageVolume() = %v, want %v", returnedResp, tt.resp)
 			}
 		})
+	}
+}
+
+func TestNodeStageVolumeResolvesDeviceBeforeLockingNode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	deviceutils := mocks.NewMockDeviceUtils(ctrl)
+	lookupStarted := make(chan struct{})
+	continueLookup := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseLookup := func() {
+		releaseOnce.Do(func() { close(continueLookup) })
+	}
+	defer releaseLookup()
+
+	publishedPath := "/dev/publish"
+	byIDPaths := []string{"/dev/disk/by-id/linode-test"}
+	deviceutils.EXPECT().VerifyDevicePath([]string{publishedPath}).DoAndReturn(func([]string) (string, error) {
+		close(lookupStarted)
+		<-continueLookup
+		return "", nil
+	})
+	deviceutils.EXPECT().GetDiskByIdPaths(gomock.Any(), "").Return(byIDPaths)
+	deviceutils.EXPECT().VerifyDevicePath(byIDPaths).Return("", errors.New("stop after lock check"))
+
+	ns := &NodeServer{deviceutils: deviceutils}
+	req := &csi.NodeStageVolumeRequest{
+		VolumeId:          "1000-test",
+		StagingTargetPath: "/mnt/staging",
+		PublishContext:    map[string]string{devicePathKey: publishedPath},
+		VolumeCapability: &csi.VolumeCapability{
+			AccessMode: &csi.VolumeCapability_AccessMode{
+				Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			},
+		},
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := ns.NodeStageVolume(context.Background(), req)
+		done <- err
+	}()
+
+	select {
+	case <-lookupStarted:
+	case err := <-done:
+		t.Fatalf("NodeStageVolume returned before device lookup: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("NodeStageVolume did not start device lookup")
+	}
+
+	lockAvailable := ns.mux.TryLock()
+	if lockAvailable {
+		ns.mux.Unlock()
+	}
+	releaseLookup()
+
+	select {
+	case err := <-done:
+		if status.Code(err) != codes.Internal {
+			t.Fatalf("NodeStageVolume error code = %v, want %v (error: %v)", status.Code(err), codes.Internal, err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("NodeStageVolume did not return after device lookup completed")
+	}
+
+	if !lockAvailable {
+		t.Fatal("NodeStageVolume held the node-wide lock while resolving the device path")
 	}
 }
 
