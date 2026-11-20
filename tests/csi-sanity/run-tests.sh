@@ -32,22 +32,13 @@ SKIP_TESTS_STRING=$(
 # maximum ("san-" + 8 hex chars) and may be overridden via CSI_SANITY_VOLUME_PREFIX.
 VOLUME_PREFIX="${CSI_SANITY_VOLUME_PREFIX:-san-$(openssl rand -hex 4)}"
 echo "Using volume label prefix: ${VOLUME_PREFIX}"
-# socat reaches the node plugin's socket (which also serves the ControllerServer),
-# so the prefix settings must be applied to the node DaemonSet.
-kubectl set env daemonset/csi-linode-node \
-   -n kube-system \
-   -c csi-linode-plugin \
-   LINODE_VOLUME_LABEL_PREFIX="${VOLUME_PREFIX}" \
-   LINODE_LIST_VOLUMES_FILTER_BY_PREFIX="true"
-kubectl rollout status daemonset/csi-linode-node -n kube-system --timeout=300s
-
 # Create socat statefulset
 kubectl apply -f tests/csi-sanity/socat.yaml
 
 # Wait for pod to be ready
 kubectl wait --for=condition=ready --timeout=60s pods/csi-socat-0
 
-# Patch the NodeServer daemonset and add the LINODE_TOKEN and LINODE_API env vars.
+# Patch the NodeServer daemonset with the sanity-test environment variables.
 # The csi-sanity check require CrateVolume and ListVolume calls to be working.
 
 # Warning: This patch expects the csi-linode-plugin container to be the 2nd container
@@ -56,6 +47,22 @@ kubectl patch daemonset csi-linode-node \
    -n kube-system \
    --type='json' \
    -p='[
+    {
+      "op": "add",
+      "path": "/spec/template/spec/containers/1/env/-",
+      "value": {
+        "name": "LINODE_VOLUME_LABEL_PREFIX",
+        "value": "'"${VOLUME_PREFIX}"'"
+      }
+    },
+    {
+      "op": "add",
+      "path": "/spec/template/spec/containers/1/env/-",
+      "value": {
+        "name": "LINODE_LIST_VOLUMES_FILTER_BY_PREFIX",
+        "value": "true"
+      }
+    },
     {
       "op": "add",
       "path": "/spec/template/spec/containers/1/env/-",
