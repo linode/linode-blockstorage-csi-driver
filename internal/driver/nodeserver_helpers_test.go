@@ -328,6 +328,22 @@ func TestNodeServer_resolveStageDevicePath(t *testing.T) {
 		compareGRPCErrors(t, err, errDevicePathNotFound(byIDPaths))
 	})
 
+	t.Run("honors caller deadline before own timeout", func(t *testing.T) {
+		devicePathWaitTimeout = time.Hour
+		ctrl := gomock.NewController(t)
+		dUtils := mocks.NewMockDeviceUtils(ctrl)
+
+		dUtils.EXPECT().GetDiskByIdPaths(gomock.Any(), "").Return(byIDPaths).AnyTimes()
+		dUtils.EXPECT().VerifyDevicePath(gomock.Any()).Return("", nil).MinTimes(2)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer cancel()
+
+		ns := &NodeServer{deviceutils: dUtils}
+		_, err := ns.resolveStageDevicePath(ctx, req, key, "")
+		compareGRPCErrors(t, err, errDevicePathNotFound(byIDPaths))
+	})
+
 	t.Run("does not retry on verification error", func(t *testing.T) {
 		devicePathWaitTimeout = 5 * time.Second
 		ctrl := gomock.NewController(t)

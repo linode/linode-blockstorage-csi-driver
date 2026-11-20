@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
 	filesystem "github.com/linode/linode-blockstorage-csi-driver/pkg/filesystem"
@@ -218,42 +219,45 @@ func errDevicePathNotFound(devicePaths []string) error {
 // available and locally verified, then falls back to the by-id lookup.
 //
 // The Linode API reports a volume as attached before udev has necessarily created
-// the matching /dev/disk/by-id symlink on the node, so the lookup is retried for
-// up to devicePathWaitTimeout before giving up.
+// the matching /dev/disk/by-id symlink on the node, so the lookup is polled until
+// the caller's deadline or devicePathWaitTimeout, whichever comes first.
 func (ns *NodeServer) resolveStageDevicePath(ctx context.Context, req *csi.NodeStageVolumeRequest, key linodevolumes.LinodeVolumeKey, partition string) (string, error) {
 	log, _ := logger.GetLogger(ctx)
 	log.V(4).Info("Entering resolveStageDevicePath", "volumeID", req.GetVolumeId(), "partition", partition)
 
 	publishedPath := req.GetPublishContext()[devicePathKey]
 
-	ctx, cancel := context.WithTimeout(ctx, devicePathWaitTimeout)
-	defer cancel()
-
-	for attempt := 1; ; attempt++ {
+	var (
+		devicePath  string
+		devicePaths []string
+		lookupErr   error
+	)
+	pollErr := wait.PollUntilContextTimeout(ctx, devicePathPollInterval, devicePathWaitTimeout, true, func(context.Context) (bool, error) {
 		if publishedPath != "" {
 			if verified, err := ns.deviceutils.VerifyDevicePath([]string{publishedPath}); err == nil && verified != "" {
 				log.V(4).Info("Using device path from PublishContext", "devicePath", verified)
-				return verified, nil
+				devicePath = verified
+				return true, nil
 			}
 			log.V(4).Info("PublishContext device path was not found on this node, falling back to local lookup", "devicePath", publishedPath)
 		}
 
-		devicePath, devicePaths, err := ns.lookupDevicePath(key, partition)
-		if err != nil {
-			return "", err
+		devicePath, devicePaths, lookupErr = ns.lookupDevicePath(key, partition)
+		if lookupErr != nil {
+			return false, lookupErr
 		}
-		if devicePath != "" {
-			return devicePath, nil
+		if devicePath == "" {
+			log.V(4).Info("Device path not available yet, retrying", "attemptedPaths", devicePaths)
 		}
-
-		log.V(4).Info("Device path not available yet, retrying", "attempt", attempt, "attemptedPaths", devicePaths)
-
-		select {
-		case <-ctx.Done():
-			return "", errDevicePathNotFound(devicePaths)
-		case <-time.After(devicePathPollInterval):
-		}
+		return devicePath != "", nil
+	})
+	if lookupErr != nil {
+		return "", lookupErr
 	}
+	if pollErr != nil {
+		return "", errDevicePathNotFound(devicePaths)
+	}
+	return devicePath, nil
 }
 
 // ensureMountPoint checks if the staging target path is a mount point or not.
