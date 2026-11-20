@@ -43,6 +43,9 @@ type LinodeDriver struct {
 	name              string
 	vendorVersion     string
 	volumeLabelPrefix string
+	// listVolumesFilterByPrefix restricts ListVolumes to volumes whose label
+	// starts with volumeLabelPrefix. It has no effect when the prefix is empty.
+	listVolumesFilterByPrefix bool
 
 	ns  *NodeServer
 	ids *IdentityServer
@@ -89,6 +92,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 	name,
 	vendorVersion,
 	volumeLabelPrefix string,
+	listVolumesFilterByPrefix bool,
 	encrypt Encryption,
 	enableMetrics string,
 	metricsPort string,
@@ -120,6 +124,7 @@ func (linodeDriver *LinodeDriver) SetupLinodeDriver(
 		return errors.New("volume label prefix may only contain: [A-Za-z0-9_-]")
 	}
 	linodeDriver.volumeLabelPrefix = volumeLabelPrefix
+	linodeDriver.listVolumesFilterByPrefix = listVolumesFilterByPrefix
 
 	log.V(2).Info("Setting up RPC Servers")
 
