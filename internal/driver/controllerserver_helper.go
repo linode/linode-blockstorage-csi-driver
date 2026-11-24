@@ -583,15 +583,17 @@ func (cs *ControllerServer) createAndWaitForVolume(ctx context.Context, name str
 		statusPollTimeout = CloneTimeout
 	}
 
-	log.V(4).Info("Waiting for volume to be active", "volumeID", vol.ID)
+	// Keep the ID: WaitForVolumeStatus returns a nil volume on error.
+	volumeID := vol.ID
+	log.V(4).Info("Waiting for volume to be active", "volumeID", volumeID)
 	ctx, cancel := context.WithTimeout(ctx, statusPollTimeout)
 	defer cancel()
-	vol, err = cs.client.WaitForVolumeStatus(ctx, vol.ID, linodego.VolumeActive)
+	vol, err = cs.client.WaitForVolumeStatus(ctx, volumeID, linodego.VolumeActive)
 	if err != nil {
-		return nil, errInternal("Timed out waiting for volume %d to be active: %v", vol.ID, err)
+		return nil, errInternal("Timed out waiting for volume %d to be active: %v", volumeID, err)
 	}
 
-	log.V(4).Info("Volume is active", "volumeID", vol.ID)
+	log.V(4).Info("Volume is active", "volumeID", volumeID)
 	return vol, nil
 }
 
