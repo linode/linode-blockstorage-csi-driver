@@ -357,10 +357,28 @@ func TestCreateAndWaitForVolume(t *testing.T) {
 			setupMocks: func() {
 				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
 				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 101, Size: 50}, nil)
-				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 101, Size: 50}, fmt.Errorf("timed out"))
+				// linodego returns a nil volume when the context expires.
+				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), 101, linodego.VolumeActive).Return(nil, context.DeadlineExceeded)
 			},
 			expectedVolume: nil,
-			expectedError:  errInternal("Timed out waiting for volume 101 to be active: timed out"),
+			expectedError:  errInternal("Timed out waiting for volume 101 to be active: %v", context.DeadlineExceeded),
+		},
+		{
+			name:       "Volume status polling fails",
+			volumeName: "poll-error-volume",
+			sizeGB:     50,
+			parameters: map[string]string{
+				VolumeTags: "tag1,tag2",
+			},
+			sourceInfo: nil,
+			setupMocks: func() {
+				mockClient.EXPECT().ListVolumes(gomock.Any(), gomock.Any()).Return(nil, nil)
+				mockClient.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Return(&linodego.Volume{ID: 102, Size: 50}, nil)
+				// linodego returns a nil volume when GetVolume fails.
+				mockClient.EXPECT().WaitForVolumeStatus(gomock.Any(), 102, linodego.VolumeActive).Return(nil, fmt.Errorf("api error"))
+			},
+			expectedVolume: nil,
+			expectedError:  errInternal("Timed out waiting for volume 102 to be active: api error"),
 		},
 	}
 
