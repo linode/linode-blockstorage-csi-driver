@@ -44,6 +44,9 @@ spec:
             - --csi-address=$(ADDRESS)
             - --feature-gates=Topology=true
             - --v=2
+            {{- with .Values.csiProvisioner.timeout }}
+            - --timeout={{ . }}
+            {{- end }}
             {{- with .Values.controller.kubeconfig }}
               {{- if and .mountDir .secretKey }}
             - --kubeconfig={{ printf "%s/%s" .mountDir .secretKey }}
@@ -136,6 +139,9 @@ spec:
             {{- end }}
             {{- if .Values.enableMetrics}}
             - --metrics-address={{ .Values.csiResizer.metrics.address }}
+            {{- end }}
+            {{- with .Values.csiResizer.timeout }}
+            - --timeout={{ . }}
             {{- end }}
           env:
             - name: ADDRESS
