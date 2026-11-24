@@ -63,6 +63,10 @@ csiProvisioner:
   pullPolicy: IfNotPresent
   # Resource requests and limits for the CSI provisioner container
   resources: {}
+  # Timeout for CreateVolume and DeleteVolume calls to the driver.
+  # The sidecar default (10s) is shorter than volume creation can take.
+  # Leave empty to use the sidecar default.
+  timeout: 60s
   metrics:
     address: "0.0.0.0:10248"
     port: 10248  # Metrics port for csi-provisioner
@@ -83,6 +87,10 @@ csiResizer:
   pullPolicy: IfNotPresent
   # Resource requests and limits for the CSI resizer container
   resources: {}
+  # Timeout for ControllerExpandVolume calls to the driver.
+  # The sidecar default (10s) is shorter than a resize can take.
+  # Leave empty to use the sidecar default.
+  timeout: 60s
   metrics:
     address: "0.0.0.0:10250"
     port: 10250  # Metrics port for csi-resizer

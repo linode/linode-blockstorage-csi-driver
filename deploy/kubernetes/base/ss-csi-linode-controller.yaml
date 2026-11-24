@@ -32,6 +32,7 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--feature-gates=Topology=true"
             - "--v=2"
+            - "--timeout=60s"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
@@ -67,6 +68,7 @@ spec:
           args:
           - "--v=2"
           - "--csi-address=$(ADDRESS)"
+          - "--timeout=60s"
           env:
           - name: ADDRESS
             value: /var/lib/csi/sockets/pluginproxy/csi.sock
