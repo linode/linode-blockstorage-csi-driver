@@ -348,6 +348,8 @@ spec:
           value: https://api.linode.com/v4
         - name: DRIVER_ROLE
           value: controller
+        - name: LINODE_SKIP_METADATA_SERVICE
+          value: "true"
         - name: NODE_NAME
           valueFrom:
             fieldRef:
