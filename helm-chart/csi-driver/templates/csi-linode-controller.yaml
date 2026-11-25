@@ -181,6 +181,11 @@ spec:
               value: {{ .Values.volumeLabelPrefix | default "" | quote }}
             - name: LINODE_LIST_VOLUMES_FILTER_BY_PREFIX
               value: {{ .Values.listVolumesFilterByPrefix | default false | quote }}
+            # The metadata service (169.254.169.254) is only reachable from the host
+            # network. On the pod network every lookup would just time out, so go
+            # straight to the product_serial / Kubernetes API fallbacks.
+            - name: LINODE_SKIP_METADATA_SERVICE
+              value: {{ not .Values.controller.hostNetwork | quote }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

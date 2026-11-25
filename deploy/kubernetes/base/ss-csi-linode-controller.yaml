@@ -89,6 +89,11 @@ spec:
               value: https://api.linode.com/v4
             - name: DRIVER_ROLE
               value: controller
+            # The metadata service (169.254.169.254) is only reachable from the host
+            # network; this pod runs on the pod network, so use the product_serial /
+            # Kubernetes API (NODE_NAME) fallbacks instead of waiting for a timeout.
+            - name: LINODE_SKIP_METADATA_SERVICE
+              value: "true"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

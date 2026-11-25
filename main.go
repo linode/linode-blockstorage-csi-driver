@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/ianschenck/envflag"
@@ -59,6 +60,13 @@ type configuration struct {
 	// volumes whose label starts with volumeLabelPrefix.
 	listVolumesFilterByPrefix bool
 
+	// When true, do not query the Linode metadata service (169.254.169.254) on
+	// start-up and use the product_serial / Kubernetes API fallbacks instead.
+	skipMetadataService bool
+
+	// Upper bound for the metadata service lookup on start-up.
+	metadataServiceTimeout time.Duration
+
 	// Name of the current node, when running as the node plugin.
 	//
 	// Deprecated: This is not needed as the CSI driver now uses the Linode
@@ -87,6 +95,8 @@ func loadConfig() configuration {
 	envflag.StringVar(&cfg.linodeURL, "LINODE_URL", fmt.Sprintf("%s://%s", linodego.APIProto, linodego.APIHost), "Linode API URL")
 	envflag.StringVar(&cfg.volumeLabelPrefix, "LINODE_VOLUME_LABEL_PREFIX", "", "Linode Block Storage volume label prefix")
 	envflag.BoolVar(&cfg.listVolumesFilterByPrefix, "LINODE_LIST_VOLUMES_FILTER_BY_PREFIX", false, "Only return volumes whose label starts with LINODE_VOLUME_LABEL_PREFIX from ListVolumes")
+	envflag.BoolVar(&cfg.skipMetadataService, "LINODE_SKIP_METADATA_SERVICE", false, "Do not query the Linode metadata service on start-up; use the product_serial and Kubernetes API fallbacks instead")
+	envflag.DurationVar(&cfg.metadataServiceTimeout, "LINODE_METADATA_SERVICE_TIMEOUT", 5*time.Second, "Upper bound for the Linode metadata service lookup on start-up (0 disables the bound)")
 	envflag.StringVar(&cfg.nodeName, "NODE_NAME", "", "Name of the current node") // deprecated
 	envflag.StringVar(&cfg.enableMetrics, "ENABLE_METRICS", "", "This flag conditionally runs the metrics servers")
 	envflag.StringVar(&cfg.metricsPort, "METRICS_PORT", "8081", "This flag specifies the port on which the metrics https server will run")
@@ -163,7 +173,10 @@ func handle(ctx context.Context) error {
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 	resizer := mount.NewResizeFs(mounter.Exec)
 
-	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem)
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem, driver.MetadataOptions{
+		SkipMetadataService:    cfg.skipMetadataService,
+		MetadataServiceTimeout: cfg.metadataServiceTimeout,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get node metadata: %w", err)
 	}

@@ -129,6 +129,8 @@ Generates release manifests and Helm chart in `release/` directory.
 - Volume names use prefix pattern: `pvc-{uuid}` for K8s PVC integration
 - Optional volume label prefix via `LINODE_VOLUME_LABEL_PREFIX` (max 12 chars, regex: `^[0-9A-Za-z_-]{0,12}$`)
 - `LINODE_LIST_VOLUMES_FILTER_BY_PREFIX=true` (default false) makes `ListVolumes` return only volumes whose label starts with the prefix; otherwise all account volumes are listed
+- `LINODE_SKIP_METADATA_SERVICE=true` (default false) skips the Linode metadata service on start-up and resolves node metadata via `product_serial` / the Kubernetes API (`NODE_NAME` + node `providerID`); the chart sets it for the controller unless `controller.hostNetwork` is enabled
+- `LINODE_METADATA_SERVICE_TIMEOUT` (default `5s`, `0` disables) bounds the metadata service lookup so an unreachable service does not block start-up for the HTTP dial timeout (30s)
 - Volume tags support via CSI parameters (`volumeTags` annotation)
 - Volume IDs are plugin-generated and MUST be unique within plugin scope
 

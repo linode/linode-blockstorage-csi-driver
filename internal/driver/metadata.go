@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	metadata "github.com/linode/go-metadata"
 	"github.com/linode/linodego/v2"
@@ -62,28 +63,28 @@ var newKubeClient = func(ctx context.Context) (KubeClient, error) {
 	return &kubeClient{client: client}, nil
 }
 
+// MetadataOptions controls how GetNodeMetadata uses the Linode metadata service.
+type MetadataOptions struct {
+	// SkipMetadataService skips the metadata service and goes straight to the
+	// product_serial and Kubernetes API fallbacks. Set it when the driver runs
+	// on the pod network (typically the controller), where 169.254.169.254 is
+	// not reachable and every attempt would only time out.
+	SkipMetadataService bool
+
+	// MetadataServiceTimeout bounds the whole metadata service lookup (token
+	// creation and instance query). Zero means no additional bound, in which
+	// case an unreachable service is only given up on after the HTTP client's
+	// own dial timeout (30s), longer than the CSI sidecars wait for the socket.
+	MetadataServiceTimeout time.Duration
+}
+
 // GetNodeMetadata retrieves metadata about the current node/instance.
-func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string, fileSystem filesystem.FileSystem) (Metadata, error) {
+func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClient, nodeName string, fileSystem filesystem.FileSystem, opts MetadataOptions) (Metadata, error) {
 	log, ctx := logger.GetLogger(ctx)
 	var instance *linodego.Instance
 
-	// Step 1: Attempt to create the metadata client
-	log.V(4).Info("Attempting to create metadata client")
-	linodeMetadataClient, err := NewMetadataClient(ctx)
-	if err != nil {
-		log.Error(err, "Failed to create metadata client")
-		linodeMetadataClient = nil
-	}
-
-	// Step 2: Try to get metadata from metadata service
-	var nodeMetadata Metadata
-	if linodeMetadataClient != nil {
-		log.V(4).Info("Attempting to get metadata from metadata service")
-		nodeMetadata, err = GetMetadata(ctx, linodeMetadataClient)
-		if err != nil {
-			log.Error(err, "Failed to get metadata from metadata service")
-		}
-	}
+	// Steps 1 and 2: Try the metadata service, unless it is known to be unreachable.
+	nodeMetadata := getMetadataFromService(ctx, opts)
 	if nodeMetadata.ID != 0 {
 		return nodeMetadata, nil
 	}
@@ -168,6 +169,41 @@ func GetNodeMetadata(ctx context.Context, cloudProvider linodeclient.LinodeClien
 	)
 
 	return nodeMetadata, nil
+}
+
+// getMetadataFromService queries the Linode metadata service within the bounds
+// set by opts. It returns an empty Metadata if the service is skipped or fails,
+// so that the caller can fall back to other sources.
+func getMetadataFromService(ctx context.Context, opts MetadataOptions) Metadata {
+	log, ctx := logger.GetLogger(ctx)
+
+	if opts.SkipMetadataService {
+		log.V(2).Info("Skipping metadata service as configured")
+		return Metadata{}
+	}
+
+	if opts.MetadataServiceTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, opts.MetadataServiceTimeout)
+		defer cancel()
+	}
+
+	// Step 1: Attempt to create the metadata client
+	log.V(4).Info("Attempting to create metadata client", "timeout", opts.MetadataServiceTimeout)
+	linodeMetadataClient, err := NewMetadataClient(ctx)
+	if err != nil {
+		log.Error(err, "Failed to create metadata client")
+		return Metadata{}
+	}
+
+	// Step 2: Try to get metadata from metadata service
+	log.V(4).Info("Attempting to get metadata from metadata service")
+	nodeMetadata, err := GetMetadata(ctx, linodeMetadataClient)
+	if err != nil {
+		log.Error(err, "Failed to get metadata from metadata service")
+		return Metadata{}
+	}
+	return nodeMetadata
 }
 
 // GetMetadata retrieves information about the current node/instance from the

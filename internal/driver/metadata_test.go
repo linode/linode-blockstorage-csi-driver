@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	metadata "github.com/linode/go-metadata"
 	"github.com/linode/linodego/v2"
@@ -126,6 +127,7 @@ func TestGetNodeMetadata(t *testing.T) {
 		expectedErr        string
 		metadataClientFunc func(context.Context) (MetadataClient, error)
 		nodeName           string
+		opts               MetadataOptions
 	}{
 		{
 			name: "Successful retrieval from metadata service",
@@ -352,6 +354,53 @@ func TestGetNodeMetadata(t *testing.T) {
 			},
 			nodeName: "test-node",
 		},
+		{
+			name: "Metadata service skipped, successful retrieval from kube API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{ProviderID: "linode://789"},
+				}, nil)
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(789)).Return(&linodego.Instance{
+					ID:     789,
+					Label:  "controller-node",
+					Region: "us-ord",
+					Specs:  &linodego.InstanceSpec{Memory: 4096},
+				}, nil)
+			},
+			expectedMetadata: Metadata{ID: 789, Label: "controller-node", Region: "us-ord", Memory: 4 << 30},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				panic("metadata client must not be created when the metadata service is skipped")
+			},
+			nodeName: "test-node",
+			opts:     MetadataOptions{SkipMetadataService: true},
+		},
+		{
+			name: "Metadata service times out, successful retrieval from kube API",
+			setupMocks: func(mockKubeClient *mocks.MockKubeClient, mockCloudProvider *mocks.MockLinodeClient, mockFileSystem *mocks.MockFileSystem) {
+				// Simulate an unreachable metadata service: the request only returns once the context is done.
+				mockMetadataClient.EXPECT().GetInstance(gomock.Any()).DoAndReturn(func(ctx context.Context) (*metadata.InstanceData, error) {
+					<-ctx.Done()
+					return nil, ctx.Err()
+				})
+				mockFileSystem.EXPECT().Open("/sys/devices/virtual/dmi/id/product_serial").Return(nil, os.ErrNotExist)
+				mockKubeClient.EXPECT().GetNode(gomock.Any(), gomock.Eq("test-node")).Return(&corev1.Node{
+					Spec: corev1.NodeSpec{ProviderID: "linode://321"},
+				}, nil)
+				mockCloudProvider.EXPECT().GetInstance(gomock.Any(), gomock.Eq(321)).Return(&linodego.Instance{
+					ID:     321,
+					Label:  "slow-metadata",
+					Region: "nl-ams",
+					Specs:  &linodego.InstanceSpec{Memory: 2048},
+				}, nil)
+			},
+			expectedMetadata: Metadata{ID: 321, Label: "slow-metadata", Region: "nl-ams", Memory: 2 << 30},
+			metadataClientFunc: func(context.Context) (MetadataClient, error) {
+				return mockMetadataClient, nil
+			},
+			nodeName: "test-node",
+			opts:     MetadataOptions{MetadataServiceTimeout: 50 * time.Millisecond},
+		},
 	}
 
 	for _, tt := range tests {
@@ -377,7 +426,7 @@ func TestGetNodeMetadata(t *testing.T) {
 			}()
 
 			// Execute the function under test
-			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, tt.nodeName, mockFileSystem)
+			nodeMetadata, err := GetNodeMetadata(context.Background(), mockCloudProvider, tt.nodeName, mockFileSystem, tt.opts)
 
 			// Check results
 			if tt.expectedErr != "" {
