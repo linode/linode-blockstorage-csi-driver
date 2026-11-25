@@ -106,6 +106,15 @@ func loadConfig() configuration {
 	return cfg
 }
 
+// metadataOptions returns how the driver should use the Linode metadata
+// service when resolving node metadata on start-up.
+func (cfg *configuration) metadataOptions() driver.MetadataOptions {
+	return driver.MetadataOptions{
+		SkipMetadataService:    cfg.skipMetadataService,
+		MetadataServiceTimeout: cfg.metadataServiceTimeout,
+	}
+}
+
 func main() {
 	// Create a base context with the logger
 	log, ctx := logger.NewLogger(context.Background())
@@ -173,10 +182,7 @@ func handle(ctx context.Context) error {
 	encrypt := driver.NewLuksEncryption(mounter.Exec, fileSystem, cryptSetup)
 	resizer := mount.NewResizeFs(mounter.Exec)
 
-	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem, driver.MetadataOptions{
-		SkipMetadataService:    cfg.skipMetadataService,
-		MetadataServiceTimeout: cfg.metadataServiceTimeout,
-	})
+	nodeMetadata, err := driver.GetNodeMetadata(ctx, cloudProvider, cfg.nodeName, fileSystem, cfg.metadataOptions())
 	if err != nil {
 		return fmt.Errorf("failed to get node metadata: %w", err)
 	}
