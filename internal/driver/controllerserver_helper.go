@@ -802,3 +802,95 @@ func (cs *ControllerServer) attachVolume(ctx context.Context, volumeID, linodeID
 	}
 	return nil // Return nil if the volume is successfully attached.
 }
+
+var (
+	// detachTimeout bounds the whole detach operation, including any
+	// re-issued detach requests. If the volume is still attached afterwards,
+	// ControllerUnpublishVolume fails so that the CO retries it later.
+	detachTimeout = WaitTimeout
+
+	// detachRetryInterval is how long to wait for a detach to take effect
+	// before asking the Linode API to detach the volume again.
+	//
+	// The API accepts a detach request that is sent while (or immediately
+	// after) the volume_attach job finishes, but the resulting volume_detach
+	// event can then stay pending indefinitely and the volume never detaches.
+	// Sending the detach request again releases such a volume within seconds.
+	detachRetryInterval = 30 * time.Second
+)
+
+// detachVolume detaches the volume and waits until the Linode API reports it
+// as detached. While the volume stays attached, the detach request is
+// re-issued every detachRetryInterval, until detachTimeout expires and an
+// error is returned. attachedTo is the instance the volume was attached to
+// when the detach was requested; a detach is never re-issued once the volume
+// is attached to a different instance.
+func (cs *ControllerServer) detachVolume(ctx context.Context, volumeID int, attachedTo *int) error {
+	log, ctx := logger.GetLogger(ctx)
+	log.V(4).Info("Entering detachVolume()", "volume_id", volumeID)
+	defer log.V(4).Info("Exiting detachVolume()")
+
+	ctx, cancel := context.WithTimeout(ctx, detachTimeout)
+	defer cancel()
+
+	var lastErr error
+	for attempt := 1; ; attempt++ {
+		issueDetach := true
+		if attempt > 1 {
+			// Re-check the volume before re-issuing the detach: it may have
+			// been detached (or deleted) in the meantime, or even attached to
+			// another instance, which must not be detached.
+			volume, err := cs.client.GetVolume(ctx, volumeID)
+			switch {
+			case linodego.IsNotFound(err):
+				return nil
+			case err != nil:
+				lastErr = fmt.Errorf("get volume: %w", err)
+				issueDetach = false
+			case volume.LinodeID == nil:
+				return nil
+			case attachedTo != nil && *volume.LinodeID != *attachedTo:
+				log.V(2).Info("Volume is now attached to a different instance, not re-issuing detach",
+					"volume_id", volumeID, "detached_from", *attachedTo, "attached_to", *volume.LinodeID)
+				return nil
+			}
+		}
+
+		if issueDetach {
+			if attempt > 1 {
+				log.V(2).Info("Volume is still attached, re-issuing detach", "volume_id", volumeID, "attempt", attempt, "last_error", lastErr)
+			}
+			if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				if attempt == 1 {
+					return errInternal("detach volume %d: %v", volumeID, err)
+				}
+				// The first detach was accepted; keep waiting for it rather
+				// than failing on an error from a re-issued request.
+				lastErr = fmt.Errorf("re-issue detach: %w", err)
+			}
+		}
+
+		waitCtx, waitCancel := context.WithTimeout(ctx, detachRetryInterval)
+		_, err := cs.client.WaitForVolumeLinodeID(waitCtx, volumeID, nil)
+		waitCancel()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		if ctx.Err() != nil {
+			return errInternal("wait for volume %d to detach: volume still attached after %s and %d detach attempt(s): %v",
+				volumeID, detachTimeout, attempt, lastErr)
+		}
+		if waitCtx.Err() == nil {
+			// The wait failed before its own deadline (e.g. an API error),
+			// pause briefly so a persistent error does not spin the loop.
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+			}
+		}
+	}
+}

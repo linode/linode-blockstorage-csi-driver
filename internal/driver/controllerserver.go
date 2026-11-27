@@ -293,20 +293,9 @@ func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *
 	}
 
 	log.V(4).Info("Executing detach volume")
-	if err := cs.client.DetachVolume(ctx, volumeID); linodego.IsNotFound(err) {
+	if err := cs.detachVolume(ctx, volumeID, volume.LinodeID); err != nil {
 		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		return &csi.ControllerUnpublishVolumeResponse{}, nil
-	} else if err != nil {
-		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("detach volume %d: %v", volumeID, err)
-	}
-
-	log.V(4).Info("Waiting for volume to detach")
-	ctx, cancel := context.WithTimeout(ctx, WaitTimeout)
-	defer cancel()
-	if _, err := cs.client.WaitForVolumeLinodeID(ctx, volumeID, nil); err != nil {
-		observability.RecordMetrics(observability.ControllerUnpublishVolumeTotal, observability.ControllerUnpublishVolumeDuration, observability.Failed, functionStartTime)
-		return &csi.ControllerUnpublishVolumeResponse{}, errInternal("wait for volume %d to detach: %v", volumeID, err)
+		return &csi.ControllerUnpublishVolumeResponse{}, err
 	}
 
 	// Record function completion
