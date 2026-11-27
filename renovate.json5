@@ -18,7 +18,8 @@
   "platformAutomerge": true,
   "kubernetes": {
     "managerFilePatterns": [
-      "/deploy/kubernetes/.+\\.yaml$/"
+      "/deploy/kubernetes/.+\\.yaml$/",
+      "/internal/driver/deploy/releases/.+\\.yaml$/"
     ]
   },
   "customManagers": [
